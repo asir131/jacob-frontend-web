@@ -75,7 +75,7 @@ export default function CategoriesPage() {
                  className="group bg-white p-8 rounded-[2.5rem] border border-slate-100 flex flex-col items-center text-center hover:shadow-2xl hover:shadow-[#2286BE]/10 hover:-translate-y-2 transition-all duration-300"
                >
                   <div className={`h-20 w-20 ${cat.color} rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
-                     {React.cloneElement(cat.icon as React.ReactElement, { size: 40 })}
+                     {React.cloneElement(cat.icon as any, { size: 40 })}
                   </div>
                   <h3 className="text-xl font-black text-slate-900 mb-1">{cat.name}</h3>
                   <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">{cat.count} Services</p>
