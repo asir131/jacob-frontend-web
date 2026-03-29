@@ -66,7 +66,7 @@ export default function PostRequestClient() {
            </div>
            <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4">Post a Custom Request</h1>
            <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto font-medium leading-relaxed">
-             Can't find exactly what you're looking for? Tell us your needs, and we'll connect you with top local experts on {BRAND.name}.
+             Can&apos;t find exactly what you&apos;re looking for? Tell us your needs, and we&apos;ll connect you with top local experts on {BRAND.name}.
            </p>
         </motion.div>
 
@@ -179,7 +179,7 @@ export default function PostRequestClient() {
                          <h3 className="text-xl font-black text-slate-900">Budget?</h3>
                       </div>
                       <div className="relative group">
-                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 font-black text-lg group-focus-within:text-[#2286BE] transition-colors">৳</span>
+                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 font-black text-lg group-focus-within:text-[#2286BE] transition-colors">$</span>
                          <Input type="number" placeholder="Enter your estimated budget" className="h-14 pl-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] bg-slate-50/50 font-black text-lg" />
                       </div>
                       <p className="text-xs text-slate-400 mt-4 font-medium">Providers can negotiate if your budget is flexible.</p>

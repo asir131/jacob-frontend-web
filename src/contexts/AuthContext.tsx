@@ -25,27 +25,27 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>('client');
-  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Default to logged in for the mock
 
-  // Simulation of auth state synchronization
-  useEffect(() => {
-    // In a real app, this would check localStorage/session for an existing session
-    const mockUser: User = {
+  // Derived user state
+  const user = React.useMemo(() => {
+    if (!isAuthenticated) return null;
+    return {
       id: 'USR-123',
       name: 'John Doe',
       email: 'john@example.com',
       avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       role: role,
     };
-    setUser(mockUser);
-  }, [role]);
+  }, [role, isAuthenticated]);
 
   const login = (newRole: Role = 'client') => {
     setRole(newRole);
+    setIsAuthenticated(true);
   };
 
   const logout = () => {
-    setUser(null);
+    setIsAuthenticated(false);
     setRole('client');
   };
 

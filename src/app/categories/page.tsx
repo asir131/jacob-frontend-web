@@ -95,7 +95,7 @@ export default function CategoriesPage() {
            <div className="relative z-10">
               <h2 className="text-4xl font-black text-white mb-6">Need a custom service?</h2>
               <p className="text-slate-400 text-lg font-medium max-w-xl mx-auto mb-10">
-                If you can't find what you're looking for, post a custom request and we'll find the best provider for you.
+                If you can&apos;t find what you&apos;re looking for, post a custom request and we&apos;ll find the best provider for you.
               </p>
               <Link
                 href="/post-request"

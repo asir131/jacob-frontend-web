@@ -26,7 +26,7 @@ export default function SavedServicesPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
              <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Saved Services</h1>
-             <p className="text-slate-500 font-medium">Manage the professionals you've love and plan to hire.</p>
+             <p className="text-slate-500 font-medium">Manage the professionals you&apos;ve love and plan to hire.</p>
           </motion.div>
           <div className="flex items-center gap-3">
              <Badge className="bg-[#2286BE]/10 text-[#2286BE] border-none font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl">

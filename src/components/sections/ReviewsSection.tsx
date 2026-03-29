@@ -131,7 +131,7 @@ export default function ReviewsSection() {
 
                {/* Feedback Text */}
                <blockquote className="text-[22px] md:text-[28px] font-bold text-slate-800 leading-[1.4] tracking-tight">
-                  "{reviews[activeIndex].review}"
+                  &quot;{reviews[activeIndex].review}&quot;
                </blockquote>
 
                {/* Location Detail */}

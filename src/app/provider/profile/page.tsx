@@ -7,7 +7,7 @@ import {
   Phone, Mail, ChevronRight, Save, Eye, EyeOff, Briefcase,
   Banknote, Building2, Plus, X, Lock, Smartphone, Monitor,
   Trash2, Check, Tag, Clock, DollarSign, ImagePlus, AlertTriangle,
-  CheckCircle2, ShieldCheck, Info
+  CheckCircle2, ShieldCheck, Info, Settings
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -134,6 +134,7 @@ export default function ProviderProfilePage() {
                   { id: 'profile', icon: <User size={18} />, label: 'Business Profile' },
                   { id: 'business', icon: <Briefcase size={18} />, label: 'Service Details' },
                   { id: 'payouts', icon: <Banknote size={18} />, label: 'Payout Info' },
+                  { id: 'billing', icon: <CreditCard size={18} />, label: 'Billing & Stripe' },
                   { id: 'security', icon: <Shield size={18} />, label: 'Security' },
                   { id: 'notifications', icon: <Bell size={18} />, label: 'Notifications' },
                 ].map(item => (
@@ -238,7 +239,7 @@ export default function ProviderProfilePage() {
                     <motion.div key="business" {...sectionAnim} className="space-y-12">
                       <div>
                         <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Service Details</h3>
-                        <p className="text-slate-500 font-medium">Configure what you offer, when you're available, and how much you charge.</p>
+                        <p className="text-slate-500 font-medium">Configure what you offer, when you&apos;re available, and how much you charge.</p>
                       </div>
 
                       {/* Category & Pricing */}
@@ -261,8 +262,8 @@ export default function ProviderProfilePage() {
                         <div className="space-y-3">
                           <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Base Hourly Rate</label>
                           <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg select-none">৳</span>
-                            <Input type="number" defaultValue="850" className="h-16 pl-10 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-black text-xl" />
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg select-none">$</span>
+                            <Input type="number" defaultValue="35" className="h-16 pl-10 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-black text-xl" />
                             <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 uppercase tracking-wider">/ hr</span>
                           </div>
                         </div>
@@ -590,6 +591,59 @@ export default function ProviderProfilePage() {
                         <Button onClick={() => handleSave('Notification preferences')} className="bg-[#2286BE] hover:bg-[#059669] font-black rounded-2xl px-14 h-16 shadow-2xl shadow-primary/20 active:scale-95 transition-all text-lg">
                           <Save size={20} className="mr-3" /> Save Preferences
                         </Button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === 'billing' && (
+                    <motion.div key="billing" {...sectionAnim} className="space-y-12">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                          <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Billing & Stripe</h3>
+                          <p className="text-slate-500 font-medium">Manage your subscription, platform fees, and payment methods via Stripe.</p>
+                        </div>
+                        <Button className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-2xl h-14 px-8 shadow-xl shadow-[#2286BE]/20 transition-all">
+                          <Plus size={20} className="mr-2" /> Add New Card
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <div className="bg-slate-950 rounded-[2.5rem] p-10 text-white relative overflow-hidden group hover:scale-[1.02] transition-all duration-500 shadow-2xl shadow-slate-200/50">
+                            <div className="relative z-10 flex flex-col justify-between h-44">
+                               <div className="flex justify-between items-start">
+                                  <div className="h-10 w-14 bg-white/10 rounded-xl backdrop-blur-md flex items-center justify-center font-black italic text-sm">VISA</div>
+                                  <Badge className="bg-emerald-400 text-white border-none font-black text-[10px] uppercase px-4 py-1.5 rounded-lg">Active</Badge>
+                               </div>
+                               <div>
+                                  <p className="font-mono text-2xl tracking-[0.25em] mb-6">•••• •••• •••• 4242</p>
+                                  <div className="flex justify-between items-end">
+                                     <div><p className="text-[10px] opacity-40 uppercase font-black tracking-widest mb-1">Expires</p><p className="font-bold underline underline-offset-4 decoration-[#2286BE]/50">12/26</p></div>
+                                     <button className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all"><Settings size={18}/></button>
+                                  </div>
+                               </div>
+                            </div>
+                         </div>
+
+                         <Card className="border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center p-10 hover:bg-slate-50 hover:border-[#2286BE]/20 transition-all group">
+                            <div className="h-16 w-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:scale-110 group-hover:text-[#2286BE] transition-all">
+                               <CreditCard size={32} />
+                            </div>
+                            <span className="mt-4 font-black text-slate-400 group-hover:text-slate-900 transition-colors uppercase tracking-widest text-xs">Link Secondary Card</span>
+                         </Card>
+                      </div>
+
+                      <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                         <div className="p-8 border-b border-slate-50 font-black text-xs uppercase tracking-[0.2em] text-slate-400">Merchant Settings</div>
+                         <div className="p-8 space-y-6">
+                            <div className="flex items-center justify-between">
+                               <div><p className="font-black text-slate-900 mb-1">Stripe Connect Account</p><p className="text-xs text-slate-500 font-medium tracking-tight">Status: <span className="text-emerald-500 font-black">Verified & Connected</span></p></div>
+                               <Button variant="outline" className="rounded-xl font-bold h-11 px-6 text-[#2286BE] border-[#2286BE]">Open Stripe Dashboard</Button>
+                            </div>
+                            <div className="flex items-center justify-between">
+                               <div><p className="font-black text-slate-900 mb-1">Platform Invoicing</p><p className="text-xs text-slate-500 font-medium tracking-tight">Auto-generate invoices for all completed orders.</p></div>
+                               <Switch defaultChecked />
+                            </div>
+                         </div>
                       </div>
                     </motion.div>
                   )}

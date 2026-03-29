@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -154,8 +155,8 @@ export default function ClientDashboardClient() {
                                 </div>
                              </div>
                              <div className="mt-3 sm:mt-0 text-right">
-                                <p className="font-black text-xl text-slate-900 leading-none">৳{order.amount}</p>
-                                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tight">Paid via SSLCommerz</p>
+                                <p className="font-black text-xl text-slate-900 leading-none">${order.amount}</p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tight">Paid via Stripe</p>
                              </div>
                           </div>
                           
@@ -197,7 +198,7 @@ export default function ClientDashboardClient() {
                     className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex gap-4 group cursor-pointer hover:border-[#2286BE]/50 transition-all duration-300"
                    >
                       <div className="h-16 w-16 bg-slate-100 rounded-xl flex-shrink-0 overflow-hidden relative shadow-inner">
-                         <img src={`https://images.unsplash.com/${svc.img}?q=80&w=150&h=150&auto=format&fit=crop`} alt="Service thumbnail" className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" />
+                         <Image src={`https://images.unsplash.com/${svc.img}?q=80&w=150&h=150&auto=format&fit=crop`} alt="Service thumbnail" fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
                       </div>
                       <div className="flex-1 overflow-hidden">
                         <h4 className="font-bold text-slate-800 text-sm line-clamp-1 group-hover:text-[#2286BE] transition-colors">{svc.title}</h4>
@@ -209,7 +210,7 @@ export default function ClientDashboardClient() {
                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight flex items-center">
                               <MapPin size={10} className="mr-1" /> {(1.2 + idx * 0.5).toFixed(1)} km away
                            </p>
-                           <p className="text-xs font-black text-slate-900">৳{svc.price}</p>
+                           <p className="text-xs font-black text-slate-900">${svc.price}</p>
                         </div>
                       </div>
                    </motion.div>

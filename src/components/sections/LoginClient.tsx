@@ -164,7 +164,7 @@ export default function LoginClient() {
                   <Mail size={36} className="text-[#2286BE]" />
                 </div>
                 <h1 className="text-3xl font-black text-slate-900 mb-2">Forgot Password?</h1>
-                <p className="text-slate-500 font-medium">Enter your email and we'll send a verification code.</p>
+                <p className="text-slate-500 font-medium">Enter your email and we&apos;ll send a verification code.</p>
               </div>
               <form onSubmit={(e) => { e.preventDefault(); setView('forgot-otp'); }} className="space-y-5">
                 <div className="relative group">
@@ -213,7 +213,7 @@ export default function LoginClient() {
                 </Button>
               </form>
               <p className="text-center mt-5 text-sm text-slate-400 font-bold">
-                Didn't receive it?{' '}
+                Didn&apos;t receive it?{' '}
                 <button className="text-[#2286BE] font-black hover:underline" onClick={() => { toast.success('Code resent!'); }}>Resend</button>
               </p>
               <button onClick={() => setView('forgot-email')} className="w-full text-center mt-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">← Back</button>

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, Check, CheckCheck, Smile } from 'lucide-react';
+import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, Check, CheckCheck, Smile, Gift, Calendar, DollarSign } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,21 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from 'sonner';
+import Link from 'next/link';
 
 const contacts = [
   {
@@ -58,25 +68,16 @@ const initialMessages = [
     status: 'read',
   },
   {
-    id: 2,
-    senderId: 1,
-    text: 'Perfect. Do I need to provide any specific tools or will you bring everything?',
-    time: '2:12 PM',
-    status: 'received',
-  },
-  {
-    id: 3,
-    senderId: 'me',
-    text: 'I will bring all the necessary tools and supplies. Just make sure the area under the sink is cleared.',
-    time: '2:14 PM',
-    status: 'read',
-  },
-  {
-    id: 4,
-    senderId: 1,
-    text: 'Is the plumbing repair still on for tomorrow?',
-    time: '2:15 PM',
-    status: 'received',
+    id: 5,
+    senderId: 'contact',
+    type: 'offer',
+    offerData: {
+      amount: 45,
+      deliveryTime: '2 Days',
+      description: 'Custom implementation of plumbing repair with premium materials and 6 months warranty.'
+    },
+    status: 'pending',
+    time: '2:30 PM',
   },
 ];
 
@@ -95,9 +96,13 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const [activeCall, setActiveCall] = useState<'voice' | 'video' | null>(null);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [offerForm, setOfferForm] = useState({ amount: '', deliveryTime: '2 Days', description: '' });
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!newMessage.trim()) return;
 
     const msg = {
@@ -110,6 +115,46 @@ export default function MessagesPage() {
 
     setMessages([...messages, msg]);
     setNewMessage('');
+  };
+
+  const handleAction = (action: string) => {
+    toast.success(`Action: ${action} processed.`);
+  };
+
+  const startCall = (type: 'voice' | 'video') => {
+    setActiveCall(type);
+  };
+
+  const handleSendOffer = () => {
+    if (!offerForm.amount || !offerForm.description) return;
+    
+    const msg = {
+      id: messages.length + 1,
+      senderId: 'me',
+      type: 'offer',
+      offerData: {
+        amount: parseInt(offerForm.amount),
+        deliveryTime: offerForm.deliveryTime,
+        description: offerForm.description
+      },
+      status: 'pending',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessages([...messages, msg]);
+    setIsOfferModalOpen(false);
+    setOfferForm({ amount: '', deliveryTime: '2 Days', description: '' });
+    toast.success('Custom offer sent successfully!');
+  };
+
+  const handleOfferResponse = (id: number, response: 'accepted' | 'declined') => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, status: response } : m));
+    toast.success(`Offer ${response}.`);
+    if (response === 'accepted') {
+      setTimeout(() => {
+        toast.info("Redirecting to order confirmation...");
+      }, 1000);
+    }
   };
 
   return (
@@ -213,13 +258,28 @@ export default function MessagesPage() {
             </div>
             
             <div className="flex items-center gap-1">
-               <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl">
+               <Button 
+                variant="ghost" 
+                size="icon" 
+                className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl"
+                onClick={() => startCall('voice')}
+              >
                   <Phone size={20} />
                </Button>
-               <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl">
+               <Button 
+                variant="ghost" 
+                size="icon" 
+                className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl"
+                onClick={() => startCall('video')}
+              >
                   <Video size={20} />
                </Button>
-               <Button variant="ghost" size="icon" className="text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl">
+               <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl transition-colors ${isInfoPanelOpen ? 'text-[#2286BE] bg-primary-soft' : ''}`}
+                onClick={() => setIsInfoPanelOpen(!isInfoPanelOpen)}
+              >
                   <Info size={20} />
                </Button>
                <DropdownMenu>
@@ -229,9 +289,24 @@ export default function MessagesPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl">
-                    <DropdownMenuItem className="py-2.5 rounded-lg cursor-pointer">Clear History</DropdownMenuItem>
-                    <DropdownMenuItem className="py-2.5 rounded-lg cursor-pointer">Block User</DropdownMenuItem>
-                    <DropdownMenuItem className="py-2.5 rounded-lg cursor-pointer text-red-600">Report</DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleAction('History Cleared')}
+                      className="py-2.5 rounded-lg cursor-pointer"
+                    >
+                      Clear History
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleAction('User Blocked')}
+                      className="py-2.5 rounded-lg cursor-pointer"
+                    >
+                      Block User
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleAction('Report Submitted')}
+                      className="py-2.5 rounded-lg cursor-pointer text-red-600 font-bold"
+                    >
+                      Report User
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                </DropdownMenu>
             </div>
@@ -252,26 +327,69 @@ export default function MessagesPage() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       className={`flex ${message.senderId === 'me' ? 'justify-end' : 'justify-start'}`}
                     >
-                       <div className={`
-                         max-w-[80%] md:max-w-[70%] lg:max-w-[60%] px-5 py-3.5 rounded-[2rem] shadow-sm relative group
-                         ${message.senderId === 'me' 
-                            ? 'bg-[#2286BE] text-white rounded-br-none' 
-                            : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
-                          }
-                       `}>
-                          <p className="text-sm md:text-base font-medium leading-relaxed">
-                            {message.text}
-                          </p>
-                          <div className={`
-                            flex items-center gap-1.5 mt-1.5 
-                            ${message.senderId === 'me' ? 'justify-end text-white/70' : 'text-slate-400'}
-                          `}>
-                             <span className="text-[10px] font-bold">{message.time}</span>
-                             {message.senderId === 'me' && (
-                               message.status === 'read' ? <CheckCheck size={14} className="text-white" /> : <Check size={14} />
-                             )}
-                          </div>
-                       </div>
+                       {message.type === 'offer' ? (
+                         <div className={`
+                            w-full max-w-sm p-6 rounded-[2.5rem] shadow-2xl border bg-white mb-4
+                            ${message.senderId === 'me' ? 'border-[#2286BE]/30' : 'border-slate-100'}
+                         `}>
+                            <div className="flex items-center gap-3 mb-4">
+                               <div className="h-10 w-10 rounded-xl bg-[#2286BE]/10 text-[#2286BE] flex items-center justify-center">
+                                  <Gift size={20} />
+                               </div>
+                               <div>
+                                  <h4 className="font-black text-slate-900">Custom Offer</h4>
+                                  <p className="text-[10px] uppercase font-bold text-slate-400">Limited time proposal</p>
+                               </div>
+                            </div>
+                            
+                            <p className="text-sm font-medium text-slate-600 mb-6 leading-relaxed">
+                               {message.offerData.description}
+                            </p>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                               <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Budget</p>
+                                  <p className="font-black text-[#2286BE] underline underline-offset-4 decoration-[#2286BE]/40">${message.offerData.amount}</p>
+                               </div>
+                               <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Delivery</p>
+                                  <p className="font-black text-slate-900">{message.offerData.deliveryTime}</p>
+                               </div>
+                            </div>
+
+                            {message.senderId !== 'me' && message.status === 'pending' ? (
+                               <div className="flex flex-col gap-2">
+                                  <Button onClick={() => handleOfferResponse(message.id, 'accepted')} className="w-full bg-[#2286BE] hover:bg-[#1b6da0] font-black h-12 rounded-xl">Accept Offer</Button>
+                                  <Button onClick={() => handleOfferResponse(message.id, 'declined')} variant="outline" className="w-full border-slate-100 font-bold h-12 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50">Decline</Button>
+                               </div>
+                            ) : (
+                               <div className={`p-4 rounded-xl text-center font-black uppercase tracking-widest text-xs border ${message.status === 'accepted' ? 'bg-green-50 text-green-600 border-green-100' : message.status === 'declined' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                  Offer {message.status}
+                               </div>
+                            )}
+                         </div>
+                       ) : (
+                         <div className={`
+                           max-w-[80%] md:max-w-[70%] lg:max-w-[60%] px-5 py-3.5 rounded-[2rem] shadow-sm relative group
+                           ${message.senderId === 'me' 
+                              ? 'bg-[#2286BE] text-white rounded-br-none' 
+                              : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
+                            }
+                         `}>
+                            <p className="text-sm md:text-base font-medium leading-relaxed">
+                              {message.text}
+                            </p>
+                            <div className={`
+                              flex items-center gap-1.5 mt-1.5 
+                              ${message.senderId === 'me' ? 'justify-end text-white/70' : 'text-slate-400'}
+                            `}>
+                               <span className="text-[10px] font-bold">{message.time}</span>
+                               {message.senderId === 'me' && (
+                                 message.status === 'read' ? <CheckCheck size={14} className="text-white" /> : <Check size={14} />
+                               )}
+                            </div>
+                         </div>
+                       )}
                     </motion.div>
                   ))}
                </AnimatePresence>
@@ -280,13 +398,28 @@ export default function MessagesPage() {
 
          {/* Message Input */}
          <footer className="p-6 bg-white border-t border-slate-100">
-            <form 
+             <form 
               onSubmit={handleSendMessage}
               className="max-w-4xl mx-auto flex items-center gap-3 bg-slate-50 h-16 px-4 rounded-[2rem] border border-slate-100 focus-within:border-[#2286BE] focus-within:ring-4 focus-within:ring-[#2286BE]/5 transition-all"
             >
-               <Button type="button" variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
-                  <Paperclip size={20} />
-               </Button>
+               <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
+                       <Paperclip size={20} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56 p-2 rounded-2xl shadow-xl">
+                      <DropdownMenuItem onClick={() => setIsOfferModalOpen(true)} className="py-3 rounded-xl gap-3 cursor-pointer group">
+                        <div className="h-10 w-10 rounded-xl bg-[#2286BE]/10 text-[#2286BE] flex items-center justify-center group-hover:scale-110 transition-transform">
+                           <Gift size={20} />
+                        </div>
+                        <div>
+                           <p className="font-black text-slate-900 group-hover:text-[#2286BE]">Custom Offer</p>
+                           <p className="text-[9px] uppercase font-bold text-slate-400">Send tailored proposal</p>
+                        </div>
+                      </DropdownMenuItem>
+                  </DropdownMenuContent>
+               </DropdownMenu>
                <Input 
                  value={newMessage}
                  onChange={(e) => setNewMessage(e.target.value)}
@@ -310,27 +443,42 @@ export default function MessagesPage() {
          </footer>
       </main>
 
-      {/* Right User Detail Panel (Desktop Only) */}
-      <aside className="hidden lg:flex w-80 border-l border-slate-100 flex-col bg-white">
-          <ScrollArea className="flex-1">
-             <div className="p-8 text-center">
-                <Avatar className="h-24 w-24 mx-auto mb-4 border-4 border-slate-50 ring-2 ring-primary-soft">
-                  <AvatarImage src={selectedContact.avatar} />
-                  <AvatarFallback className="text-2xl font-bold">{selectedContact.name[0]}</AvatarFallback>
-                </Avatar>
-                <h2 className="text-xl font-black text-slate-900">{selectedContact.name}</h2>
-                <p className="text-sm font-bold text-[#2286BE] mb-8">{selectedContact.role}</p>
-                
-                <div className="grid grid-cols-2 gap-4 mb-10">
-                   <div className="p-4 bg-slate-50 rounded-2xl text-center">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Orders</p>
-                      <p className="font-black text-slate-900">12</p>
-                   </div>
-                   <div className="p-4 bg-slate-50 rounded-2xl text-center">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Spent</p>
-                      <p className="font-black text-slate-900">৳8.4k</p>
-                   </div>
-                </div>
+      {/* Right User Detail Panel (Desktop/Toggle View) */}
+      <AnimatePresence>
+        {(isInfoPanelOpen || (typeof window !== 'undefined' && window.innerWidth >= 1024)) && (
+          <motion.aside 
+            initial={{ x: 320, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 320, opacity: 0 }}
+            className={`
+              ${isInfoPanelOpen ? 'fixed inset-y-0 right-0 z-[60] flex shadow-2xl' : 'hidden lg:flex'}
+              w-80 border-l border-slate-100 flex-col bg-white
+            `}
+          >
+            <ScrollArea className="flex-1">
+               <div className="p-8 text-center">
+                  <div className="lg:hidden flex justify-start mb-6">
+                    <Button variant="ghost" size="icon" onClick={() => setIsInfoPanelOpen(false)}>
+                      <ArrowLeft size={20} />
+                    </Button>
+                  </div>
+                  <Avatar className="h-24 w-24 mx-auto mb-4 border-4 border-slate-50 ring-2 ring-primary-soft">
+                    <AvatarImage src={selectedContact.avatar} />
+                    <AvatarFallback className="text-2xl font-bold">{selectedContact.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <h2 className="text-xl font-black text-slate-900">{selectedContact.name}</h2>
+                  <p className="text-sm font-bold text-[#2286BE] mb-8">{selectedContact.role}</p>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-10">
+                     <div className="p-4 bg-slate-50 rounded-2xl text-center">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Orders</p>
+                        <p className="font-black text-slate-900">12</p>
+                     </div>
+                     <div className="p-4 bg-slate-50 rounded-2xl text-center">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Spent</p>
+                        <p className="font-black text-slate-900">$84</p>
+                     </div>
+                  </div>
 
                 <div className="space-y-4 text-left">
                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Shared Files</h4>
@@ -351,11 +499,98 @@ export default function MessagesPage() {
              </div>
           </ScrollArea>
           <div className="p-6 border-t border-slate-50">
-             <Button variant="outline" className="w-full h-12 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors">
+             <Button 
+              variant="outline" 
+              onClick={() => handleAction('Conversation Deleted')}
+              className="w-full h-12 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors"
+             >
                 Delete Conversation
              </Button>
           </div>
-      </aside>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Calling Overlays */}
+      <AnimatePresence>
+        {activeCall && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center text-white"
+          >
+            <Avatar className="h-32 w-32 border-4 border-white/20 mb-8 animate-pulse">
+              <AvatarImage src={selectedContact.avatar} />
+              <AvatarFallback className="text-4xl">{selectedContact.name[0]}</AvatarFallback>
+            </Avatar>
+            <h2 className="text-3xl font-black mb-2">{selectedContact.name}</h2>
+            <p className="text-slate-400 font-bold tracking-widest uppercase text-xs mb-12">
+              {activeCall === 'video' ? 'Initializing Video Call...' : 'Calling...'}
+            </p>
+            
+            <div className="flex gap-8">
+              <Button 
+                onClick={() => setActiveCall(null)}
+                className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600 shadow-2xl shadow-red-500/20"
+              >
+                <Phone size={28} className="rotate-[135deg]" />
+              </Button>
+              {activeCall === 'video' && (
+                <Button className="h-16 w-16 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md">
+                   <Video size={28} />
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Dialog open={isOfferModalOpen} onOpenChange={setIsOfferModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-[2rem] p-8 border-none shadow-2xl overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Create Custom Offer</DialogTitle>
+            <p className="text-slate-500 font-medium">Define your proposal and send it directly to {selectedContact.name}.</p>
+          </DialogHeader>
+          <div className="space-y-6 my-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Offer Budget</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-[#2286BE]">$</div>
+                <Input 
+                  type="number"
+                  placeholder="0.00"
+                  value={offerForm.amount}
+                  onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
+                  className="h-14 pl-10 rounded-2xl border-slate-100 bg-slate-50 focus:ring-[#2286BE]/20 font-black text-lg"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Delivery Time</label>
+              <Input 
+                placeholder="e.g. 2 Days"
+                value={offerForm.deliveryTime}
+                onChange={(e) => setOfferForm({ ...offerForm, deliveryTime: e.target.value })}
+                className="h-14 rounded-2xl border-slate-100 bg-slate-50 font-bold"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Project Details</label>
+              <textarea 
+                placeholder="Describe what is included in this offer..."
+                value={offerForm.description}
+                onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })}
+                className="w-full min-h-[120px] p-4 rounded-2xl border border-slate-100 bg-slate-50 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-[#2286BE]/20 transition-all resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-col gap-3">
+            <Button onClick={handleSendOffer} className="h-14 bg-[#2286BE] hover:bg-[#1b6da0] rounded-[1.2rem] font-black shadow-xl shadow-[#2286BE]/20 text-lg">Send Custom Offer</Button>
+            <Button variant="ghost" onClick={() => setIsOfferModalOpen(false)} className="text-slate-400 font-bold">Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

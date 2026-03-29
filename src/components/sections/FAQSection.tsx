@@ -102,7 +102,7 @@ export default function FAQSection() {
         <div className="mt-16 p-8 rounded-[32px] bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-slate-300">
            <div className="text-center md:text-left">
               <h3 className="text-[22px] font-black mb-2">Still have questions?</h3>
-              <p className="text-slate-400 font-medium">We're here to help you 24/7 with any inquiries.</p>
+              <p className="text-slate-400 font-medium">We&apos;re here to help you 24/7 with any inquiries.</p>
            </div>
            <button 
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-[#2286BE] font-black text-[15px] transition-all hover:bg-[#1b6da0] hover:scale-105 active:scale-95"

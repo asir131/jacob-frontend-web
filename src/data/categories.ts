@@ -13,6 +13,7 @@ export interface Service {
   price: number;
   location: string;
   badge: string;
+  level: string;
   tags: string[];
   image: string;
 }
@@ -36,9 +37,9 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-indigo-600',
     bgGradient: 'from-indigo-100 to-white',
     services: [
-      { id: 101, title: 'Premium Deep Home Cleaning & Organization', rating: 5.0, reviews: 142, price: 150, location: 'Citywide', badge: 'Top Rated', tags: ['In-House', 'Premium', 'Guarantee'], image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' },
-      { id: 102, title: 'Complete Property Maintenance Plan', rating: 4.98, reviews: 89, price: 899, location: 'Citywide', badge: 'Verified', tags: ['Subscription', 'All-in-one'], image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&q=80' },
-      { id: 103, title: 'Luxury Move-in & Move-out Service', rating: 4.95, reviews: 56, price: 500, location: 'Citywide', badge: 'Top Rated', tags: ['Moving', 'VIP'], image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80' },
+      { id: 101, title: 'Premium Deep Home Cleaning & Organization', rating: 5.0, reviews: 142, price: 150, location: 'Citywide', badge: 'Top Rated', level: 'Top Rated', tags: ['In-House', 'Premium', 'Guarantee'], image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' },
+      { id: 102, title: 'Complete Property Maintenance Plan', rating: 4.98, reviews: 89, price: 899, location: 'Citywide', badge: 'Verified', level: 'Level 2', tags: ['Subscription', 'All-in-one'], image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&q=80' },
+      { id: 103, title: 'Luxury Move-in & Move-out Service', rating: 4.95, reviews: 56, price: 500, location: 'Citywide', badge: 'Top Rated', level: 'Top Rated', tags: ['Moving', 'VIP'], image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80' },
     ],
   },
   'cleaning': {
@@ -49,10 +50,10 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-blue-500',
     bgGradient: 'from-blue-50 to-white',
     services: [
-      { id: 1, title: 'Deep Home Cleaning – Full Package', rating: 4.95, reviews: 312, price: 45, location: 'New York, NY', badge: 'Top Rated', tags: ['Eco-Friendly', 'Same Day'], image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&q=80' },
-      { id: 2, title: 'Office Sanitization & Cleaning', rating: 4.87, reviews: 184, price: 85, location: 'Houston, TX', badge: 'Verified', tags: ['Commercial', 'Weekly Plans'], image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=600&q=80' },
-      { id: 3, title: 'Bathroom & Kitchen Deep Clean', rating: 4.92, reviews: 227, price: 800, location: 'Uttara', badge: 'Top Rated', tags: ['Eco-Friendly'], image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80' },
-      { id: 4, title: 'Sofa & Carpet Steam Cleaning', rating: 4.80, reviews: 96, price: 600, location: 'Gulshan', badge: 'Verified', tags: ['Steam Clean'], image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' },
+      { id: 1, title: 'Deep Home Cleaning – Full Package', rating: 4.95, reviews: 312, price: 45, location: 'New York, NY', badge: 'Top Rated', level: 'Top Rated', tags: ['Eco-Friendly', 'Same Day'], image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&q=80' },
+      { id: 2, title: 'Office Sanitization & Cleaning', rating: 4.87, reviews: 184, price: 85, location: 'Houston, TX', badge: 'Verified', level: 'Level 2', tags: ['Commercial', 'Weekly Plans'], image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=600&q=80' },
+      { id: 3, title: 'Bathroom & Kitchen Deep Clean', rating: 4.92, reviews: 227, price: 800, location: 'Uttara', badge: 'Top Rated', level: 'Top Rated', tags: ['Eco-Friendly'], image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80' },
+      { id: 4, title: 'Sofa & Carpet Steam Cleaning', rating: 4.80, reviews: 96, price: 600, location: 'Gulshan', badge: 'Verified', level: 'Level 2', tags: ['Steam Clean'], image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' },
     ],
   },
   'plumbing': {
@@ -63,9 +64,9 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-orange-500',
     bgGradient: 'from-orange-50 to-white',
     services: [
-      { id: 1, title: 'Emergency Pipe Leak Repair', rating: 4.90, reviews: 204, price: 35, location: 'Austin, TX', badge: 'Top Rated', tags: ['Emergency', '24/7'], image: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=600&q=80' },
-      { id: 2, title: 'Bathroom Fixture Installation', rating: 4.82, reviews: 137, price: 900, location: 'Gulshan', badge: 'Verified', tags: ['Installation'], image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600&q=80' },
-      { id: 3, title: 'Drain Unclogging Service', rating: 4.78, reviews: 89, price: 400, location: 'Uttara', badge: 'Verified', tags: ['Same Day'], image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80' },
+      { id: 1, title: 'Emergency Pipe Leak Repair', rating: 4.90, reviews: 204, price: 35, location: 'Austin, TX', badge: 'Top Rated', level: 'Top Rated', tags: ['Emergency', '24/7'], image: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=600&q=80' },
+      { id: 2, title: 'Bathroom Fixture Installation', rating: 4.82, reviews: 137, price: 900, location: 'Gulshan', badge: 'Verified', level: 'Level 2', tags: ['Installation'], image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600&q=80' },
+      { id: 3, title: 'Drain Unclogging Service', rating: 4.78, reviews: 89, price: 400, location: 'Uttara', badge: 'Verified', level: 'Level 2', tags: ['Same Day'], image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80' },
     ],
   },
   'electrical': {
@@ -76,8 +77,8 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-yellow-500',
     bgGradient: 'from-yellow-50 to-white',
     services: [
-      { id: 1, title: 'Electrical Wiring & Rewiring', rating: 4.93, reviews: 178, price: 75, location: 'Miami, FL', badge: 'Top Rated', tags: ['Certified', 'Safe'], image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600&q=80' },
-      { id: 2, title: 'Fan & Light Installation', rating: 4.85, reviews: 301, price: 300, location: 'Gulshan', badge: 'Verified', tags: ['Quick Fix'], image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' },
+      { id: 1, title: 'Electrical Wiring & Rewiring', rating: 4.93, reviews: 178, price: 75, location: 'Miami, FL', badge: 'Top Rated', level: 'Top Rated', tags: ['Certified', 'Safe'], image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600&q=80' },
+      { id: 2, title: 'Fan & Light Installation', rating: 4.85, reviews: 301, price: 300, location: 'Gulshan', badge: 'Verified', level: 'Level 2', tags: ['Quick Fix'], image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' },
     ],
   },
   'painting': {
@@ -88,8 +89,8 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-pink-500',
     bgGradient: 'from-pink-50 to-white',
     services: [
-      { id: 1, title: 'Interior Wall Painting – Full Home', rating: 4.91, reviews: 145, price: 150, location: 'Los Angeles, CA', badge: 'Top Rated', tags: ['Interior', 'Full Home'], image: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=600&q=80' },
-      { id: 2, title: 'Exterior House Painting', rating: 4.82, reviews: 87, price: 8000, location: 'Gulshan', badge: 'Verified', tags: ['Exterior'], image: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600&q=80' },
+      { id: 1, title: 'Interior Wall Painting – Full Home', rating: 4.91, reviews: 145, price: 150, location: 'Los Angeles, CA', badge: 'Top Rated', level: 'Top Rated', tags: ['Interior', 'Full Home'], image: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=600&q=80' },
+      { id: 2, title: 'Exterior House Painting', rating: 4.82, reviews: 87, price: 8000, location: 'Gulshan', badge: 'Verified', level: 'Level 2', tags: ['Exterior'], image: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600&q=80' },
     ],
   },
   'pest-control': {
@@ -100,7 +101,7 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-green-500',
     bgGradient: 'from-green-50 to-white',
     services: [
-      { id: 1, title: 'Full Home Pest Treatment', rating: 4.88, reviews: 203, price: 65, location: 'Houston, TX', badge: 'Top Rated', tags: ['Safe', 'Full Home'], image: 'https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=600&q=80' },
+      { id: 1, title: 'Full Home Pest Treatment', rating: 4.88, reviews: 203, price: 65, location: 'Houston, TX', badge: 'Top Rated', level: 'Top Rated', tags: ['Safe', 'Full Home'], image: 'https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=600&q=80' },
     ],
   },
   'appliance-repair': {
@@ -111,7 +112,7 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-indigo-500',
     bgGradient: 'from-indigo-50 to-white',
     services: [
-      { id: 1, title: 'AC Repair & Gas Refill', rating: 4.94, reviews: 387, price: 1200, location: 'Dhaka', badge: 'Top Rated', tags: ['AC', 'Gas Refill'], image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80' },
+      { id: 1, title: 'AC Repair & Gas Refill', rating: 4.94, reviews: 387, price: 1200, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['AC', 'Gas Refill'], image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80' },
     ],
   },
   'carpentry': {
@@ -122,7 +123,7 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-amber-500',
     bgGradient: 'from-amber-50 to-white',
     services: [
-      { id: 1, title: 'Custom Furniture Design & Build', rating: 4.96, reviews: 89, price: 8000, location: 'Dhaka', badge: 'Top Rated', tags: ['Custom', 'Furniture'], image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600&q=80' },
+      { id: 1, title: 'Custom Furniture Design & Build', rating: 4.96, reviews: 89, price: 8000, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Custom', 'Furniture'], image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600&q=80' },
     ],
   },
   'shifting': {
@@ -133,7 +134,7 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-purple-500',
     bgGradient: 'from-purple-50 to-white',
     services: [
-      { id: 1, title: 'Full Home Shifting Package', rating: 4.91, reviews: 178, price: 6000, location: 'Dhaka', badge: 'Top Rated', tags: ['Full Home', 'Insured'], image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80' },
+      { id: 1, title: 'Full Home Shifting Package', rating: 4.91, reviews: 178, price: 6000, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Full Home', 'Insured'], image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80' },
     ],
   },
   'beauty': {
@@ -144,7 +145,7 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-rose-500',
     bgGradient: 'from-rose-50 to-white',
     services: [
-      { id: 1, title: 'Bridal Makeup & Hair Package', rating: 4.97, reviews: 312, price: 5000, location: 'Dhaka', badge: 'Top Rated', tags: ['Bridal', 'Premium'], image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=600&q=80' },
+      { id: 1, title: 'Bridal Makeup & Hair Package', rating: 4.97, reviews: 312, price: 5000, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Bridal', 'Premium'], image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=600&q=80' },
     ],
   },
   'personal-care': {
@@ -155,7 +156,7 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
     color: 'text-red-500',
     bgGradient: 'from-red-50 to-white',
     services: [
-      { id: 1, title: 'Elderly Care & Companionship', rating: 4.96, reviews: 127, price: 2500, location: 'Dhaka', badge: 'Top Rated', tags: ['Elderly', 'Compassionate'], image: 'https://images.unsplash.com/photo-1576765608622-067973a79f53?w=600&q=80' },
+      { id: 1, title: 'Elderly Care & Companionship', rating: 4.96, reviews: 127, price: 2500, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Elderly', 'Compassionate'], image: 'https://images.unsplash.com/photo-1576765608622-067973a79f53?w=600&q=80' },
     ],
   },
 };

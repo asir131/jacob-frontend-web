@@ -95,15 +95,4 @@ export const ServiceApi = {
     return MOCK_SERVICES.find(s => s.id === id) || null;
   },
 
-  /**
-   * Subscribes to the newsletter (Mock)
-   */
-  async subscribeToNewsletter(email: string): Promise<{ success: boolean; message: string }> {
-    const response = await api.post<{ message: string }>('/newsletter/subscribe', { email });
-    
-    return {
-      success: !response.error,
-      message: response.error || response.data?.message || 'Successfully subscribed!'
-    };
-  }
 };

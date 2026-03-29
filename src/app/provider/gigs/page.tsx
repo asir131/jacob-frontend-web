@@ -34,19 +34,22 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
+// Static data for provider gigs to ensure render purity
+const MY_GIGS_DATA = MOCK_SERVICES.slice(0, 5).map((s, i) => ({
+  ...s,
+  status: i === 0 || i === 2 ? 'Active' : i === 1 ? 'Paused' : 'Draft',
+  impressions: (1500 * (i + 1)) + 450,
+  clicks: (120 * (i + 1)) + 32,
+  orders: (12 * (i + 1)) + 3,
+  conversion: ((12 * (i + 1) + 3) / (120 * (i + 1) + 32) * 100).toFixed(1),
+}));
+
 export default function ProviderGigsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('active');
   
-  // Fake filtering since the mock is static
-  const myGigs = MOCK_SERVICES.slice(0, 5).map((s, i) => ({
-    ...s,
-    status: i === 0 || i === 2 ? 'Active' : i === 1 ? 'Paused' : 'Draft',
-    impressions: Math.floor(Math.random() * 5000 + 2000),
-    clicks: Math.floor(Math.random() * 500 + 100),
-    orders: Math.floor(Math.random() * 50 + 5),
-    conversion: (Math.random() * 5 + 1).toFixed(1),
-  }));
+  // No longer need useMemo for static data
+  const myGigs = MY_GIGS_DATA;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-12">
@@ -165,7 +168,7 @@ export default function ProviderGigsPage() {
                           </div>
                           <div className="text-right">
                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starting at</p>
-                             <p className="text-2xl font-black text-slate-900 tracking-tight">৳{gig.startingPrice.toLocaleString()}</p>
+                             <p className="text-2xl font-black text-slate-900 tracking-tight">${gig.startingPrice.toLocaleString()}</p>
                           </div>
                        </div>
 
@@ -212,7 +215,7 @@ export default function ProviderGigsPage() {
             </div>
             <h3 className="text-2xl font-black text-slate-900 mb-2">No Gigs Found</h3>
             <p className="text-slate-500 max-w-xs text-center mb-8 font-medium">
-              You haven't created any services in this category yet. Start growing your business today!
+              You haven&apos;t created any services in this category yet. Start growing your business today!
             </p>
             <Link href="/provider/gigs/create">
               <Button className="bg-[#2286BE] hover:bg-[#059669] font-black h-14 px-10 rounded-2xl shadow-xl shadow-primary/20">

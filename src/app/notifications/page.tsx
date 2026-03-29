@@ -33,7 +33,7 @@ const initialNotifications = [
     id: 3,
     type: 'payment',
     title: 'Payment Received',
-    description: 'A payment of ৳2,500 for "Home Cleaning" has been credited to your wallet.',
+    description: 'A payment of $25 for "Home Cleaning" has been credited to your wallet.',
     time: '3 hours ago',
     unread: false,
     icon: <CreditCard className="text-[#2286BE]" />,
@@ -43,7 +43,7 @@ const initialNotifications = [
     id: 4,
     type: 'system',
     title: 'Level Up!',
-    description: 'Congratulations! You have been promoted to "Silver Provider" based on your 5-star reviews.',
+    description: 'Congratulations! You have been promoted to "Level 2 Professional" based on your 5-star reviews.',
     time: 'Yesterday',
     unread: false,
     icon: <Sparkles className="text-amber-500" />,
@@ -208,7 +208,7 @@ export default function NotificationsPage() {
                 </div>
                 <h3 className="text-xl font-black text-slate-900 mb-2">All caught up!</h3>
                 <p className="text-slate-400 font-medium max-w-xs mx-auto">
-                  You have no notifications in this category. We'll let you know when something happens!
+                  You have no notifications in this category. We&apos;ll let you know when something happens!
                 </p>
              </motion.div>
            )}

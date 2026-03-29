@@ -75,7 +75,7 @@ export default function HowItWorksSection() {
               How {BRAND.name} works?
             </h2>
             <p className="mt-6 text-lg text-slate-500 font-medium leading-relaxed">
-              We've simplified home services by connecting you directly with trusted local neighbors and pros.
+              We&apos;ve simplified home services by connecting you directly with trusted local neighbors and pros.
             </p>
 
             <div className="mt-12 space-y-10">

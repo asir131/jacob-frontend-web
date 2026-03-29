@@ -131,10 +131,10 @@ export default function CreateGigPage() {
                           </Select>
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-slate-500 mb-1 block">Price (BDT)</label>
+                          <label className="text-xs font-semibold text-slate-500 mb-1 block">Price (USD)</label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
-                            <Input className="h-10 pl-8 text-sm font-bold text-slate-900 focus-visible:ring-[#2286BE]" defaultValue={(idx + 1) * 1500} type="number" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                            <Input className="h-10 pl-8 text-sm font-bold text-slate-900 focus-visible:ring-[#2286BE]" defaultValue={(idx + 1) * 15} type="number" />
                           </div>
                         </div>
                       </div>
@@ -231,14 +231,14 @@ export default function CreateGigPage() {
                <div className="mx-auto w-24 h-24 bg-primary-soft rounded-full flex items-center justify-center mb-6 shadow-inner">
                  <Check size={48} className="text-[#2286BE]" />
                </div>
-               <h2 className="text-3xl font-extrabold text-slate-900 mb-4">You're almost there!</h2>
+               <h2 className="text-3xl font-extrabold text-slate-900 mb-4">You&apos;re almost there!</h2>
                <p className="text-slate-500 max-w-md mx-auto text-lg mb-8">Your gig is fully configured and ready to be shown to local clients within your specified radius.</p>
                
                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-md mx-auto mb-8 shadow-sm">
                  <h4 className="font-bold text-slate-900 mb-2">Gig Summary</h4>
                  <div className="space-y-2 text-sm text-slate-600">
                    <div className="flex justify-between"><span>Title:</span> <span className="font-semibold text-slate-900 truncate max-w-[200px]">House Cleaning...</span></div>
-                   <div className="flex justify-between"><span>Starting Price:</span> <span className="font-semibold text-slate-900">৳1500</span></div>
+                   <div className="flex justify-between"><span>Starting Price:</span> <span className="font-semibold text-slate-900">$15.00</span></div>
                    <div className="flex justify-between"><span>Radius:</span> <span className="font-semibold text-slate-900">25 km</span></div>
                  </div>
                </div>

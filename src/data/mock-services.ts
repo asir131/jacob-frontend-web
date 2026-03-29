@@ -8,7 +8,8 @@ export interface Service {
     name: string;
     type: 'Solo' | 'Team' | 'Agency';
     avatar: string;
-    badge: 'Verified' | 'Top Rated' | 'New';
+    badge?: 'Verified' | 'Top Rated' | 'New' | 'Level 1' | 'Level 2' | 'Level 3';
+    level: 'New' | 'Level 1' | 'Level 2' | 'Level 3' | 'Top Rated';
     rating: number;
     completedOrders: number;
   };
@@ -42,6 +43,7 @@ export const MOCK_SERVICES: Service[] = [
       type: 'Solo',
       avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267041',
       badge: 'Top Rated',
+      level: 'Top Rated',
       rating: 4.9,
       completedOrders: 142,
     },
@@ -68,6 +70,7 @@ export const MOCK_SERVICES: Service[] = [
       type: 'Team',
       avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267042',
       badge: 'Verified',
+      level: 'Level 2',
       rating: 4.7,
       completedOrders: 310,
     },
@@ -94,6 +97,7 @@ export const MOCK_SERVICES: Service[] = [
       type: 'Agency',
       avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267043',
       badge: 'Verified',
+      level: 'Level 1',
       rating: 4.5,
       completedOrders: 82,
     },
@@ -120,6 +124,7 @@ export const MOCK_SERVICES: Service[] = [
       type: 'Solo',
       avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267044',
       badge: 'Top Rated',
+      level: 'Top Rated',
       rating: 5.0,
       completedOrders: 43,
     },
@@ -143,6 +148,7 @@ export const MOCK_SERVICES: Service[] = [
       type: 'Agency',
       avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267045',
       badge: 'Verified',
+      level: 'Level 3',
       rating: 4.8,
       completedOrders: 512,
     },

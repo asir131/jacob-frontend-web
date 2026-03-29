@@ -20,40 +20,6 @@ export default function Footer() {
 
   return (
     <footer className="bg-slate-950 text-white">
-      {/* Newsletter Section */}
-      <div className="border-b border-white/5">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
-            <div className="max-w-xl text-center lg:text-left">
-              <h3 className="text-2xl md:text-3xl font-black mb-3">Subscribe to our newsletter</h3>
-              <p className="text-slate-400 text-base font-medium">Get local service updates and neighborhood news directly to your inbox.</p>
-            </div>
-            <form 
-               className="w-full max-w-md flex flex-col sm:flex-row gap-3"
-               onSubmit={(e) => {
-                  e.preventDefault();
-                  alert('Thank you for subscribing! Check your inbox soon.'); // Mock handler
-               }}
-            >
-              <div className="relative flex-1">
-                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                 <input 
-                    type="email" 
-                    required
-                    placeholder="Enter your email address" 
-                    className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 text-[15px] font-medium outline-none focus:border-[#2286BE] focus:ring-1 focus:ring-[#2286BE] transition-all"
-                 />
-              </div>
-              <button 
-                 type="submit"
-                 className="h-14 px-8 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black rounded-2xl transition-all active:scale-95 shadow-xl shadow-primary/10 flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                Join Now <Send size={16} />
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
 
       {/* Main Footer Links */}
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-20">

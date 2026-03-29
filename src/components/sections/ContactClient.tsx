@@ -39,7 +39,7 @@ export default function ContactClient() {
         <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <span className="inline-flex bg-[#2286BE]/20 text-[#2286BE] px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest mb-6">Contact Us</span>
-            <h1 className="text-5xl font-black text-white tracking-tight mb-4 mt-4">We'd Love to Hear From You</h1>
+            <h1 className="text-5xl font-black text-white tracking-tight mb-4 mt-4">We&apos;d Love to Hear From You</h1>
             <p className="text-slate-400 text-lg font-medium">Questions, feedback, or just want to say hi — our team is ready.</p>
           </motion.div>
         </div>
@@ -71,7 +71,7 @@ export default function ContactClient() {
                 <div className="text-center py-16">
                   <CheckCircle2 size={64} className="text-emerald-500 mx-auto mb-6" />
                   <h3 className="text-2xl font-black text-slate-900 mb-3">Message Sent!</h3>
-                  <p className="text-slate-500 font-medium">We'll get back to you at your email within 12 hours.</p>
+                  <p className="text-slate-500 font-medium">We&apos;ll get back to you at your email within 12 hours.</p>
                 </div>
               ) : (
                 <>

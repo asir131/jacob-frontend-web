@@ -29,6 +29,7 @@ export default function BrowseServicesPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [minRating, setMinRating] = useState<number>(0);
   const [providerTypes, setProviderTypes] = useState<string[]>([]);
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -64,6 +65,11 @@ export default function BrowseServicesPage() {
       filtered = filtered.filter(s => providerTypes.includes(s.provider.type));
     }
 
+    // Apply Level Type
+    if (selectedLevels.length > 0) {
+      filtered = filtered.filter(s => selectedLevels.includes(s.provider.level));
+    }
+
     // Apply Sort
     if (sortBy === 'distance') {
       filtered.sort((a, b) => (a.distance || 0) - (b.distance || 0));
@@ -85,6 +91,12 @@ export default function BrowseServicesPage() {
   const toggleProviderType = (type: string) => {
     setProviderTypes(prev => 
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const toggleLevel = (level: string) => {
+    setSelectedLevels(prev => 
+      prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
     );
   };
 
@@ -203,6 +215,26 @@ export default function BrowseServicesPage() {
                 </div>
               </div>
 
+              {/* Seller Level */}
+              <div className="mb-10">
+                <h3 className="text-sm font-black text-slate-900 mb-6 uppercase tracking-widest">Seller Level</h3>
+                <div className="space-y-4">
+                  {['Top Rated', 'Level 3', 'Level 2', 'Level 1', 'New'].map(lvl => (
+                    <div key={lvl} className="flex items-center space-x-3">
+                      <Checkbox 
+                        id={`lvl-${lvl}`} 
+                        checked={selectedLevels.includes(lvl)}
+                        onCheckedChange={() => toggleLevel(lvl)}
+                        className="h-5 w-5 rounded-md data-[state=checked]:bg-[#2286BE] data-[state=checked]:border-[#2286BE]"
+                      />
+                      <label htmlFor={`lvl-${lvl}`} className="text-sm font-bold text-slate-600 cursor-pointer">
+                        {lvl}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Minimum Rating */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-6 uppercase tracking-widest">Rating</h3>
@@ -239,7 +271,7 @@ export default function BrowseServicesPage() {
                     <MapPin size={48} className="text-[#2286BE]" />
                   </div>
                   <h2 className="text-3xl font-black text-slate-900 mb-4">No Services Found</h2>
-                  <p className="text-slate-500 mb-10 max-w-md mx-auto font-medium text-lg leading-relaxed">We couldn't find any experts matching your filters within {radius}km of {city}.</p>
+                  <p className="text-slate-500 mb-10 max-w-md mx-auto font-medium text-lg leading-relaxed">We couldn&apos;t find any experts matching your filters within {radius}km of {city}.</p>
                   <Link href="/post-request">
                     <Button className="bg-[#2286BE] hover:bg-[#1b6da0] px-10 h-16 text-lg font-black rounded-2xl shadow-xl shadow-[#2286BE]/20">Post a Custom Request</Button>
                   </Link>
@@ -272,7 +304,7 @@ export default function BrowseServicesPage() {
                               <div className="absolute inset-0 flex items-center justify-center text-slate-400">Premium Service</div>
                             )}
                             <div className="absolute top-4 left-4">
-                               <Badge className="bg-white/95 backdrop-blur-md text-slate-900 border-none font-black text-[10px] uppercase px-3 py-1 shadow-sm">৳{service.startingPrice}</Badge>
+                               <Badge className="bg-white/95 backdrop-blur-md text-slate-900 border-none font-black text-[10px] uppercase px-3 py-1 shadow-sm">${service.startingPrice}</Badge>
                             </div>
                             <button
                                onClick={(e) => {
@@ -290,11 +322,25 @@ export default function BrowseServicesPage() {
                           {/* Content */}
                           <div className={`p-6 flex flex-col flex-1 ${viewMode === 'list' ? 'justify-center' : ''}`}>
                             <div className="flex items-center gap-2 mb-4">
-                                <Avatar className="h-6 w-6 border border-slate-100 shadow-sm">
-                                  <AvatarImage src={service.provider.avatar} />
-                                  <AvatarFallback className="bg-[#2286BE]/10 text-[#2286BE] text-[8px] font-black">PRO</AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs font-black text-slate-900 tracking-tight">{service.provider.name}</span>
+                                <Link href={`/provider/${service.provider.id}`} className="hover:underline accent-[#2286BE] flex items-center gap-2">
+                                  <Avatar className="h-6 w-6 border border-slate-100 shadow-sm">
+                                    <AvatarImage src={service.provider.avatar} />
+                                    <AvatarFallback className="bg-[#2286BE]/10 text-[#2286BE] text-[8px] font-black">PRO</AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-xs font-black text-slate-900 tracking-tight">{service.provider.name}</span>
+                                </Link>
+                                {service.provider.level && (
+                                  <Badge className={`
+                                    ml-1 border-none font-black text-[9px] uppercase px-2 py-0.5 rounded-md
+                                    ${service.provider.level === 'Top Rated' ? 'bg-amber-400 text-white' : 
+                                      service.provider.level === 'Level 3' ? 'bg-purple-500 text-white' :
+                                      service.provider.level === 'Level 2' ? 'bg-green-500 text-white' :
+                                      service.provider.level === 'Level 1' ? 'bg-blue-500 text-white' :
+                                      'bg-slate-400 text-white'}
+                                  `}>
+                                    {service.provider.level}
+                                  </Badge>
+                                )}
                                 {service.provider.badge === 'Verified' && <ShieldCheck size={14} className="text-[#2286BE]" />}
                             </div>
                             

@@ -95,7 +95,7 @@ export default function SuccessStoriesClient() {
     <div className="min-h-screen bg-[#F8FAFC]">
 
       {/* Hero + Stats combined — no negative margin clip */}
-      <section className="relative bg-slate-900 pt-24 pb-16 text-center overflow-hidden">
+      <section className="relative bg-slate-900 pt-32 pb-24 text-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#2286BE]/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-[100px]" />
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/5 rounded-full -translate-x-1/2 translate-y-1/2 blur-[80px]" />
@@ -111,7 +111,7 @@ export default function SuccessStoriesClient() {
         </div>
 
         {/* Stats — inside the dark hero, fully visible */}
-        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {stats.map(stat => (
@@ -126,13 +126,13 @@ export default function SuccessStoriesClient() {
       </section>
 
       {/* Stories */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-28">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-32 pb-28">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {stories.map((story, i) => (
             <motion.div key={story.name} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
               <div className={`bg-gradient-to-b ${story.color} to-white rounded-[2.5rem] border border-slate-100 p-8 h-full flex flex-col hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all hover:-translate-y-1`}>
                 <Quote size={32} className="text-[#2286BE]/20 mb-4" aria-hidden="true" />
-                <p className="text-slate-600 font-medium leading-relaxed mb-8 flex-1">"{story.quote}"</p>
+                <p className="text-slate-600 font-medium leading-relaxed mb-8 flex-1">&quot;{story.quote}&quot;</p>
                 <div className="border-t border-slate-100 pt-6">
                   <div className="flex items-center gap-4 mb-4">
                     <Avatar className="h-14 w-14 border-2 border-white ring-2 ring-slate-100">

@@ -149,7 +149,7 @@ export default function JoinProviderClient() {
             <p className="text-slate-400 font-medium mb-10 max-w-lg mx-auto">Join thousands of professionals already growing their business on {BRAND.name}.</p>
             <Link href="/signup">
               <Button className="h-16 px-14 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-lg rounded-2xl shadow-xl shadow-[#2286BE]/20 active:scale-95 transition-all">
-                Join as Provider — It's Free
+                Join as Provider — It&apos;s Free
               </Button>
             </Link>
           </div>

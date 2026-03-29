@@ -78,7 +78,7 @@ export default function AuthModal({ isOpen, onClose, title = "Join LocallyServe"
              </div>
 
              <p className="mt-8 text-center text-[11px] font-medium text-slate-400 px-4">
-                By continuing, you agree to {BRAND.name}'s <span className="underline cursor-pointer">Terms of Service</span> and <span className="underline cursor-pointer">Privacy Policy</span>.
+                By continuing, you agree to {BRAND.name}&apos;s <span className="underline cursor-pointer">Terms of Service</span> and <span className="underline cursor-pointer">Privacy Policy</span>.
              </p>
           </motion.div>
         </div>

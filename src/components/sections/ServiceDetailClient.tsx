@@ -49,7 +49,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
     if (service.images && service.images.length > 0 && !selectedImage) {
       setSelectedImage(service.images[0]);
     }
-  }, [service.images]);
+  }, [service.images, selectedImage]);
 
   const handleBooking = () => {
     router.push(`/book/${service.id}`);
@@ -189,9 +189,9 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 <TabsContent value="faq">
                    <Accordion type="single" collapsible className="w-full space-y-4">
                       {[
-                        { q: "Do you bring your own supplies?", a: "Yes! We bring all necessary high-end supplies and tools. You don't need to provide anything unless specifically requested." },
+                        { q: "Do you bring your own supplies?", a: "Yes! We bring all necessary high-end supplies and tools. You don&apos;t need to provide anything unless specifically requested." },
                         { q: "How long does the service take?", a: "It depends on the scope. A basic package takes 1-2 hours, while standard and premium can take up to 4-6 hours." },
-                        { q: "What if I'm outside your standard area?", a: "We cover a 25km radius from our base location. Additional travel charges may apply if you're slightly outside." }
+                        { q: "What if I&apos;m outside your standard area?", a: "We cover a 25km radius from our base location. Additional travel charges may apply if you&apos;re slightly outside." }
                       ].map((faq, i) => (
                         <AccordionItem key={i} value={`faq-${i}`} className="border-none bg-white rounded-3xl px-8 shadow-sm">
                           <AccordionTrigger className="text-left font-black text-slate-900 hover:no-underline py-6 text-lg">{faq.q}</AccordionTrigger>
@@ -219,7 +219,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                               </div>
                               <div className="flex text-amber-400 gap-0.5" aria-hidden="true"><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/></div>
                            </div>
-                           <p className="text-slate-600 leading-relaxed text-lg font-medium">"Exceptional service! Arrived right on time and provided high-quality work. Will definitely book again for my next project."</p>
+                           <p className="text-slate-600 leading-relaxed text-lg font-medium">&quot;Exceptional service! Arrived right on time and provided high-quality work. Will definitely book again for my next project.&quot;</p>
                         </div>
                       ))}
                    </div>
@@ -335,7 +335,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                   </div>
                   <div>
                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">{BRAND.name} Guarantee</h3>
-                     <p className="text-slate-400 font-medium text-base">Your satisfaction is our top priority. If you're not happy, we'll make it right.</p>
+                     <p className="text-slate-400 font-medium text-base">Your satisfaction is our top priority. If you&apos;re not happy, we&apos;ll make it right.</p>
                   </div>
                </div>
             </div>
@@ -366,7 +366,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 </div>
                 
                 <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Share this Service</h3>
-                <p className="text-slate-500 font-medium mb-8">Spread the word about {service.provider.name}'s expertise.</p>
+                <p className="text-slate-500 font-medium mb-8">Spread the word about {service.provider.name}&apos;s expertise.</p>
 
                 <div className="space-y-6">
                    {/* Copy Link */}

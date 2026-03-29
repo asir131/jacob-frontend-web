@@ -104,9 +104,6 @@ export default function ClientOrdersPage() {
                   onChange={e => setSearch(e.target.value)} 
                 />
              </div>
-             <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 bg-white border-slate-200">
-               <Filter size={20} className="text-slate-600" />
-             </Button>
            </div>
         </motion.div>
 
@@ -175,7 +172,7 @@ export default function ClientOrdersPage() {
                                   <div className="text-right w-full sm:w-auto pt-4 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex sm:block justify-between items-center">
                                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1 block sm:hidden">Total Amount</p>
                                      <div className="text-right">
-                                       <p className="text-2xl font-black text-slate-900 tracking-tight">৳{order.total.toLocaleString()}</p>
+                                       <p className="text-2xl font-black text-slate-900 tracking-tight">${order.total.toLocaleString()}</p>
                                        <p className="text-[10px] font-bold text-[#2286BE] bg-[#2286BE]/10 px-2 py-0.5 rounded mt-1 inline-block uppercase tracking-widest">Paid via App</p>
                                      </div>
                                   </div>
@@ -210,7 +207,7 @@ export default function ClientOrdersPage() {
                     </div>
                     <h3 className="text-2xl font-bold text-slate-900 mb-2">No orders found</h3>
                     <p className="text-slate-500 max-w-xs text-center mb-8">
-                      We couldn't find any orders matching your current filters or search criteria.
+                      We couldn&apos;t find any orders matching your current filters or search criteria.
                     </p>
                     <Button 
                       onClick={() => {setSearch(''); setActiveTab('all');}}

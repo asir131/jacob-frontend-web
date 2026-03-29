@@ -219,7 +219,7 @@ export default function ResolutionCenterClient({ role }: { role: 'client' | 'pro
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-black text-slate-900">Open a New Case</h2>
-                  <p className="text-slate-500 font-medium text-sm mt-1">Tell us what happened. We'll mediate fairly.</p>
+                  <p className="text-slate-500 font-medium text-sm mt-1">Tell us what happened. We&apos;ll mediate fairly.</p>
                 </div>
                 <button onClick={() => setIsNewOpen(false)} className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-colors"><X size={20} /></button>
               </div>

@@ -252,7 +252,7 @@ export default function Header() {
                    </Link>
                    <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
                      <Button className="w-full h-14 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black rounded-2xl">
-                       Sign Up — It's Free
+                       Sign Up — It&apos;s Free
                      </Button>
                    </Link>
                  </div>

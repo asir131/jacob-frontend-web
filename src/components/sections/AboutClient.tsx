@@ -52,7 +52,7 @@ export default function AboutClient() {
           className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 p-12 md:p-16 text-center">
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Our Mission</p>
           <blockquote className="text-2xl md:text-3xl font-black text-slate-900 leading-normal">
-            "To build Bangladesh's most trusted marketplace where skilled professionals prosper and every home gets the care it deserves."
+            &quot;To build Bangladesh&apos;s most trusted marketplace where skilled professionals prosper and every home gets the care it deserves.&quot;
           </blockquote>
         </motion.div>
       </section>
@@ -130,7 +130,7 @@ export default function AboutClient() {
           <div className="relative z-10">
             <Users size={40} className="text-[#2286BE] mx-auto mb-6" />
             <h2 className="text-4xl font-black text-white mb-4">Be Part of the Movement</h2>
-            <p className="text-slate-400 font-medium mb-10 max-w-lg mx-auto">Whether you're a client or a provider, {BRAND.name} is your platform.</p>
+            <p className="text-slate-400 font-medium mb-10 max-w-lg mx-auto">Whether you&apos;re a client or a provider, {BRAND.name} is your platform.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/services">
                 <Button className="h-14 px-10 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-base rounded-2xl">Find a Service</Button>

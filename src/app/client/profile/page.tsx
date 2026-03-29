@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
 
@@ -230,7 +231,7 @@ export default function ClientProfilePage() {
                                  { title: 'Order Updates', desc: 'Receive status changes for your service requests.', default: true },
                                  { title: 'Promotional Offers', desc: 'Updates on new features and local service discounts.', default: false },
                                  { title: 'Messages', desc: 'Alerts when a provider sends you a direct message.', default: true },
-                               ].map((item, i) => (
+                                ].map((item, i) => (
                                  <div key={i} className="flex items-center justify-between p-6 bg-white border border-slate-100 rounded-[2rem] hover:shadow-lg hover:shadow-slate-200/50 transition-all group">
                                     <div className="max-w-md">
                                        <p className="font-bold text-slate-900 transition-colors group-hover:text-[#2286BE]">{item.title}</p>
@@ -243,7 +244,77 @@ export default function ClientProfilePage() {
                          </motion.div>
                        )}
 
-                    </AnimatePresence>
+                       {activeTab === 'billing' && (
+                         <motion.div 
+                           key="billing"
+                           initial={{ opacity: 0, y: 20 }}
+                           animate={{ opacity: 1, y: 0 }}
+                           className="space-y-12"
+                         >
+                            <div className="flex items-center justify-between">
+                               <div>
+                                  <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Billing & Payments</h3>
+                                  <p className="text-slate-500 font-medium">Manage your payment methods and view history.</p>
+                               </div>
+                               <Button size="lg" className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-2xl px-8 shadow-xl shadow-[#2286BE]/20 transition-all">
+                                  Add Card
+                               </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-4">
+                               <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden group hover:scale-[1.02] transition-all duration-500 shadow-2xl shadow-slate-900/40">
+                                  <div className="relative z-10 flex flex-col justify-between h-44">
+                                     <div className="flex justify-between items-start">
+                                        <div className="h-12 w-16 bg-white/10 rounded-xl backdrop-blur-md flex items-center justify-center font-black italic">VISA</div>
+                                        <Badge className="bg-white/20 text-white border-none font-black text-[10px] uppercase px-4 py-1.5 rounded-lg">Primary</Badge>
+                                     </div>
+                                     <div>
+                                        <p className="font-mono text-2xl tracking-[0.25em] mb-6">•••• •••• •••• 4242</p>
+                                        <div className="flex justify-between items-end">
+                                           <div><p className="text-[10px] opacity-50 uppercase font-black tracking-widest mb-1 font-sans">Expires</p><p className="font-bold font-sans">12/26</p></div>
+                                           <div className="flex gap-2"><Button size="sm" variant="ghost" className="h-10 w-10 p-0 rounded-xl bg-white/10 hover:bg-white/20"><Settings size={18} /></Button></div>
+                                        </div>
+                                     </div>
+                                  </div>
+                                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full translate-x-1/3 -translate-y-1/3 blur-3xl pointer-events-none" />
+                               </div>
+
+                               <div className="bg-gradient-to-br from-[#2286BE] to-blue-700 rounded-[2.5rem] p-10 text-white relative overflow-hidden group hover:scale-[1.02] transition-all duration-500 shadow-2xl shadow-blue-500/30">
+                                  <div className="relative z-10 flex flex-col justify-between h-44">
+                                     <div className="flex justify-between items-start">
+                                        <div className="h-12 w-16 bg-white/10 rounded-xl backdrop-blur-md flex items-center justify-center font-black italic">MCARD</div>
+                                     </div>
+                                     <div>
+                                        <p className="font-mono text-2xl tracking-[0.25em] mb-6">•••• •••• •••• 8888</p>
+                                        <div className="flex justify-between items-end">
+                                           <div><p className="text-[10px] opacity-50 uppercase font-black tracking-widest mb-1 font-sans">Expires</p><p className="font-bold font-sans">08/25</p></div>
+                                           <div className="flex gap-2"><Button size="sm" variant="ghost" className="h-10 w-10 p-0 rounded-xl bg-white/10 hover:bg-white/20"><Settings size={18} /></Button></div>
+                                        </div>
+                                     </div>
+                                  </div>
+                                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -translate-x-1/4 translate-y-1/4 blur-3xl pointer-events-none" />
+                               </div>
+                            </div>
+
+                            <div className="space-y-6">
+                               <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Billing History</h4>
+                               <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                                  {[
+                                    { date: 'Oct 12, 2023', item: 'Deep Home Cleaning', amount: '$45' },
+                                    { date: 'Sep 28, 2023', item: 'AC Maintenance', amount: '$22' },
+                                    { date: 'Sep 15, 2023', item: 'Plumbing Repair', amount: '$15' },
+                                  ].map((tx, i) => (
+                                    <div key={i} className="px-10 py-8 hover:bg-slate-50 transition-all flex items-center justify-between border-b border-slate-50 last:border-none">
+                                       <div><p className="font-black text-slate-900 text-lg mb-1">{tx.item}</p><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{tx.date}</p></div>
+                                       <div className="text-right"><p className="font-black text-slate-900 text-lg mb-1">{tx.amount}</p><button className="text-[10px] font-black uppercase text-[#2286BE] hover:underline tracking-widest">Receipt</button></div>
+                                    </div>
+                                  ))}
+                               </div>
+                            </div>
+                         </motion.div>
+                       )}
+
+                     </AnimatePresence>
                  </div>
               </motion.div>
            </div>
