@@ -13,17 +13,17 @@ interface LocationState {
 
 const LocationContext = createContext<LocationState | undefined>(undefined);
 
-// Default coordinates for Dhaka
-const DEFAULT_COORDS = { lat: 23.8103, lng: 90.4125 };
+// Default coordinates for New York
+const DEFAULT_COORDS = { lat: 40.7128, lng: -74.0060 };
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
-  const [city, setCity] = useState('Dhaka, Bangladesh');
+  const [city, setCity] = useState('New York, USA');
   const [radius, setRadius] = useState(25);
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     // Attempt to parse city and set rough coordinates, or just default to Dhaka for mock.
-    if (city.toLowerCase().includes('dhaka')) {
+    if (city.toLowerCase().includes('new york')) {
       setCoordinates(DEFAULT_COORDS);
     } else if (city.toLowerCase().includes('chattogram')) {
       setCoordinates({ lat: 22.3569, lng: 91.7832 });
@@ -45,7 +45,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         (error) => {
           console.error('Error detecting location:', error);
           // Fallback
-          setCity('Dhaka, Bangladesh');
+          setCity('New York, USA');
         }
       );
     }

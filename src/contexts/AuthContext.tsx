@@ -2,16 +2,18 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type Role = 'client' | 'provider' | 'admin';
+type Role = 'client' | 'provider';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role: Role;
+}
 
 interface AuthState {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar: string;
-    role: Role;
-  } | null;
+  user: User | null;
   role: Role;
   setRole: (role: Role) => void;
   isAuthenticated: boolean;
@@ -22,30 +24,24 @@ interface AuthState {
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Use a sensible default for the current simulation
   const [role, setRole] = useState<Role>('client');
-  const [user, setUser] = useState<AuthState['user']>(null);
+  const [user, setUser] = useState<User | null>(null);
 
-  // Initialize with a mock user. In a real app this would come from an API/token.
+  // Simulation of auth state synchronization
   useEffect(() => {
-    setUser({
+    // In a real app, this would check localStorage/session for an existing session
+    const mockUser: User = {
       id: 'USR-123',
       name: 'John Doe',
       email: 'john@example.com',
-      avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       role: role,
-    });
+    };
+    setUser(mockUser);
   }, [role]);
 
   const login = (newRole: Role = 'client') => {
     setRole(newRole);
-    setUser({
-      id: 'USR-123',
-      name: 'John Doe',
-      email: 'john@example.com',
-      avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
-      role: newRole,
-    });
   };
 
   const logout = () => {

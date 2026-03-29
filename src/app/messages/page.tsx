@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, Check, CheckCheck, Smile } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,7 +81,17 @@ const initialMessages = [
 ];
 
 export default function MessagesPage() {
-  const [selectedContact, setSelectedContact] = useState(contacts[0]);
+  const { role: userRole } = useAuth();
+  
+  // Filter contacts based on current role
+  // If I am a client, I see providers. If I am a provider, I see clients.
+  const filteredContacts = contacts.filter(c => {
+    if (userRole === 'client') return c.role === 'Provider';
+    if (userRole === 'provider') return c.role === 'Client';
+    return true;
+  });
+
+  const [selectedContact, setSelectedContact] = useState(filteredContacts[0] || contacts[0]);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -106,8 +117,9 @@ export default function MessagesPage() {
       
       {/* Sidebar */}
       <aside className={`
-        ${isSidebarOpen ? 'w-full md:w-80 lg:w-96' : 'w-0'} 
-        border-r border-slate-100 flex flex-col transition-all duration-300 md:relative absolute z-20 h-full bg-white
+        ${isSidebarOpen ? 'flex' : 'hidden'} md:flex
+        w-full md:w-80 lg:w-96 flex-shrink-0
+        border-r border-slate-100 flex-col transition-all duration-300
       `}>
         <div className="p-6 border-b border-slate-100">
            <div className="flex items-center justify-between mb-6">
@@ -127,7 +139,7 @@ export default function MessagesPage() {
 
         <ScrollArea className="flex-1">
            <div className="p-3 space-y-1">
-              {contacts.map((contact) => (
+              {filteredContacts.map((contact) => (
                 <button
                   key={contact.id}
                   onClick={() => {

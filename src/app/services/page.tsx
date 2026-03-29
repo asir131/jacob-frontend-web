@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { MOCK_SERVICES, calculateDistance } from '@/data/mock-services';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from '@/contexts/LocationContext';
-import { MapPin, Star, Filter, ShieldCheck, Map, Grid, List as ListIcon, Heart } from 'lucide-react';
+import { MapPin, Star, Filter, ShieldCheck, Map, Grid, List as ListIcon, Heart, Search } from 'lucide-react';
+import AuthModal from '@/components/ui/AuthModal';
+import { useAuth } from '@/contexts/AuthContext';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -17,14 +19,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function BrowseServicesPage() {
   const { city, coordinates, radius, setRadius } = useLocation();
+  const { isAuthenticated } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
   const [sortBy, setSortBy] = useState('relevance');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   // Filters State
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [minRating, setMinRating] = useState<number>(0);
   const [providerTypes, setProviderTypes] = useState<string[]>([]);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Computed Services with distances
   const availableServices = useMemo(() => {
@@ -36,8 +42,12 @@ export default function BrowseServicesPage() {
       return { ...service, distance };
     });
 
-    // Apply distance filter
     filtered = filtered.filter(s => s.distance !== undefined && s.distance <= radius);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(s => s.title.toLowerCase().includes(q) || s.category.toLowerCase().includes(q));
+    }
 
     // Apply Categories
     if (selectedCategories.length > 0) {
@@ -64,7 +74,7 @@ export default function BrowseServicesPage() {
     }
 
     return filtered;
-  }, [coordinates, radius, selectedCategories, minRating, providerTypes, sortBy]);
+  }, [coordinates, radius, selectedCategories, minRating, providerTypes, sortBy, searchQuery]);
 
   const toggleCategory = (cat: string) => {
     setSelectedCategories(prev => 
@@ -82,34 +92,49 @@ export default function BrowseServicesPage() {
     <div className="min-h-screen bg-slate-50/50 py-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+        <div className="flex flex-col gap-6 mb-12">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Services in {city}</h1>
             <p className="text-slate-500 font-medium">Found {availableServices.length} verified professionals near you</p>
           </motion.div>
-          <div className="flex items-center gap-3">
-             <Button variant="outline" className="md:hidden h-12 rounded-xl border-slate-200" onClick={() => setIsMobileFiltersOpen(true)}>
-               <Filter size={18} className="mr-2" /> Filters
-             </Button>
 
-             <div className="flex bg-white rounded-xl border border-slate-100 p-1.5 shadow-sm">
-                <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 'text-slate-400 hover:text-slate-600'}`}><Grid size={18} /></button>
-                <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon size={18} /></button>
-                <button onClick={() => setViewMode('map')} className={`p-2 rounded-lg transition-all ${viewMode === 'map' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 'text-slate-400 hover:text-slate-600'}`}><Map size={18} /></button>
-             </div>
+          {/* Search + Controls Row */}
+          <div className="flex flex-col md:flex-row items-center gap-3">
+            {/* Search bar */}
+            <div className="relative flex-1 w-full">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for a service or category..."
+                className="w-full h-12 pl-12 pr-4 rounded-2xl bg-white border border-slate-200 font-bold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2286BE]/40 transition-all shadow-sm"
+              />
+            </div>
 
-             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[200px] bg-white h-12 rounded-xl border-slate-200 font-bold">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl p-1">
-                <SelectItem value="relevance" className="rounded-lg py-2.5">Relevance</SelectItem>
-                <SelectItem value="distance" className="rounded-lg py-2.5">Distance</SelectItem>
-                <SelectItem value="price-low" className="rounded-lg py-2.5">Price: Low to High</SelectItem>
-                <SelectItem value="rating" className="rounded-lg py-2.5">Highest Rated</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Right controls */}
+            <div className="flex items-center gap-3 shrink-0">
+              <Button variant="outline" className="md:hidden h-12 rounded-xl border-slate-200" onClick={() => setIsMobileFiltersOpen(true)}>
+                <Filter size={18} className="mr-2" /> Filters
+              </Button>
+
+              <div className="flex bg-white rounded-xl border border-slate-100 p-1.5 shadow-sm" role="group" aria-label="View mode">
+                <button onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 'text-slate-400 hover:text-slate-600'}`}><Grid size={18} aria-hidden="true" /></button>
+                <button onClick={() => setViewMode('list')} aria-label="List view" aria-pressed={viewMode === 'list'} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon size={18} aria-hidden="true" /></button>
+                <button onClick={() => setViewMode('map')} aria-label="Map view" aria-pressed={viewMode === 'map'} className={`p-2 rounded-lg transition-all ${viewMode === 'map' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 'text-slate-400 hover:text-slate-600'}`}><Map size={18} aria-hidden="true" /></button>
+              </div>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[200px] bg-white h-12 rounded-xl border-slate-200 font-bold">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl p-1">
+                  <SelectItem value="relevance" className="rounded-lg py-2.5">Relevance</SelectItem>
+                  <SelectItem value="distance" className="rounded-lg py-2.5">Distance</SelectItem>
+                  <SelectItem value="price-low" className="rounded-lg py-2.5">Price: Low to High</SelectItem>
+                  <SelectItem value="rating" className="rounded-lg py-2.5">Highest Rated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -128,12 +153,12 @@ export default function BrowseServicesPage() {
                 <h3 className="text-sm font-black text-slate-900 mb-6 flex items-center justify-between uppercase tracking-widest">
                   Distance <span className="text-[#2286BE]">{radius}km</span>
                 </h3>
-                <Slider 
-                  defaultValue={[radius]} 
-                  max={100} 
-                  min={5} 
-                  step={5} 
-                  onValueChange={(val) => setRadius(val[0])} 
+                <Slider
+                  value={[radius]}
+                  max={100}
+                  min={5}
+                  step={5}
+                  onValueChange={(val: number[]) => setRadius(val[0] ?? radius)}
                   className="[&_[role=slider]]:bg-[#2286BE] [&_[role=slider]]:border-[#2286BE] [&_[role=slider]]:scale-125"
                 />
               </div>
@@ -162,7 +187,7 @@ export default function BrowseServicesPage() {
               <div className="mb-10">
                 <h3 className="text-sm font-black text-slate-900 mb-6 uppercase tracking-widest">Expert Type</h3>
                 <div className="space-y-4">
-                  {['Solo', 'Team', 'Agency', 'Company'].map(type => (
+                  {['Solo', 'Team', 'Agency'].map(type => (
                     <div key={type} className="flex items-center space-x-3">
                       <Checkbox 
                         id={`type-${type}`} 
@@ -249,8 +274,16 @@ export default function BrowseServicesPage() {
                             <div className="absolute top-4 left-4">
                                <Badge className="bg-white/95 backdrop-blur-md text-slate-900 border-none font-black text-[10px] uppercase px-3 py-1 shadow-sm">৳{service.startingPrice}</Badge>
                             </div>
-                            <button className="absolute top-4 right-4 h-10 w-10 bg-white/95 backdrop-blur-md rounded-xl text-slate-400 hover:text-red-500 hover:scale-110 transition-all shadow-sm flex items-center justify-center">
-                               <Heart size={18} />
+                            <button
+                               onClick={(e) => {
+                                 e.preventDefault();
+                                 if (!isAuthenticated) return setIsAuthModalOpen(true);
+                                 setFavorites(prev => prev.includes(service.id) ? prev.filter(id => id !== service.id) : [...prev, service.id]);
+                               }}
+                               className={`absolute top-4 right-4 h-10 w-10 bg-white/95 backdrop-blur-md rounded-xl transition-all shadow-sm flex items-center justify-center ${favorites.includes(service.id) ? 'text-red-500' : 'text-slate-400 hover:text-red-500 hover:scale-110'}`}
+                               aria-label={`Save ${service.title} to wishlist`}
+                            >
+                               <Heart size={18} fill={favorites.includes(service.id) ? "currentColor" : "none"} aria-hidden="true" />
                             </button>
                           </div>
 
@@ -292,6 +325,13 @@ export default function BrowseServicesPage() {
 
         </div>
       </div>
+
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        title="Love this Service?"
+        subtitle="Sign in to save this pro to your favorites and build a local dream team."
+      />
     </div>
   );
 }

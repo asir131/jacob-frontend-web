@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -181,12 +182,16 @@ export default function ClientOrdersPage() {
                                </div>
                                
                                <div className="grid grid-cols-2 gap-4">
-                                 <Button variant="outline" className="w-full h-12 font-bold text-slate-600 border-slate-200 hover:bg-slate-50 active:scale-95 transition-all">
-                                   <MessageSquare size={18} className="mr-2" /> Message
-                                 </Button>
-                                 <Button className="w-full h-12 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg shadow-[#2286BE]/20 active:scale-95 transition-all">
-                                   {order.status === 'Completed' ? 'Leave Review' : 'Track Order'}
-                                 </Button>
+                                 <Link href="/messages" className="w-full">
+                                   <Button variant="outline" className="w-full h-12 font-bold text-slate-600 border-slate-200 hover:bg-slate-50 active:scale-95 transition-all">
+                                     <MessageSquare size={18} className="mr-2" /> Message
+                                   </Button>
+                                 </Link>
+                                 <Link href={`/client/orders/${order.id}`} className="w-full">
+                                   <Button className="w-full h-12 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg shadow-[#2286BE]/20 active:scale-95 transition-all">
+                                     {order.status === 'Completed' ? 'Leave Review' : 'Track Order'}
+                                   </Button>
+                                 </Link>
                                </div>
                             </CardContent>
                          </Card>

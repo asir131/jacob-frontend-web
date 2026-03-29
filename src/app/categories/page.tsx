@@ -14,11 +14,13 @@ import {
   Truck, 
   Heart,
   Droplets,
-  Scissors
+  Scissors,
+  ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 
 const categories = [
+  { id: 0, name: 'LocallyServe Pro', icon: <ShieldCheck />, color: 'bg-indigo-100 text-indigo-600', count: 3 },
   { id: 1, name: 'Cleaning', icon: <Droplets />, color: 'bg-blue-50 text-blue-500', count: 124 },
   { id: 2, name: 'Plumbing', icon: <Wrench />, color: 'bg-orange-50 text-orange-500', count: 86 },
   { id: 3, name: 'Electrical', icon: <Zap />, color: 'bg-yellow-50 text-yellow-500', count: 92 },

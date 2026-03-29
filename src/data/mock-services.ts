@@ -6,7 +6,7 @@ export interface Service {
   provider: {
     id: string;
     name: string;
-    type: 'Solo' | 'Team' | 'Agency' | 'Company';
+    type: 'Solo' | 'Team' | 'Agency';
     avatar: string;
     badge: 'Verified' | 'Top Rated' | 'New';
     rating: number;
@@ -18,7 +18,15 @@ export interface Service {
     lng: number;
   };
   startingPrice: number;
+  description: string;
   images: string[];
+  requirements?: string;
+  deliveryTime?: {
+    basic: string;
+    standard: string;
+    premium: string;
+  };
+  travelRadius?: number;
   distance?: number; // Calculated dynamically
 }
 
@@ -38,12 +46,16 @@ export const MOCK_SERVICES: Service[] = [
       completedOrders: 142,
     },
     location: {
-      city: 'Dhaka, Bangladesh',
-      lat: 23.7937,
-      lng: 90.4066, // Banani
+      city: 'New York, NY',
+      lat: 40.7128,
+      lng: -74.0060,
     },
-    startingPrice: 1500,
+    startingPrice: 45,
+    description: 'Get your home sparkling clean with our deep cleaning package. We cover every corner, including hard-to-reach areas, ensuring a high-quality, hygienic environment for your family.',
     images: ['/service1.png', '/service2.png'],
+    requirements: 'Please ensure clear access to all rooms. Access to water and a power outlet is required.',
+    deliveryTime: { basic: '1 Day', standard: '2 Days', premium: '3 Days' },
+    travelRadius: 25,
   },
   {
     id: 'GIG-002',
@@ -60,12 +72,16 @@ export const MOCK_SERVICES: Service[] = [
       completedOrders: 310,
     },
     location: {
-      city: 'Dhaka, Bangladesh',
-      lat: 23.7509,
-      lng: 90.3933, // Farmgate
+      city: 'Austin, TX',
+      lat: 30.2672,
+      lng: -97.7431,
     },
-    startingPrice: 500,
+    startingPrice: 25,
+    description: 'Expert plumbers ready to handle emergency leaks, pipe repairs, and full drainage system maintenance. Fast, reliable, and equipped with industrial-grade tools.',
     images: ['/service3.png'],
+    requirements: 'Clear access to the leaking area and shutting off the main water valve may be needed.',
+    deliveryTime: { basic: '1 Day', standard: '1 Day', premium: '2 Days' },
+    travelRadius: 15,
   },
   {
     id: 'GIG-003',
@@ -82,12 +98,16 @@ export const MOCK_SERVICES: Service[] = [
       completedOrders: 82,
     },
     location: {
-      city: 'Dhaka, Bangladesh',
-      lat: 23.7340,
-      lng: 90.3928, // Shahbag
+      city: 'Miami, FL',
+      lat: 25.7617,
+      lng: -80.1918,
     },
-    startingPrice: 800,
+    startingPrice: 35,
+    description: 'Breathe clean air with our master cooling service. We provide full gas refills, filter cleaning, and system diagnostics for all major AC brands.',
     images: ['/service4.png'],
+    requirements: 'Access to the outdoor unit and an indoor power source for cleaning equipment.',
+    deliveryTime: { basic: '1 Day', standard: '1 Day', premium: '2 Days' },
+    travelRadius: 20,
   },
   {
     id: 'GIG-004',
@@ -104,11 +124,12 @@ export const MOCK_SERVICES: Service[] = [
       completedOrders: 43,
     },
     location: {
-      city: 'Dhaka, Bangladesh',
-      lat: 23.8103,
-      lng: 90.4125, // Gulshan
+      city: 'Los Angeles, CA',
+      lat: 34.0522,
+      lng: -118.2437,
     },
-    startingPrice: 5000,
+    startingPrice: 150,
+    description: 'Premium bridal makeup and styling delivered at your doorstep. From traditional Mehndi to modern wedding looks, our experts ensure you look your best.',
     images: ['/hero2.png'],
   },
   {
@@ -119,18 +140,19 @@ export const MOCK_SERVICES: Service[] = [
     provider: {
       id: 'USR-005',
       name: 'PestBusters Ltd.',
-      type: 'Company',
+      type: 'Agency',
       avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267045',
       badge: 'Verified',
       rating: 4.8,
       completedOrders: 512,
     },
     location: {
-      city: 'Chattogram, Bangladesh',
-      lat: 22.3569,
-      lng: 91.7832,
+      city: 'Houston, TX',
+      lat: 29.7604,
+      lng: -95.3698,
     },
-    startingPrice: 2000,
+    startingPrice: 65,
+    description: 'Professional pest control solutions for termites, roaches, and rodents. Safe for pets and kids, ensuring a pest-free home or office environment.',
     images: ['/service1.png'],
   },
 ];

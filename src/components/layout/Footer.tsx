@@ -2,175 +2,144 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
-  FaYoutube, 
-  FaInstagram, 
-  FaFacebookF, 
-  FaTwitter,
-  FaLinkedinIn
-} from 'react-icons/fa';
-import { Mail, MapPin, Phone, Globe } from 'lucide-react';
-import { useLocation } from '@/contexts/LocationContext';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+  Facebook, 
+  Twitter, 
+  Instagram, 
+  Linkedin, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Send 
+} from 'lucide-react';
+import { BRAND, CONTACT, SOCIAL_LINKS, APP_LINKS } from '@/lib/constants';
 
-const Footer = () => {
-  const { city, setCity } = useLocation();
-
-  const handleCityChange = (value: string) => {
-    setCity(value);
-  };
+export default function Footer() {
+  const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full bg-slate-900 pt-20 pb-10 border-t border-slate-800 relative overflow-hidden">
-      {/* Decorative Gradient Background */}
-      <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-[#2286BE] opacity-[0.03] blur-[120px] rounded-full pointer-events-none"></div>
-      
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        
-        {/* Newsletter Section */}
-        <div className="bg-slate-800/50 rounded-3xl p-8 md:p-12 mb-20 border border-slate-700/50 flex flex-col lg:flex-row items-center justify-between gap-10">
-          <div className="max-w-md">
-            <h3 className="text-2xl md:text-3xl font-black text-white mb-3">Stay in the loop</h3>
-            <p className="text-slate-400 font-medium">Get exclusive offers and top provider recommendations delivered to your inbox.</p>
-          </div>
-          <div className="flex w-full lg:w-auto gap-3">
-            <Input 
-              placeholder="Enter your email" 
-              className="bg-slate-900/50 border-slate-700 h-14 rounded-2xl text-white placeholder:text-slate-500 min-w-0 md:min-w-[300px]"
-            />
-            <Button className="bg-[#2286BE] hover:bg-[#059669] h-14 px-8 rounded-2xl font-bold shadow-lg shadow-primary/20">Subscribe</Button>
+    <footer className="bg-slate-950 text-white">
+      {/* Newsletter Section */}
+      <div className="border-b border-white/5">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+            <div className="max-w-xl text-center lg:text-left">
+              <h3 className="text-2xl md:text-3xl font-black mb-3">Subscribe to our newsletter</h3>
+              <p className="text-slate-400 text-base font-medium">Get local service updates and neighborhood news directly to your inbox.</p>
+            </div>
+            <form 
+               className="w-full max-w-md flex flex-col sm:flex-row gap-3"
+               onSubmit={(e) => {
+                  e.preventDefault();
+                  alert('Thank you for subscribing! Check your inbox soon.'); // Mock handler
+               }}
+            >
+              <div className="relative flex-1">
+                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                 <input 
+                    type="email" 
+                    required
+                    placeholder="Enter your email address" 
+                    className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 text-[15px] font-medium outline-none focus:border-[#2286BE] focus:ring-1 focus:ring-[#2286BE] transition-all"
+                 />
+              </div>
+              <button 
+                 type="submit"
+                 className="h-14 px-8 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black rounded-2xl transition-all active:scale-95 shadow-xl shadow-primary/10 flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                Join Now <Send size={16} />
+              </button>
+            </form>
           </div>
         </div>
+      </div>
 
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-20">
+      {/* Main Footer Links */}
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 md:gap-16">
           
-          {/* Logo & Description */}
-          <div className="lg:col-span-2">
-            <Link href="/" className="inline-block mb-6">
-              <span className="text-2xl font-black text-white tracking-tight flex items-center">
-                Locally<span className="text-[#2286BE]">Serve</span>
-              </span>
+          {/* Brand Info */}
+          <div className="col-span-1">
+            <Link href="/" className="inline-flex items-center gap-2 mb-8">
+              <div className="h-10 w-10 bg-[#2286BE] rounded-xl flex items-center justify-center p-2">
+                 <Image src={BRAND.logo} alt={BRAND.name} width={24} height={24} className="invert" />
+              </div>
+              <span className="text-2xl font-black tracking-tight">{BRAND.name}</span>
             </Link>
-            <p className="text-slate-400 font-medium leading-relaxed mb-8 max-w-sm">
-              Connecting you with the most skilled professionals in your neighborhood. 
-              Quality service, guaranteed locally.
+            <p className="text-slate-400 text-[15px] font-medium leading-[1.6] mb-8">
+              {BRAND.tagline} Connecting trust with neighbors since 2024.
             </p>
-            
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-3 text-slate-300">
-                <div className="p-2 bg-slate-800 rounded-lg"><MapPin size={16} className="text-[#2286BE]" /></div>
-                <span className="text-sm font-bold">{city}</span>
-              </div>
-              <div className="flex items-center gap-3 text-slate-300">
-                <div className="p-2 bg-slate-800 rounded-lg"><Phone size={16} className="text-[#2286BE]" /></div>
-                <span className="text-sm font-bold">+880 1700 000000</span>
-              </div>
-            </div>
-
             <div className="flex items-center gap-4">
-              {[
-                { icon: <FaFacebookF />, href: "#" },
-                { icon: <FaTwitter />, href: "#" },
-                { icon: <FaInstagram />, href: "#" },
-                { icon: <FaLinkedinIn />, href: "#" },
-                { icon: <FaYoutube />, href: "#" }
-              ].map((social, idx) => (
-                <Link 
-                  key={idx} 
-                  href={social.href} 
-                  className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:bg-[#2286BE] hover:text-white transition-all duration-300 shadow-sm"
-                >
-                  {social.icon}
-                </Link>
-              ))}
+              <a href={SOCIAL_LINKS.facebook} aria-label="Facebook" className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:bg-[#2286BE] hover:text-white transition-all"><Facebook size={20} /></a>
+              <a href={SOCIAL_LINKS.twitter} aria-label="Twitter" className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:bg-[#2286BE] hover:text-white transition-all"><Twitter size={20} /></a>
+              <a href={SOCIAL_LINKS.instagram} aria-label="Instagram" className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:bg-[#2286BE] hover:text-white transition-all"><Instagram size={20} /></a>
+              <a href={SOCIAL_LINKS.linkedin} aria-label="LinkedIn" className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:bg-[#2286BE] hover:text-white transition-all"><Linkedin size={20} /></a>
             </div>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-white font-black uppercase tracking-widest text-[12px] mb-6">Services</h4>
+            <h4 className="text-[13px] font-black uppercase tracking-widest text-[#2286BE] mb-8">Explore</h4>
             <ul className="space-y-4">
-              {['Cleaning', 'Plumbing', 'Electrical', 'Appliances', 'Shifting'].map(item => (
-                <li key={item}>
-                  <Link href={`/services?category=${item}`} className="text-slate-400 hover:text-[#2286BE] font-bold text-sm transition-colors">{item}</Link>
-                </li>
-              ))}
+              <li><Link href="/services" className="text-slate-400 font-medium hover:text-white transition-colors">Find Services</Link></li>
+              <li><Link href="/categories" className="text-slate-400 font-medium hover:text-white transition-colors">Categories</Link></li>
+              <li><Link href="/success-stories" className="text-slate-400 font-medium hover:text-white transition-colors">Success Stories</Link></li>
+              <li><Link href="/join-provider" className="text-slate-400 font-medium hover:text-white transition-colors">Join as Pro</Link></li>
+              <li><Link href="/about" className="text-slate-400 font-medium hover:text-white transition-colors">Our Story</Link></li>
             </ul>
           </div>
 
+          {/* Support */}
           <div>
-            <h4 className="text-white font-black uppercase tracking-widest text-[12px] mb-6">For Partners</h4>
+            <h4 className="text-[13px] font-black uppercase tracking-widest text-[#2286BE] mb-8">Support</h4>
             <ul className="space-y-4">
-              {[
-                { label: 'Join as Provider', href: '/join-provider' },
-                { label: 'Provider Help', href: '/provider-help' },
-                { label: 'Success Stories', href: '/success-stories' },
-                { label: 'Affiliate Program', href: '/affiliate' },
-              ].map(item => (
-                <li key={item.label}>
-                  <Link href={item.href} className="text-slate-400 hover:text-[#2286BE] font-bold text-sm transition-colors">{item.label}</Link>
-                </li>
-              ))}
+              <li><Link href={CONTACT.supportUrl} className="text-slate-400 font-medium hover:text-white transition-colors">Help Center</Link></li>
+              <li><Link href="/terms" className="text-slate-400 font-medium hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link href="/privacy" className="text-slate-400 font-medium hover:text-white transition-colors">Privacy Policy</Link></li>
             </ul>
           </div>
 
+          {/* Contact */}
           <div>
-            <h4 className="text-white font-black uppercase tracking-widest text-[12px] mb-6">Company</h4>
-            <ul className="space-y-4">
-              {[
-                { label: 'About Us', href: '/about' },
-                { label: 'Contact', href: '/contact' },
-                { label: 'Terms', href: '/terms' },
-                { label: 'Privacy', href: '/privacy' },
-              ].map(item => (
-                <li key={item.label}>
-                  <Link href={item.href} className="text-slate-400 hover:text-[#2286BE] font-bold text-sm transition-colors">{item.label}</Link>
-                </li>
-              ))}
-              <li className="pt-2">
-                <Select value={city} onValueChange={handleCityChange}>
-                  <SelectTrigger className="w-full bg-slate-800 border-slate-700 text-white text-xs h-10 font-bold rounded-xl">
-                    <SelectValue placeholder="City" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                    <SelectItem value="Dhaka, Bangladesh">Dhaka</SelectItem>
-                    <SelectItem value="Chattogram, Bangladesh">Chattogram</SelectItem>
-                    <SelectItem value="Sylhet, Bangladesh">Sylhet</SelectItem>
-                    <SelectItem value="Rajshahi, Bangladesh">Rajshahi</SelectItem>
-                  </SelectContent>
-                </Select>
+            <h4 className="text-[13px] font-black uppercase tracking-widest text-[#2286BE] mb-8">Contact</h4>
+            <ul className="space-y-6">
+              <li className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-[#2286BE] shrink-0" aria-hidden="true">
+                   <Phone size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Call Us</p>
+                  <a href={`tel:${CONTACT.phone.replace(/\s/g, '')}`} className="text-slate-200 font-black hover:text-[#2286BE] transition-colors">{CONTACT.phone}</a>
+                </div>
+              </li>
+              <li className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-[#2286BE] shrink-0" aria-hidden="true">
+                   <Mail size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-0.5">Email Us</p>
+                  <a href={`mailto:${CONTACT.email}`} className="text-slate-200 font-black hover:text-[#2286BE] transition-colors">{CONTACT.email}</a>
+                </div>
               </li>
             </ul>
           </div>
-        </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-10 border-t border-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-6">
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">
-            © 2026 LocallyServe. Made with ❤️ for your neighborhood.
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="border-t border-white/5 bg-slate-950/50">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <p className="text-slate-500 text-sm font-medium">
+            © {currentYear} {BRAND.name} Marketplace. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-widest">
-              <Globe size={14} /> English (US)
-            </div>
-            <div className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-widest">
-              ৳ BDT
-            </div>
+            <Link href={APP_LINKS.appStore} className="text-slate-500 hover:text-white text-[13px] font-bold transition-colors">iOS App</Link>
+            <Link href={APP_LINKS.googlePlay} className="text-slate-500 hover:text-white text-[13px] font-bold transition-colors">Android App</Link>
           </div>
         </div>
-
       </div>
     </footer>
   );
-};
-
-export default Footer;
+}

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -75,10 +75,6 @@
   --radius-3xl: calc(var(--radius) * 3);
 }
 
-* {
-  @apply transition-colors duration-200;
-}
-
 body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -106,6 +102,13 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Accessible focus-visible styles — never suppress focus rings */
+  *:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
@@ -138,4 +141,12 @@ body {
 .dark .glass {
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth link & button transitions — targeted, not global */
+a,
+button,
+[role="button"] {
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease, opacity 0.2s ease, transform 0.15s ease;
 }
