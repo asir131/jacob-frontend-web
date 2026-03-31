@@ -2,9 +2,12 @@ import type { Metadata } from 'next';
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import StoreProvider from "@/providers/StoreProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import { LocationProvider } from "@/contexts/LocationContext";
 import "react-day-picker/style.css";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { Toaster } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BRAND, SEO, CONTACT, SOCIAL_LINKS } from "@/lib/constants";
@@ -96,16 +99,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="antialiased flex flex-col min-h-screen">
         <ErrorBoundary>
-          <AuthProvider>
-            <LocationProvider>
-              <Header />
-              <div className="pt-[72px] lg:pt-[88px]">
-                <main className="flex-1">{children}</main>
-              </div>
-              <Footer />
-              <Toaster position="top-center" richColors />
-            </LocationProvider>
-          </AuthProvider>
+          <StoreProvider>
+            <AuthProvider>
+              <SocketProvider>
+                <LocationProvider>
+                  <Header />
+                  <div className="pt-[72px] lg:pt-[88px]">
+                    <main className="flex-1">{children}</main>
+                  </div>
+                  <Footer />
+                  <Toaster position="top-center" richColors />
+                </LocationProvider>
+              </SocketProvider>
+            </AuthProvider>
+          </StoreProvider>
         </ErrorBoundary>
       </body>
     </html>

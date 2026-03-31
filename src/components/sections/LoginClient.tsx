@@ -11,8 +11,30 @@ import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 
 type LoginView = 'login' | 'forgot-email' | 'forgot-otp' | 'new-password' | 'success';
+type LoginResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    accessToken: string;
+    refreshToken: string;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: 'client' | 'provider' | 'superAdmin';
+      avatar?: string;
+      phone?: string;
+      address?: string;
+      preferredLanguage?: string;
+      locationLat?: number | null;
+      locationLng?: number | null;
+    };
+  };
+};
 
 export default function LoginClient() {
   const { login } = useAuth();
@@ -24,18 +46,62 @@ export default function LoginClient() {
   const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const loginPayload = {
+      email: email.trim(),
+      password,
+    };
+
+    if (!loginPayload.email || !loginPayload.password) {
+      toast.error('Email and password are required.');
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      toast.error('Missing NEXT_PUBLIC_API_URL. Set frontend API base URL first.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      login('client');
+      const { data, error } = await api.post<LoginResponse>('/api/auth/login', loginPayload);
+
+      if (error) {
+        toast.error(error);
+        return;
+      }
+
+      if (!data?.success || !data.data) {
+        toast.error(data?.message || 'Login failed. Please try again.');
+        return;
+      }
+
+      localStorage.setItem('auth_token', data.data.accessToken);
+      localStorage.setItem('refresh_token', data.data.refreshToken);
+
+      const normalizedRole = data.data.user.role === 'provider' ? 'provider' : 'client';
+      login({
+        id: data.data.user.id,
+        firstName: data.data.user.firstName,
+        lastName: data.data.user.lastName,
+        email: data.data.user.email,
+        role: normalizedRole,
+        avatar: data.data.user.avatar,
+        phone: data.data.user.phone,
+        address: data.data.user.address,
+        preferredLanguage: data.data.user.preferredLanguage,
+        locationLat: data.data.user.locationLat ?? undefined,
+        locationLng: data.data.user.locationLng ?? undefined,
+      });
       toast.success(`Welcome back to ${BRAND.name}!`);
-      router.push('/client/dashboard');
+      router.push('/');
     } catch {
-      toast.error('Invalid credentials. Please try again.');
+      toast.error('Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -92,8 +158,17 @@ export default function LoginClient() {
                   <label htmlFor="login-email" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Email Address</label>
                   <div className="relative group">
                     <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors" />
-                    <Input id="login-email" type="email" name="email" autoComplete="email" placeholder="john@example.com"
-                      className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold text-slate-900" required />
+                    <Input
+                      id="login-email"
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      placeholder="john@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold text-slate-900"
+                      required
+                    />
                   </div>
                 </div>
 
@@ -102,8 +177,18 @@ export default function LoginClient() {
                   <label htmlFor="login-password" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Password</label>
                   <div className="relative group">
                     <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors" />
-                    <Input id="login-password" type={showPassword ? 'text' : 'password'} name="password" autoComplete="current-password"
-                      placeholder="••••••••" className="h-14 pl-12 pr-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold text-slate-900" required minLength={8} />
+                    <Input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      autoComplete="current-password"
+                      placeholder="********"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-14 pl-12 pr-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold text-slate-900"
+                      required
+                      minLength={8}
+                    />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -132,7 +217,7 @@ export default function LoginClient() {
 
                 <Button type="submit" disabled={isLoading} aria-busy={isLoading}
                   className="w-full h-16 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-lg rounded-2xl shadow-xl shadow-[#2286BE]/20 mt-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60">
-                  {isLoading ? 'Signing in…' : <> Sign In <ChevronRight size={20} className="ml-2" /></>}
+                  {isLoading ? 'Signing in...' : <> Sign In <ChevronRight size={20} className="ml-2" /></>}
                 </Button>
               </form>
 
@@ -278,3 +363,4 @@ export default function LoginClient() {
     </div>
   );
 }
+

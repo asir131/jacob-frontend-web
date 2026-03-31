@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 
 const initialNotifications = [
   {
@@ -67,15 +68,34 @@ const itemVariants = {
 };
 
 export default function NotificationsPage() {
+  const {
+    notifications: liveNotifications,
+    markAllNotificationsAsRead,
+    clearNotifications,
+  } = useSocketNotifications();
   const [notifications, setNotifications] = useState(initialNotifications);
   const [filter, setFilter] = useState('all');
 
-  const filteredNotifications = notifications.filter(n => 
+  const socketMappedNotifications = liveNotifications.map((item, index) => ({
+    id: Number(`9${index + 1}`),
+    type: item.type,
+    title: item.title,
+    description: item.description,
+    time: new Date(item.createdAt).toLocaleString(),
+    unread: item.unread,
+    icon: <Bell className="text-[#2286BE]" />,
+    color: 'bg-primary-soft',
+  }));
+
+  const allNotifications = [...socketMappedNotifications, ...notifications];
+
+  const filteredNotifications = allNotifications.filter(n => 
     filter === 'all' ? true : n.type === filter
   );
 
   const markAllAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, unread: false })));
+    markAllNotificationsAsRead();
   };
 
   const deleteNotification = (id: number) => {
@@ -110,6 +130,10 @@ export default function NotificationsPage() {
               </Button>
               <Button 
                 variant="outline" 
+                onClick={() => {
+                  setNotifications([]);
+                  clearNotifications();
+                }}
                 className="border-slate-200 text-slate-600 font-bold rounded-xl h-11 shadow-sm hover:border-[#2286BE] hover:text-[#2286BE]"
               >
                  Clear History

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, 
   X, 
@@ -20,7 +20,9 @@ import {
 } from 'lucide-react';
 import { BRAND, CONTACT } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -31,9 +33,11 @@ import {
 
 export default function Header() {
   const { user, role, setRole, logout, isAuthenticated } = useAuth();
+  const { unreadCount } = useSocketNotifications();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -102,7 +106,11 @@ export default function Header() {
                   <Link href="/notifications" aria-label="Notifications">
                     <button className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors relative ${isScrolled ? 'hover:bg-slate-100 text-slate-500 hover:text-[#2286BE]' : 'bg-white/50 hover:bg-white text-slate-500 hover:text-[#2286BE]'}`}>
                       <Bell size={20} strokeWidth={2.5} />
-                      <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
+                      {unreadCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      ) : null}
                     </button>
                   </Link>
                   <Link href="/messages" aria-label="Messages">
@@ -116,9 +124,12 @@ export default function Header() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 group outline-none">
-                       <div className="h-10 w-10 rounded-xl bg-[#2286BE]/10 border border-[#2286BE]/20 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
-                          <User size={20} className="text-[#2286BE]" strokeWidth={2.5} />
-                       </div>
+                       <Avatar className="h-10 w-10 rounded-xl bg-[#2286BE]/10 border border-[#2286BE]/20 overflow-hidden transition-transform group-hover:scale-105">
+                          <AvatarImage src={user?.avatar || ''} alt={user?.name || 'User'} />
+                          <AvatarFallback className="bg-[#2286BE]/10 text-[#2286BE]">
+                            <User size={20} strokeWidth={2.5} />
+                          </AvatarFallback>
+                       </Avatar>
                        <ChevronDown size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
                     </button>
                   </DropdownMenuTrigger>
@@ -166,7 +177,13 @@ export default function Header() {
                     </Link>
                     
                     <DropdownMenuSeparator className="bg-slate-50" />
-                    <DropdownMenuItem onClick={() => logout()} className="rounded-xl focus:bg-red-50 focus:text-red-500 font-bold py-2.5 text-red-500 cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        logout();
+                        router.push('/login');
+                      }}
+                      className="rounded-xl focus:bg-red-50 focus:text-red-500 font-bold py-2.5 text-red-500 cursor-pointer"
+                    >
                       <LogOut className="mr-3 h-4 w-4" /> Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -232,7 +249,11 @@ export default function Header() {
                    <Link href="/notifications" aria-label="Notifications">
                      <button className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 relative">
                        <Bell size={24} />
-                       <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full" />
+                       {unreadCount > 0 ? (
+                         <span className="absolute top-0 right-0 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                           {unreadCount > 9 ? '9+' : unreadCount}
+                         </span>
+                       ) : null}
                      </button>
                    </Link>
                    <Link href="/messages" aria-label="Messages">

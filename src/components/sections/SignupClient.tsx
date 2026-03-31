@@ -8,18 +8,108 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
+import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+
+type SignupForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+};
+
+type SignupResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    email: string;
+    otpExpiresInMinutes: number;
+  };
+};
 
 export default function SignupClient() {
+  const router = useRouter();
   const [role, setRole] = useState<'client' | 'provider'>('client');
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<SignupForm>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+  });
+
+  const handleChange = (field: keyof SignupForm, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    const payload = {
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      role,
+    };
+
+    if (!payload.firstName || !payload.lastName || !payload.email || !payload.password) {
+      toast.error('Please fill in all required fields.');
+      return;
+    }
+
+    if (payload.password.length < 8) {
+      toast.error('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      toast.error('Missing NEXT_PUBLIC_API_URL. Set frontend API base URL first.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1400));
-      toast.success(`Account created! Welcome to ${BRAND.name}.`);
+      const { data, error } = await api.post<SignupResponse>('/api/auth/signup', payload);
+
+      if (error) {
+        toast.error(error);
+        return;
+      }
+
+      if (!data?.success) {
+        toast.error(data?.message || 'Registration failed. Please try again.');
+        return;
+      }
+
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: payload.email,
+        password: '',
+      });
+
+      const expiresIn = data.data?.otpExpiresInMinutes;
+      toast.success(
+        expiresIn
+          ? `OTP sent to ${payload.email}. It expires in ${expiresIn} minutes.`
+          : `OTP sent to ${payload.email}.`
+      );
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(
+          'pending_signup_auth',
+          JSON.stringify({
+            email: payload.email,
+            password: payload.password,
+            role,
+            createdAt: Date.now(),
+          })
+        );
+      }
+
+      router.push(`/signup/verify-otp?email=${encodeURIComponent(payload.email)}`);
     } catch {
       toast.error('Registration failed. Please try again or contact support.');
     } finally {
@@ -29,7 +119,6 @@ export default function SignupClient() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 py-20 relative overflow-hidden">
-      {/* Decorative Elements */}
       <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-[#2286BE]/5 rounded-full blur-[140px] -translate-x-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#2286BE]/5 rounded-full blur-[120px] translate-x-1/2 translate-y-1/2 pointer-events-none" aria-hidden="true" />
 
@@ -47,7 +136,6 @@ export default function SignupClient() {
           <p className="text-slate-500 font-medium text-lg">Join {BRAND.name} and start your journey today.</p>
         </div>
 
-        {/* Role Selector */}
         <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-10" role="group" aria-label="Account type selection">
           <button
             type="button"
@@ -76,9 +164,11 @@ export default function SignupClient() {
                 </label>
                 <Input
                   id="signup-firstname"
-                  name="firstname"
+                  name="firstName"
                   autoComplete="given-name"
                   placeholder="John"
+                  value={formData.firstName}
+                  onChange={(e) => handleChange('firstName', e.target.value)}
                   className="h-14 rounded-2xl border border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                 />
@@ -89,9 +179,11 @@ export default function SignupClient() {
                 </label>
                 <Input
                   id="signup-lastname"
-                  name="lastname"
+                  name="lastName"
                   autoComplete="family-name"
                   placeholder="Doe"
+                  value={formData.lastName}
+                  onChange={(e) => handleChange('lastName', e.target.value)}
                   className="h-14 rounded-2xl border border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                 />
@@ -110,6 +202,8 @@ export default function SignupClient() {
                   name="email"
                   autoComplete="email"
                   placeholder="john@example.com"
+                  value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
                   className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                 />
@@ -128,6 +222,8 @@ export default function SignupClient() {
                   name="password"
                   autoComplete="new-password"
                   placeholder="Min. 8 characters"
+                  value={formData.password}
+                  onChange={(e) => handleChange('password', e.target.value)}
                   className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                   minLength={8}
@@ -153,7 +249,7 @@ export default function SignupClient() {
               aria-busy={isLoading}
               className="w-full h-16 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-lg rounded-2xl shadow-xl shadow-[#2286BE]/20 mt-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {isLoading ? 'Creating account…' : <>Create Account <CheckCircle2 size={20} className="ml-2" aria-hidden="true" /></>}
+              {isLoading ? 'Creating account...' : <>Create Account <CheckCircle2 size={20} className="ml-2" aria-hidden="true" /></>}
             </Button>
           </form>
         </div>
