@@ -24,7 +24,7 @@ type PackageState = {
 const PACKAGE_NAMES = ['Basic', 'Standard', 'Premium'];
 const INITIAL_PACKAGES: PackageState[] = PACKAGE_NAMES.map((name, index) => ({
   name,
-  title: `${name} package`,
+  title: '',
   description: '',
   deliveryTime: String(index + 1),
   price: String((index + 1) * 15),
@@ -324,7 +324,12 @@ export default function CreateGigPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-xs font-semibold text-slate-500 mb-1 block">Title</label>
-                        <Input value={pkg.title} onChange={(e) => updatePackage(idx, 'title', e.target.value)} className="h-10 text-sm focus-visible:ring-[#2286BE]" placeholder="Short Title" />
+                        <Input
+                          value={pkg.title}
+                          onChange={(e) => updatePackage(idx, 'title', e.target.value)}
+                          className="h-10 text-sm focus-visible:ring-[#2286BE]"
+                          placeholder={`${pkg.name} package`}
+                        />
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-slate-500 mb-1 block">Description</label>
