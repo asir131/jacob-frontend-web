@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Package, MessageSquare, CreditCard, ChevronRight, Filter, CheckCircle2, Trash2, Clock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -73,8 +73,14 @@ export default function NotificationsPage() {
     markAllNotificationsAsRead,
     clearNotifications,
   } = useSocketNotifications();
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState(() =>
+    initialNotifications.map((item) => ({ ...item, unread: false }))
+  );
   const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    markAllNotificationsAsRead();
+  }, [markAllNotificationsAsRead]);
 
   const socketMappedNotifications = liveNotifications.map((item, index) => ({
     id: Number(`9${index + 1}`),

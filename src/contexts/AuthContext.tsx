@@ -34,7 +34,7 @@ interface LoginPayload {
 interface AuthState {
   user: AuthUser | null;
   role: Role;
-  setRole: (role: Role) => void;
+  setRole: (role: Role) => Promise<void>;
   isAuthenticated: boolean;
   login: (payload?: LoginPayload) => void;
   updateProfile: (payload: Partial<AuthUser>) => void;
@@ -78,12 +78,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch(hydrateAuthState(storedUser));
   }, [dispatch]);
 
-  const setRole = (nextRole: Role) => {
+  const setRole = async (nextRole: Role) => {
     dispatch(setAuthRole(nextRole));
 
     if (typeof window !== 'undefined' && user) {
       const nextUser = { ...user, role: nextRole };
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+
+      const token = localStorage.getItem('auth_token');
+      const apiBase = process.env.NEXT_PUBLIC_API_URL;
+      if (token && apiBase) {
+        try {
+          const response = await fetch(`${apiBase}/api/profile/me`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ role: nextRole }),
+          });
+
+          const payload = await response.json();
+          if (response.ok && payload?.success && payload?.data?.user) {
+            const updatedUser = payload.data.user as AuthUser;
+            dispatch(updateAuthProfile(updatedUser));
+            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
+          }
+        } catch {
+          // keep local switch even if backend sync fails
+        }
+      }
     }
   };
 

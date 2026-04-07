@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 export default function Header() {
   const { user, role, setRole, logout, isAuthenticated } = useAuth();
@@ -142,7 +143,16 @@ export default function Header() {
                     
                     <div className="px-2 pb-2">
                       <Button
-                        onClick={() => setRole(role === 'client' ? 'provider' : 'client')}
+                        onClick={async () => {
+                          const nextRole = role === 'client' ? 'provider' : 'client';
+                          await setRole(nextRole);
+                          toast.success(
+                            nextRole === 'provider'
+                              ? 'Switched to selling mode.'
+                              : 'Switched to buying mode.'
+                          );
+                          router.push(nextRole === 'provider' ? '/provider/dashboard' : '/client/dashboard');
+                        }}
                         className="w-full h-10 bg-[#2286BE]/5 hover:bg-[#2286BE]/10 text-[#2286BE] font-black text-xs uppercase tracking-widest rounded-xl transition-all border border-[#2286BE]/10"
                       >
                         <ArrowLeftRight size={14} className="mr-2" />
@@ -161,6 +171,14 @@ export default function Header() {
                         <Briefcase className="mr-3 h-4 w-4" /> My Orders
                       </DropdownMenuItem>
                     </Link>
+
+                    {role === 'provider' && (
+                      <Link href="/provider/gigs">
+                        <DropdownMenuItem className="rounded-xl focus:bg-[#2286BE]/5 focus:text-[#2286BE] font-bold py-2.5 cursor-pointer">
+                          <LayoutDashboard className="mr-3 h-4 w-4" /> My Gig
+                        </DropdownMenuItem>
+                      </Link>
+                    )}
 
                     {role === 'client' && (
                       <Link href="/client/saved-services">

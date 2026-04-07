@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
@@ -72,13 +72,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const unreadCount = useMemo(() => notifications.filter((item) => item.unread).length, [notifications]);
 
-  const markAllNotificationsAsRead = () => {
+  const markAllNotificationsAsRead = useCallback(() => {
     dispatch(markAllNotificationsAsReadAction());
-  };
+  }, [dispatch]);
 
-  const clearNotifications = () => {
+  const clearNotifications = useCallback(() => {
     dispatch(clearNotificationsAction());
-  };
+  }, [dispatch]);
 
   return (
     <SocketContext.Provider
