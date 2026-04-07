@@ -34,6 +34,11 @@ type LoginResponse = {
       preferredLanguage?: string;
       locationLat?: number | null;
       locationLng?: number | null;
+      businessBio?: string;
+      experienceLevel?: string;
+      serviceCity?: string;
+      serviceLocationLat?: number | null;
+      serviceLocationLng?: number | null;
     };
   };
 };
@@ -150,6 +155,11 @@ export default function SignupOtpVerifyClient() {
         preferredLanguage: loginRes.data.data.user.preferredLanguage,
         locationLat: loginRes.data.data.user.locationLat ?? undefined,
         locationLng: loginRes.data.data.user.locationLng ?? undefined,
+        businessBio: loginRes.data.data.user.businessBio,
+        experienceLevel: loginRes.data.data.user.experienceLevel,
+        serviceCity: loginRes.data.data.user.serviceCity,
+        serviceLocationLat: loginRes.data.data.user.serviceLocationLat ?? undefined,
+        serviceLocationLng: loginRes.data.data.user.serviceLocationLng ?? undefined,
       });
 
       sessionStorage.removeItem('pending_signup_auth');

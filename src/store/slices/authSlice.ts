@@ -15,6 +15,11 @@ export interface AuthUser {
   preferredLanguage?: string;
   locationLat?: number;
   locationLng?: number;
+  businessBio?: string;
+  experienceLevel?: string;
+  serviceCity?: string;
+  serviceLocationLat?: number;
+  serviceLocationLng?: number;
 }
 
 interface AuthState {

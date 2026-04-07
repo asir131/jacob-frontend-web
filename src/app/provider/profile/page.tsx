@@ -1,113 +1,410 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
-  User, Shield, Bell, CreditCard, LogOut, Camera, MapPin,
-  Phone, Mail, ChevronRight, Save, Eye, EyeOff, Briefcase,
-  Banknote, Building2, Plus, X, Lock, Smartphone, Monitor,
-  Trash2, Check, Tag, Clock, DollarSign, ImagePlus, AlertTriangle,
-  CheckCircle2, ShieldCheck, Info, Settings
+  Bell,
+  Banknote,
+  Briefcase,
+  Camera,
+  ChevronRight,
+  CreditCard,
+  LogOut,
+  Mail,
+  MapPin,
+  Navigation,
+  Save,
+  Shield,
+  User,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from '@/contexts/LocationContext';
+import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-const notificationGroups = [
-  {
-    label: 'Order Alerts',
-    items: [
-      { id: 'new_order', icon: <Briefcase size={18} />, title: 'New Order', desc: 'Get notified when a client places a new booking', defaultOn: true },
-      { id: 'order_accepted', icon: <CheckCircle2 size={18} />, title: 'Order Accepted', desc: 'Confirmation when your acceptance is registered', defaultOn: true },
-      { id: 'order_cancelled', icon: <X size={18} />, title: 'Order Cancelled', desc: 'Alert when a client cancels their booking', defaultOn: true },
-    ],
-  },
-  {
-    label: 'Earnings',
-    items: [
-      { id: 'payout', icon: <Banknote size={18} />, title: 'Payout Processed', desc: 'Notified when your earnings are transferred', defaultOn: true },
-      { id: 'weekly', icon: <Clock size={18} />, title: 'Weekly Summary', desc: 'A digest of your weekly performance and earnings', defaultOn: false },
-    ],
-  },
-  {
-    label: 'Marketing',
-    items: [
-      { id: 'promos', icon: <Tag size={18} />, title: 'Tips & Promotions', desc: 'Helpful tips and promotional opportunities', defaultOn: false },
-      { id: 'features', icon: <Info size={18} />, title: 'New Features', desc: 'Be the first to hear about platform updates', defaultOn: true },
-    ],
-  },
-];
-
-function PasswordStrength({ password }: { password: string }) {
-  const strength = password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : /[A-Z]/.test(password) && /[0-9]/.test(password) && /[^a-zA-Z0-9]/.test(password) ? 4 : 3;
-  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-  const colors = ['', 'bg-red-400', 'bg-amber-400', 'bg-blue-400', 'bg-emerald-400'];
-  if (password.length === 0) return null;
-  return (
-    <div className="space-y-1.5">
-      <div className="flex gap-1.5">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i <= strength ? colors[strength] : 'bg-slate-100'}`} />
-        ))}
-      </div>
-      <p className={`text-xs font-bold ${strength === 1 ? 'text-red-400' : strength === 2 ? 'text-amber-500' : strength === 3 ? 'text-blue-500' : 'text-emerald-500'}`}>
-        {labels[strength]}
-      </p>
-    </div>
-  );
-}
+const formatAddress = (area: string, district: string, zip: string) =>
+  [area || 'Area unavailable', district || 'District unavailable', zip || 'ZIP N/A'].join(', ');
 
 export default function ProviderProfilePage() {
+  const { user, role, logout, updateProfile } = useAuth();
+  const { city, coordinates, detectLocation } = useLocation();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [activeTab, setActiveTab] = useState('profile');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [twoFactor, setTwoFactor] = useState(false);
-  const [activeDays, setActiveDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-  const [skills, setSkills] = useState(['Deep Cleaning', 'Eco-Friendly', 'Carpet Cleaning']);
-  const [skillInput, setSkillInput] = useState('');
-  const [notifChannel, setNotifChannel] = useState('email');
-  const [notifStates, setNotifStates] = useState<Record<string, boolean>>(
-    Object.fromEntries(notificationGroups.flatMap(g => g.items.map(i => [i.id, i.defaultOn])))
-  );
+  const [contactNameDraft, setContactNameDraft] = useState<string | null>(null);
+  const [bioDraft, setBioDraft] = useState<string | null>(null);
+  const [experienceDraft, setExperienceDraft] = useState<string | null>(null);
+  const [serviceCityDraft, setServiceCityDraft] = useState<string | null>(null);
+  const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
 
-  const handleSave = (section: string) => {
-    toast.success(`${section} updated successfully!`);
-  };
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isResolvingCity, setIsResolvingCity] = useState(false);
+  const [selectedMapCoords, setSelectedMapCoords] = useState<{ lat: number; lng: number }>({
+    lat: 40.7128,
+    lng: -74.006,
+  });
 
-  const toggleDay = (day: string) => {
-    setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-  };
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-  const addSkill = () => {
-    const trimmed = skillInput.trim();
-    if (trimmed && !skills.includes(trimmed)) {
-      setSkills(prev => [...prev, trimmed]);
-      setSkillInput('');
+  const defaultContactName = user ? user.name || `${user.firstName} ${user.lastName}`.trim() : '';
+  const defaultBusinessBio = user?.businessBio || '';
+  const defaultExperience = user?.experienceLevel || '';
+  const defaultServiceCity = user?.serviceCity || city;
+  const defaultAvatarSrc = user?.avatar || '';
+
+  const contactName = contactNameDraft ?? defaultContactName;
+  const businessBio = bioDraft ?? defaultBusinessBio;
+  const experienceLevel = experienceDraft ?? defaultExperience;
+  const serviceCity = serviceCityDraft ?? defaultServiceCity;
+  const avatar = avatarDraft ?? defaultAvatarSrc;
+
+  const savedServiceLat = typeof user?.serviceLocationLat === 'number' ? user.serviceLocationLat : null;
+  const savedServiceLng = typeof user?.serviceLocationLng === 'number' ? user.serviceLocationLng : null;
+  const coordLat = coordinates?.lat ?? null;
+  const coordLng = coordinates?.lng ?? null;
+
+  useEffect(() => {
+    if (savedServiceLat !== null && savedServiceLng !== null) {
+      setSelectedMapCoords({ lat: savedServiceLat, lng: savedServiceLng });
+      return;
+    }
+
+    if (coordLat !== null && coordLng !== null) {
+      setSelectedMapCoords({ lat: coordLat, lng: coordLng });
+    }
+  }, [coordLat, coordLng, savedServiceLat, savedServiceLng]);
+
+  const resetDrafts = () => {
+    setContactNameDraft(null);
+    setBioDraft(null);
+    setExperienceDraft(null);
+    setServiceCityDraft(null);
+    setAvatarDraft(null);
+
+    if (savedServiceLat !== null && savedServiceLng !== null) {
+      setSelectedMapCoords({ lat: savedServiceLat, lng: savedServiceLng });
     }
   };
 
-  const removeSkill = (skill: string) => setSkills(prev => prev.filter(s => s !== skill));
+  const getAddressFromCoordinates = async (lat: number, lng: number) => {
+    const fallbackText = formatAddress('', '', '');
 
-  const sectionAnim = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 },
-    transition: { duration: 0.25 },
+    if (!mapboxToken) {
+      try {
+        const fallbackRes = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+        );
+
+        if (!fallbackRes.ok) return fallbackText;
+        const fallbackData = (await fallbackRes.json()) as {
+          locality?: string;
+          city?: string;
+          principalSubdivision?: string;
+          postcode?: string;
+        };
+
+        return formatAddress(
+          fallbackData.locality || fallbackData.city || '',
+          fallbackData.principalSubdivision || '',
+          fallbackData.postcode || ''
+        );
+      } catch {
+        return fallbackText;
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?language=en&limit=10&access_token=${mapboxToken}`
+      );
+      if (!response.ok) return fallbackText;
+
+      const data = (await response.json()) as {
+        features?: Array<{
+          id: string;
+          text: string;
+          place_type?: string[];
+          context?: Array<{ id: string; text: string }>;
+        }>;
+      };
+
+      const features = data.features || [];
+      const topFeature = features[0];
+      const contexts = topFeature?.context || [];
+
+      const fromContext = (prefix: string) =>
+        contexts.find((item) => item.id?.startsWith(prefix))?.text || '';
+      const fromFeature = (type: string) =>
+        features.find((item) => item.place_type?.includes(type))?.text || '';
+
+      const area =
+        fromFeature('neighborhood') ||
+        fromFeature('locality') ||
+        topFeature?.text ||
+        fromFeature('address') ||
+        fromFeature('place');
+      const district =
+        fromContext('district.') ||
+        fromFeature('district') ||
+        fromContext('place.') ||
+        fromFeature('place') ||
+        fromContext('region.');
+      const zip = fromContext('postcode.') || fromFeature('postcode');
+
+      return formatAddress(area || '', district || '', zip || '');
+    } catch {
+      return fallbackText;
+    }
   };
+
+  const saveCoordinatesAsServiceCity = async (lat: number, lng: number, successMessage: string) => {
+    setIsResolvingCity(true);
+    const nextCity = await getAddressFromCoordinates(lat, lng);
+    setServiceCityDraft(nextCity);
+    setSelectedMapCoords({ lat, lng });
+    updateProfile({
+      serviceCity: nextCity,
+      serviceLocationLat: lat,
+      serviceLocationLng: lng,
+    });
+    setIsResolvingCity(false);
+    toast.success(successMessage);
+  };
+
+  const handleUseCurrentLocation = async () => {
+    detectLocation();
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          void saveCoordinatesAsServiceCity(
+            position.coords.latitude,
+            position.coords.longitude,
+            'Service city updated from current location.'
+          );
+        },
+        async () => {
+          if (coordinates) {
+            await saveCoordinatesAsServiceCity(
+              coordinates.lat,
+              coordinates.lng,
+              'Service city updated from current location.'
+            );
+            return;
+          }
+
+          setServiceCityDraft(city);
+          updateProfile({ serviceCity: city });
+          toast.success('Service city set from detected city.');
+        }
+      );
+      return;
+    }
+
+    if (coordinates) {
+      await saveCoordinatesAsServiceCity(coordinates.lat, coordinates.lng, 'Service city updated.');
+      return;
+    }
+
+    setServiceCityDraft(city);
+    updateProfile({ serviceCity: city });
+    toast.success('Service city set from detected city.');
+  };
+
+  const handleSetCenterAsServiceCity = async () => {
+    await saveCoordinatesAsServiceCity(
+      selectedMapCoords.lat,
+      selectedMapCoords.lng,
+      'Map center saved as service city.'
+    );
+  };
+
+  const handleUploadAvatar = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+
+    const uploadAvatar = async () => {
+      const token = localStorage.getItem('auth_token');
+      const apiBase = process.env.NEXT_PUBLIC_API_URL;
+
+      if (!apiBase || !token) {
+        toast.error('Missing API configuration or auth token.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      setIsUploadingAvatar(true);
+      try {
+        const response = await fetch(`${apiBase}/api/profile/avatar`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload?.success) {
+          toast.error(payload?.message || 'Failed to upload profile image.');
+          return;
+        }
+
+        const nextAvatarUrl = payload?.data?.avatarUrl;
+        if (!nextAvatarUrl) {
+          toast.error('Upload succeeded but image URL was missing.');
+          return;
+        }
+
+        setAvatarDraft(nextAvatarUrl);
+        updateProfile({ avatar: nextAvatarUrl });
+        toast.success('Profile image updated.');
+      } catch {
+        toast.error('Could not upload image right now.');
+      } finally {
+        setIsUploadingAvatar(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+
+    void uploadAvatar();
+  };
+
+  const handleSaveBusinessProfile = async () => {
+    const cleanContactName = contactName.trim();
+    if (!cleanContactName) {
+      toast.error('Contact name is required.');
+      return;
+    }
+
+    const [firstName, ...rest] = cleanContactName.split(' ').filter(Boolean);
+    const lastName = rest.join(' ');
+
+    const token = localStorage.getItem('auth_token');
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+
+    if (!token || !apiBase) {
+      toast.error('Missing API configuration or auth token.');
+      return;
+    }
+
+    setIsSavingProfile(true);
+
+    try {
+      const response = await fetch(`${apiBase}/api/profile/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          businessBio: businessBio.trim(),
+          experienceLevel: experienceLevel.trim(),
+          serviceCity: serviceCity.trim(),
+          serviceLocationLat: selectedMapCoords.lat,
+          serviceLocationLng: selectedMapCoords.lng,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        toast.error(payload?.message || 'Failed to save business profile.');
+        return;
+      }
+
+      const nextUser = payload?.data?.user;
+      updateProfile({
+        firstName: nextUser?.firstName ?? firstName,
+        lastName: nextUser?.lastName ?? lastName,
+        name: `${nextUser?.firstName ?? firstName} ${nextUser?.lastName ?? lastName}`.trim(),
+        email: nextUser?.email ?? user?.email,
+        avatar: nextUser?.avatar ?? avatar,
+        businessBio: nextUser?.businessBio ?? businessBio.trim(),
+        experienceLevel: nextUser?.experienceLevel ?? experienceLevel.trim(),
+        serviceCity: nextUser?.serviceCity ?? serviceCity.trim(),
+        serviceLocationLat:
+          typeof nextUser?.serviceLocationLat === 'number'
+            ? nextUser.serviceLocationLat
+            : selectedMapCoords.lat,
+        serviceLocationLng:
+          typeof nextUser?.serviceLocationLng === 'number'
+            ? nextUser.serviceLocationLng
+            : selectedMapCoords.lng,
+      });
+
+      resetDrafts();
+      toast.success(payload?.message || 'Business profile saved successfully.');
+    } catch {
+      toast.error('Could not save business profile right now.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleCancel = () => {
+    resetDrafts();
+    toast.info('Changes discarded.');
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] py-16">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-10 text-center shadow-lg shadow-slate-200/40">
+            <h2 className="text-2xl font-black text-slate-900">Please login first</h2>
+            <p className="mt-3 text-slate-500 font-medium">
+              You need an account session to access provider profile.
+            </p>
+            <Link
+              href="/login"
+              className="mt-6 inline-flex h-12 items-center rounded-xl bg-[#2286BE] px-6 font-bold text-white"
+            >
+              Go to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== 'provider') {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] py-16">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-10 text-center shadow-lg shadow-slate-200/40">
+            <h2 className="text-2xl font-black text-slate-900">This page is only for provider role.</h2>
+            <p className="mt-3 text-slate-500 font-medium">You are currently using client mode.</p>
+            <Link
+              href="/client/profile"
+              className="mt-6 inline-flex h-12 items-center rounded-xl bg-[#2286BE] px-6 font-bold text-white"
+            >
+              Open Client Profile
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-10">
-
-          {/* Sidebar */}
           <div className="lg:w-80 shrink-0">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -115,38 +412,44 @@ export default function ProviderProfilePage() {
               className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl shadow-slate-200/50 text-center sticky top-24"
             >
               <div className="relative inline-block mb-6 group">
-                <Avatar className="h-32 w-32 border-4 border-primary-soft ring-2 ring-white">
-                  <AvatarImage src="https://i.pravatar.cc/150?u=a042581f4e290267046" />
-                  <AvatarFallback className="text-3xl font-black text-slate-300">SK</AvatarFallback>
+                <Avatar className="h-32 w-32 border-4 border-[#2286BE]/10 ring-2 ring-white">
+                  <AvatarImage src={avatar} />
+                  <AvatarFallback className="bg-slate-200 text-slate-500">
+                    <User size={44} />
+                  </AvatarFallback>
                 </Avatar>
-                <button className="absolute bottom-1 right-1 h-10 w-10 bg-[#2286BE] text-white rounded-full border-4 border-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all">
-                  <Camera size={18} />
+                <button
+                  type="button"
+                  disabled={isUploadingAvatar}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-1 right-1 h-10 w-10 bg-[#2286BE] text-white rounded-full border-4 border-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isUploadingAvatar ? <span className="text-[10px] font-black">...</span> : <Camera size={18} />}
                 </button>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleUploadAvatar} />
               </div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Sarah Khan</h2>
-              <div className="flex items-center justify-center gap-1.5 mt-2">
-                <div className="h-2 w-2 bg-[#2286BE] rounded-full animate-pulse" />
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Master Cleaner • Pro</p>
-              </div>
+
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">{contactName || user.name}</h2>
+              <p className="text-sm font-bold text-[#2286BE] uppercase tracking-widest mt-1">Verified Provider</p>
 
               <div className="mt-10 space-y-2">
                 {[
-                  { id: 'profile', icon: <User size={18} />, label: 'Business Profile' },
-                  { id: 'business', icon: <Briefcase size={18} />, label: 'Service Details' },
+                  { id: 'profile', icon: <Briefcase size={18} />, label: 'Business Profile' },
+                  { id: 'business', icon: <User size={18} />, label: 'Service Details' },
                   { id: 'payouts', icon: <Banknote size={18} />, label: 'Payout Info' },
                   { id: 'billing', icon: <CreditCard size={18} />, label: 'Billing & Stripe' },
                   { id: 'security', icon: <Shield size={18} />, label: 'Security' },
                   { id: 'notifications', icon: <Bell size={18} />, label: 'Notifications' },
-                ].map(item => (
+                ].map((item) => (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => setActiveTab(item.id)}
-                    className={`
-                      w-full flex items-center justify-between px-6 py-4 rounded-2xl font-bold transition-all duration-300
-                      ${activeTab === item.id
-                        ? 'bg-primary-soft text-[#2286BE] shadow-sm'
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}
-                    `}
+                    className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl font-bold transition-all duration-300 ${
+                      activeTab === item.id
+                        ? 'bg-[#2286BE]/10 text-[#2286BE] shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
                   >
                     <div className="flex items-center gap-4">
                       {item.icon}
@@ -158,501 +461,221 @@ export default function ProviderProfilePage() {
               </div>
 
               <div className="mt-10 pt-10 border-t border-slate-100">
-                <Button variant="ghost" className="w-full text-red-500 hover:bg-red-50 hover:text-red-700 font-bold rounded-2xl h-12">
+                <Button
+                  variant="ghost"
+                  onClick={logout}
+                  className="w-full text-red-500 hover:bg-red-50 hover:text-red-700 font-bold rounded-2xl h-12"
+                >
                   <LogOut size={18} className="mr-3" /> Sign Out
                 </Button>
               </div>
             </motion.div>
           </div>
 
-          {/* Main Content */}
           <div className="flex-1 min-w-0">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
+              className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
             >
-              <div className="p-8 md:p-12 lg:p-16">
-                <AnimatePresence mode="wait">
+              <div className="p-8 md:p-12 space-y-8">
+                {activeTab === 'profile' && (
+                  <>
+                    <div>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Business Profile</h3>
+                      <p className="text-slate-500 font-medium">
+                        Manage how your business appears to clients.
+                      </p>
+                    </div>
 
-                  {/* ── Business Profile ────────────────────────────────── */}
-                  {activeTab === 'profile' && (
-                    <motion.div key="profile" {...sectionAnim} className="space-y-12">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                          <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Business Profile</h3>
-                          <p className="text-slate-500 font-medium">Manage how your service business appears to clients.</p>
-                        </div>
-                        <Badge className="bg-primary-soft text-[#2286BE] px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest border-none">Top Rated Plus</Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Contact Name</label>
-                          <div className="relative">
-                            <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input defaultValue="Sarah Khan" className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-bold text-lg" />
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Business Email</label>
-                          <div className="relative">
-                            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input defaultValue="sarah.services@pro.com" className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-bold text-lg" />
-                          </div>
-                        </div>
-                        <div className="space-y-3 md:col-span-2">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Bio / Business Motto</label>
-                          <textarea
-                            defaultValue="Professional deep cleaning expert with over 8 years of experience in Dhaka. Committed to using eco-friendly materials and providing pixel-perfect hygiene for your home."
-                            className="w-full border border-slate-200 rounded-[1.25rem] p-6 focus:ring-2 focus:ring-[#2286BE] focus:border-transparent outline-none transition-all resize-none text-base font-medium h-32 leading-relaxed"
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Service City</label>
-                          <div className="relative">
-                            <MapPin size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input defaultValue="Dhaka, Bangladesh" className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-bold" />
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Experience Level</label>
-                          <div className="relative">
-                            <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input defaultValue="Expert (8+ Years)" className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-bold" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-10 border-t border-slate-100 flex justify-end gap-5">
-                        <Button variant="ghost" className="font-bold rounded-2xl px-10 h-16">Discard changes</Button>
-                        <Button onClick={() => handleSave('Business Profile')} className="bg-[#2286BE] hover:bg-[#059669] font-black rounded-2xl px-14 h-16 shadow-2xl shadow-primary/20 active:scale-95 transition-all text-lg">
-                          <Save size={20} className="mr-3" /> Save Business Profile
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* ── Service Details ──────────────────────────────────── */}
-                  {activeTab === 'business' && (
-                    <motion.div key="business" {...sectionAnim} className="space-y-12">
-                      <div>
-                        <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Service Details</h3>
-                        <p className="text-slate-500 font-medium">Configure what you offer, when you&apos;re available, and how much you charge.</p>
-                      </div>
-
-                      {/* Category & Pricing */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Service Category</label>
-                          <div className="relative">
-                            <Tag size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none" />
-                            <select className="w-full h-16 pl-12 pr-6 rounded-[1.25rem] border border-slate-200 font-bold text-slate-800 bg-white focus:ring-2 focus:ring-[#2286BE] focus:border-transparent outline-none appearance-none cursor-pointer">
-                              <option>Home Cleaning</option>
-                              <option>Plumbing</option>
-                              <option>Electrical Work</option>
-                              <option>AC Repair</option>
-                              <option>Painting</option>
-                              <option>Pest Control</option>
-                            </select>
-                            <ChevronRight size={16} className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Base Hourly Rate</label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg select-none">$</span>
-                            <Input type="number" defaultValue="35" className="h-16 pl-10 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-black text-xl" />
-                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 uppercase tracking-wider">/ hr</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Availability */}
-                      <div className="space-y-4">
-                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Available Days</label>
-                        <div className="flex flex-wrap gap-3">
-                          {DAYS.map(day => (
-                            <button
-                              key={day}
-                              onClick={() => toggleDay(day)}
-                              className={`h-12 w-16 rounded-2xl font-black text-sm transition-all duration-200 active:scale-95 ${
-                                activeDays.includes(day)
-                                  ? 'bg-[#2286BE] text-white shadow-lg shadow-[#2286BE]/25'
-                                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                              }`}
-                            >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Working Hours */}
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Start Time</label>
-                          <div className="relative">
-                            <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input type="time" defaultValue="08:00" className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-bold" />
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">End Time</label>
-                          <div className="relative">
-                            <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input type="time" defaultValue="20:00" className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-bold" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Skills */}
-                      <div className="space-y-4">
-                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Skills & Specializations</label>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {skills.map(skill => (
-                            <span key={skill} className="flex items-center gap-2 bg-primary-soft text-[#2286BE] px-4 py-2 rounded-full font-bold text-sm">
-                              {skill}
-                              <button onClick={() => removeSkill(skill)} className="hover:text-red-500 transition-colors">
-                                <X size={14} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Contact Name</label>
+                        <div className="relative">
+                          <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                           <Input
-                            placeholder="Add a skill (e.g. Window Washing)"
-                            value={skillInput}
-                            onChange={e => setSkillInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && addSkill()}
-                            className="h-14 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-medium"
+                            value={contactName}
+                            onChange={(e) => setContactNameDraft(e.target.value)}
+                            className="h-14 pl-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold"
                           />
-                          <Button onClick={addSkill} className="h-14 px-6 rounded-[1.25rem] bg-[#2286BE] hover:bg-[#059669] font-bold">
-                            <Plus size={18} />
-                          </Button>
                         </div>
                       </div>
 
-                      {/* Portfolio */}
-                      <div className="space-y-4">
-                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Portfolio / Work Samples</label>
-                        <div className="grid grid-cols-3 gap-4">
-                          {[1, 2, 3].map(i => (
-                            <div
-                              key={i}
-                              className="aspect-square border-2 border-dashed border-slate-200 rounded-[1.5rem] flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#2286BE]/40 hover:bg-primary-soft/30 transition-all group"
-                            >
-                              <div className="h-12 w-12 rounded-2xl bg-slate-100 group-hover:bg-primary-soft flex items-center justify-center text-slate-300 group-hover:text-[#2286BE] transition-all">
-                                <ImagePlus size={22} />
-                              </div>
-                              <span className="text-xs font-bold text-slate-400 group-hover:text-[#2286BE] transition-colors">Upload Photo</span>
-                            </div>
-                          ))}
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Business Email</label>
+                        <div className="relative">
+                          <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            value={user.email}
+                            readOnly
+                            className="h-14 pl-12 rounded-xl border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed font-bold"
+                          />
                         </div>
                       </div>
 
-                      <div className="pt-10 border-t border-slate-100 flex justify-end gap-5">
-                        <Button variant="ghost" className="font-bold rounded-2xl px-10 h-16">Discard changes</Button>
-                        <Button onClick={() => handleSave('Service Details')} className="bg-[#2286BE] hover:bg-[#059669] font-black rounded-2xl px-14 h-16 shadow-2xl shadow-primary/20 active:scale-95 transition-all text-lg">
-                          <Save size={20} className="mr-3" /> Save Service Details
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* ── Payout Info ────────────────────────────────────── */}
-                  {activeTab === 'payouts' && (
-                    <motion.div key="payouts" {...sectionAnim} className="space-y-10">
-                      <div>
-                        <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Payout Methods</h3>
-                        <p className="text-slate-500 font-medium">Manage how you receive your earnings.</p>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <Card className="border-2 border-[#2286BE] bg-primary-soft/30 rounded-[2rem] relative overflow-hidden p-8">
-                          <div className="absolute top-4 right-4 h-6 w-6 bg-[#2286BE] rounded-full flex items-center justify-center text-white">
-                            <ChevronRight size={14} className="rotate-90" />
-                          </div>
-                          <div className="h-14 w-14 bg-white rounded-2xl flex items-center justify-center text-[#2286BE] shadow-md mb-6">
-                            <Building2 size={24} />
-                          </div>
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Primary Method</p>
-                          <h4 className="text-xl font-black text-slate-900 mb-6">Bank Alfalah Ltd.</h4>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-bold text-slate-500 tracking-widest">**** **** 4242</p>
-                            <Button variant="ghost" className="text-xs font-black text-[#2286BE] hover:bg-primary-soft uppercase tracking-widest h-8 rounded-lg px-3">Edit</Button>
-                          </div>
-                        </Card>
-                        <div className="border-4 border-dashed border-slate-100 rounded-[2rem] flex flex-col items-center justify-center p-8 hover:bg-slate-50 hover:border-[#2286BE]/10 cursor-pointer transition-all duration-300 group">
-                          <div className="h-14 w-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4 group-hover:scale-110 group-hover:text-[#2286BE] transition-all">
-                            <CreditCard size={24} />
-                          </div>
-                          <span className="font-bold text-slate-400 group-hover:text-slate-600 transition-colors">Add New Payout Method</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* ── Security ───────────────────────────────────────── */}
-                  {activeTab === 'security' && (
-                    <motion.div key="security" {...sectionAnim} className="space-y-12">
-                      <div>
-                        <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Security</h3>
-                        <p className="text-slate-500 font-medium">Keep your account and business protected at all times.</p>
-                      </div>
-
-                      {/* Change Password */}
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="h-9 w-9 rounded-xl bg-primary-soft flex items-center justify-center text-[#2286BE]">
-                            <Lock size={16} />
-                          </div>
-                          <h4 className="text-lg font-black text-slate-900">Change Password</h4>
-                        </div>
-
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Current Password</label>
-                          <div className="relative">
-                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="Enter current password"
-                              className="h-16 pl-12 pr-14 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-medium"
-                            />
-                            <button onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors">
-                              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">New Password</label>
-                          <div className="relative">
-                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input
-                              type={showNewPassword ? 'text' : 'password'}
-                              placeholder="Enter new password"
-                              value={newPassword}
-                              onChange={e => setNewPassword(e.target.value)}
-                              className="h-16 pl-12 pr-14 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-medium"
-                            />
-                            <button onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors">
-                              {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
-                          </div>
-                          <PasswordStrength password={newPassword} />
-                        </div>
-
-                        <div className="space-y-3">
-                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Confirm New Password</label>
-                          <div className="relative">
-                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input
-                              type="password"
-                              placeholder="Re-enter new password"
-                              className="h-16 pl-12 rounded-[1.25rem] border-slate-200 focus-visible:ring-[#2286BE] font-medium"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Two-Factor Auth */}
-                      <div className="rounded-[1.5rem] border border-slate-100 bg-slate-50/50 p-6 flex items-center justify-between gap-6">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500 shrink-0">
-                            <ShieldCheck size={22} />
-                          </div>
-                          <div>
-                            <h5 className="font-black text-slate-900">Two-Factor Authentication</h5>
-                            <p className="text-sm text-slate-500 font-medium mt-0.5">Add an extra layer of security via SMS verification code</p>
-                          </div>
-                        </div>
-                        <Switch
-                          checked={twoFactor}
-                          onCheckedChange={setTwoFactor}
-                          className="data-[state=checked]:bg-[#2286BE]"
+                      <div className="space-y-3 md:col-span-2">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Bio / Business Motto</label>
+                        <textarea
+                          value={businessBio}
+                          onChange={(e) => setBioDraft(e.target.value)}
+                          placeholder="Describe your business, style, and why clients should choose you."
+                          className="w-full h-32 rounded-xl border border-slate-200 p-4 focus:ring-2 focus:ring-[#2286BE] focus:border-transparent outline-none font-medium resize-none"
                         />
                       </div>
 
-                      {/* Active Sessions */}
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="h-9 w-9 rounded-xl bg-primary-soft flex items-center justify-center text-[#2286BE]">
-                            <Monitor size={16} />
-                          </div>
-                          <h4 className="text-lg font-black text-slate-900">Active Sessions</h4>
-                        </div>
-
-                        {[
-                          { icon: <Monitor size={18} />, device: 'Chrome on Windows', location: 'Dhaka, Bangladesh', time: 'Active now', current: true },
-                          { icon: <Smartphone size={18} />, device: 'Safari on iPhone 15', location: 'Dhaka, Bangladesh', time: '2 hours ago', current: false },
-                        ].map((session, i) => (
-                          <div key={i} className="flex items-center justify-between gap-4 p-5 rounded-[1.5rem] border border-slate-100 hover:border-slate-200 transition-all">
-                            <div className="flex items-center gap-4">
-                              <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${session.current ? 'bg-primary-soft text-[#2286BE]' : 'bg-slate-100 text-slate-400'}`}>
-                                {session.icon}
-                              </div>
-                              <div>
-                                <p className="font-black text-slate-900 text-sm">{session.device}</p>
-                                <p className="text-xs font-medium text-slate-400">{session.location} · {session.time}</p>
-                              </div>
-                            </div>
-                            {session.current ? (
-                              <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-xs px-3 py-1.5 rounded-lg">Current</Badge>
-                            ) : (
-                              <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-50 hover:text-red-600 font-black rounded-xl h-9 px-4 text-xs">
-                                Revoke
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="pt-10 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-                        {/* Danger Zone */}
-                        <Button variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-700 font-black rounded-2xl h-14 px-6">
-                          <Trash2 size={18} className="mr-2" /> Delete Account
-                        </Button>
-                        <Button onClick={() => handleSave('Security settings')} className="bg-[#2286BE] hover:bg-[#059669] font-black rounded-2xl px-14 h-14 shadow-2xl shadow-primary/20 active:scale-95 transition-all text-lg">
-                          <Save size={20} className="mr-3" /> Save Changes
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* ── Notifications ─────────────────────────────────── */}
-                  {activeTab === 'notifications' && (
-                    <motion.div key="notifications" {...sectionAnim} className="space-y-12">
-                      <div>
-                        <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Notifications</h3>
-                        <p className="text-slate-500 font-medium">Choose what alerts you receive and how you receive them.</p>
-                      </div>
-
-                      {/* Delivery Channel */}
-                      <div className="space-y-4">
-                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Delivery Channel</label>
-                        <div className="flex gap-3 flex-wrap">
-                          {[
-                            { id: 'email', label: 'Email', icon: <Mail size={16} /> },
-                            { id: 'sms', label: 'SMS', icon: <Phone size={16} /> },
-                            { id: 'push', label: 'Push', icon: <Bell size={16} /> },
-                          ].map(ch => (
-                            <button
-                              key={ch.id}
-                              onClick={() => setNotifChannel(ch.id)}
-                              className={`flex items-center gap-2.5 px-6 h-12 rounded-2xl font-black text-sm transition-all duration-200 ${
-                                notifChannel === ch.id
-                                  ? 'bg-[#2286BE] text-white shadow-lg shadow-[#2286BE]/25'
-                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                              }`}
-                            >
-                              {ch.icon} {ch.label}
-                            </button>
-                          ))}
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Experience Level</label>
+                        <div className="relative">
+                          <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <select
+                            value={experienceLevel}
+                            onChange={(e) => setExperienceDraft(e.target.value)}
+                            className="w-full h-14 pl-12 pr-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#2286BE] outline-none font-bold bg-white"
+                          >
+                            <option value="">Select experience</option>
+                            <option value="Beginner (0-1 Years)">Beginner (0-1 Years)</option>
+                            <option value="Intermediate (2-4 Years)">Intermediate (2-4 Years)</option>
+                            <option value="Advanced (5-7 Years)">Advanced (5-7 Years)</option>
+                            <option value="Expert (8+ Years)">Expert (8+ Years)</option>
+                          </select>
                         </div>
                       </div>
 
-                      {/* Notification Groups */}
-                      <div className="space-y-10">
-                        {notificationGroups.map(group => (
-                          <div key={group.label}>
-                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">{group.label}</p>
-                            <div className="space-y-2">
-                              {group.items.map(item => (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center justify-between gap-4 p-5 rounded-[1.5rem] border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                                      notifStates[item.id] ? 'bg-primary-soft text-[#2286BE]' : 'bg-slate-100 text-slate-400'
-                                    }`}>
-                                      {item.icon}
-                                    </div>
-                                    <div>
-                                      <p className="font-black text-slate-900 text-sm">{item.title}</p>
-                                      <p className="text-xs font-medium text-slate-400 mt-0.5">{item.desc}</p>
-                                    </div>
-                                  </div>
-                                  <Switch
-                                    checked={notifStates[item.id]}
-                                    onCheckedChange={val => setNotifStates(prev => ({ ...prev, [item.id]: val }))}
-                                    className="data-[state=checked]:bg-[#2286BE] shrink-0"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="pt-10 border-t border-slate-100 flex justify-end gap-5">
-                        <Button variant="ghost" className="font-bold rounded-2xl px-10 h-16">Reset to Default</Button>
-                        <Button onClick={() => handleSave('Notification preferences')} className="bg-[#2286BE] hover:bg-[#059669] font-black rounded-2xl px-14 h-16 shadow-2xl shadow-primary/20 active:scale-95 transition-all text-lg">
-                          <Save size={20} className="mr-3" /> Save Preferences
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {activeTab === 'billing' && (
-                    <motion.div key="billing" {...sectionAnim} className="space-y-12">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                          <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Billing & Stripe</h3>
-                          <p className="text-slate-500 font-medium">Manage your subscription, platform fees, and payment methods via Stripe.</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Service City</label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleUseCurrentLocation}
+                            className="rounded-xl font-bold border-slate-200"
+                          >
+                            <Navigation size={16} className="mr-2" />
+                            {isResolvingCity ? 'Locating...' : 'Use Current Location'}
+                          </Button>
                         </div>
-                        <Button className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-2xl h-14 px-8 shadow-xl shadow-[#2286BE]/20 transition-all">
-                          <Plus size={20} className="mr-2" /> Add New Card
-                        </Button>
+                        <div className="relative">
+                          <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            value={serviceCity}
+                            onChange={(e) => setServiceCityDraft(e.target.value)}
+                            className="h-14 pl-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Service Area Map</p>
+                        {mapboxToken ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isResolvingCity}
+                            onClick={handleSetCenterAsServiceCity}
+                            className="h-8 rounded-lg border-slate-200 px-3 text-[11px] font-black"
+                          >
+                            {isResolvingCity ? 'Setting...' : 'Set Center as Service City'}
+                          </Button>
+                        ) : (
+                          <p className="text-xs font-semibold text-slate-400">Mapbox Optional</p>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                         <div className="bg-slate-950 rounded-[2.5rem] p-10 text-white relative overflow-hidden group hover:scale-[1.02] transition-all duration-500 shadow-2xl shadow-slate-200/50">
-                            <div className="relative z-10 flex flex-col justify-between h-44">
-                               <div className="flex justify-between items-start">
-                                  <div className="h-10 w-14 bg-white/10 rounded-xl backdrop-blur-md flex items-center justify-center font-black italic text-sm">VISA</div>
-                                  <Badge className="bg-emerald-400 text-white border-none font-black text-[10px] uppercase px-4 py-1.5 rounded-lg">Active</Badge>
-                               </div>
-                               <div>
-                                  <p className="font-mono text-2xl tracking-[0.25em] mb-6">•••• •••• •••• 4242</p>
-                                  <div className="flex justify-between items-end">
-                                     <div><p className="text-[10px] opacity-40 uppercase font-black tracking-widest mb-1">Expires</p><p className="font-bold underline underline-offset-4 decoration-[#2286BE]/50">12/26</p></div>
-                                     <button className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all"><Settings size={18}/></button>
-                                  </div>
-                               </div>
-                            </div>
-                         </div>
+                      {mapboxToken ? (
+                        <MapboxLocationPicker
+                          token={mapboxToken}
+                          initialCenter={selectedMapCoords}
+                          onCenterChange={setSelectedMapCoords}
+                        />
+                      ) : (
+                        <div className="h-52 flex items-center justify-center text-sm text-slate-500 bg-slate-50 px-6 text-center">
+                          Add `NEXT_PUBLIC_MAPBOX_TOKEN` in `.env` to enable interactive map location picker.
+                        </div>
+                      )}
+                    </div>
 
-                         <Card className="border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center p-10 hover:bg-slate-50 hover:border-[#2286BE]/20 transition-all group">
-                            <div className="h-16 w-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:scale-110 group-hover:text-[#2286BE] transition-all">
-                               <CreditCard size={32} />
-                            </div>
-                            <span className="mt-4 font-black text-slate-400 group-hover:text-slate-900 transition-colors uppercase tracking-widest text-xs">Link Secondary Card</span>
-                         </Card>
-                      </div>
+                    <div className="pt-6 border-t border-slate-100 flex justify-end gap-4">
+                      <Button variant="ghost" onClick={handleCancel} className="font-bold rounded-xl px-10 h-14">
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveBusinessProfile}
+                        disabled={isSavingProfile}
+                        className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-xl px-12 h-14 shadow-xl shadow-[#2286BE]/20"
+                      >
+                        <Save size={18} className="mr-2" />
+                        {isSavingProfile ? 'Saving...' : 'Save Business Profile'}
+                      </Button>
+                    </div>
+                  </>
+                )}
 
-                      <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                         <div className="p-8 border-b border-slate-50 font-black text-xs uppercase tracking-[0.2em] text-slate-400">Merchant Settings</div>
-                         <div className="p-8 space-y-6">
-                            <div className="flex items-center justify-between">
-                               <div><p className="font-black text-slate-900 mb-1">Stripe Connect Account</p><p className="text-xs text-slate-500 font-medium tracking-tight">Status: <span className="text-emerald-500 font-black">Verified & Connected</span></p></div>
-                               <Button variant="outline" className="rounded-xl font-bold h-11 px-6 text-[#2286BE] border-[#2286BE]">Open Stripe Dashboard</Button>
-                            </div>
-                            <div className="flex items-center justify-between">
-                               <div><p className="font-black text-slate-900 mb-1">Platform Invoicing</p><p className="text-xs text-slate-500 font-medium tracking-tight">Auto-generate invoices for all completed orders.</p></div>
-                               <Switch defaultChecked />
-                            </div>
-                         </div>
-                      </div>
-                    </motion.div>
-                  )}
+                {activeTab === 'security' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Security</h3>
+                      <p className="text-slate-500 font-medium">Use client security tab if you need password changes.</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
+                      <p className="text-sm text-slate-600 font-semibold">
+                        Security API already available at `POST /api/profile/change-password`.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-                </AnimatePresence>
+                {activeTab === 'business' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Service Details</h3>
+                      <p className="text-slate-500 font-medium">Service details section is back. We can wire full service API next.</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
+                      <p className="text-sm text-slate-700 font-semibold">Configure offered services, pricing and availability here.</p>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'payouts' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Payout Info</h3>
+                      <p className="text-slate-500 font-medium">Manage your payout account details.</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
+                      <p className="text-sm text-slate-700 font-semibold">Payout setup UI restored placeholder.</p>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'billing' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Billing & Stripe</h3>
+                      <p className="text-slate-500 font-medium">View billing methods and Stripe configuration.</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
+                      <p className="text-sm text-slate-700 font-semibold">Billing section restored placeholder.</p>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'notifications' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Notifications</h3>
+                      <p className="text-slate-500 font-medium">Control provider notification preferences.</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
+                      <p className="text-sm text-slate-700 font-semibold">Notifications section restored placeholder.</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
-
         </div>
       </div>
     </div>

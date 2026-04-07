@@ -24,6 +24,11 @@ interface LoginPayload {
   preferredLanguage?: string;
   locationLat?: number | null;
   locationLng?: number | null;
+  businessBio?: string;
+  experienceLevel?: string;
+  serviceCity?: string;
+  serviceLocationLat?: number | null;
+  serviceLocationLng?: number | null;
 }
 
 interface AuthState {
@@ -102,6 +107,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       preferredLanguage: payload?.preferredLanguage || 'English (US)',
       locationLat: typeof payload?.locationLat === 'number' ? payload.locationLat : undefined,
       locationLng: typeof payload?.locationLng === 'number' ? payload.locationLng : undefined,
+      businessBio: payload?.businessBio || '',
+      experienceLevel: payload?.experienceLevel || '',
+      serviceCity: payload?.serviceCity || '',
+      serviceLocationLat:
+        typeof payload?.serviceLocationLat === 'number' ? payload.serviceLocationLat : undefined,
+      serviceLocationLng:
+        typeof payload?.serviceLocationLng === 'number' ? payload.serviceLocationLng : undefined,
     };
 
     dispatch(loginSuccess(nextUser));

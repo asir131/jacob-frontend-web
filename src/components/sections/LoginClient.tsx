@@ -32,6 +32,11 @@ type LoginResponse = {
       preferredLanguage?: string;
       locationLat?: number | null;
       locationLng?: number | null;
+      businessBio?: string;
+      experienceLevel?: string;
+      serviceCity?: string;
+      serviceLocationLat?: number | null;
+      serviceLocationLng?: number | null;
     };
   };
 };
@@ -97,6 +102,11 @@ export default function LoginClient() {
         preferredLanguage: data.data.user.preferredLanguage,
         locationLat: data.data.user.locationLat ?? undefined,
         locationLng: data.data.user.locationLng ?? undefined,
+        businessBio: data.data.user.businessBio,
+        experienceLevel: data.data.user.experienceLevel,
+        serviceCity: data.data.user.serviceCity,
+        serviceLocationLat: data.data.user.serviceLocationLat ?? undefined,
+        serviceLocationLng: data.data.user.serviceLocationLng ?? undefined,
       });
       toast.success(`Welcome back to ${BRAND.name}!`);
       router.push('/');
