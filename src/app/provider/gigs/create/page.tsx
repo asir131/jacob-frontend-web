@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Check, ChevronLeft, ChevronRight, MapPin, UploadCloud, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -33,8 +33,28 @@ const INITIAL_PACKAGES: PackageState[] = PACKAGE_NAMES.map((name, index) => ({
 const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 };
 const MAX_IMAGE_COUNT = 4;
 
+type LoadedGig = {
+  _id: string;
+  title?: string;
+  categorySlug?: string;
+  categoryName?: string;
+  customCategoryName?: string;
+  customCategoryDescription?: string;
+  description?: string;
+  requirements?: string;
+  packages?: PackageState[];
+  images?: string[];
+  baseCity?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
+  travelRadiusKm?: number | null;
+  status?: string;
+};
+
 export default function CreateGigPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('editId');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState(1);
   const [gigTitle, setGigTitle] = useState('');
@@ -45,6 +65,7 @@ export default function CreateGigPage() {
   const [packages, setPackages] = useState<PackageState[]>(INITIAL_PACKAGES);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   const [gigDescription, setGigDescription] = useState('');
   const [gigRequirements, setGigRequirements] = useState('');
   const [baseCity, setBaseCity] = useState('Dhaka, Bangladesh');
@@ -52,6 +73,7 @@ export default function CreateGigPage() {
   const [selectedMapCoords, setSelectedMapCoords] = useState(DEFAULT_CENTER);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [isLoadingGig, setIsLoadingGig] = useState(false);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -59,6 +81,72 @@ export default function CreateGigPage() {
     if (isCustomCategory) return customCategoryName.trim() || 'Custom Category';
     return DEFAULT_CATEGORIES.find((category) => category.slug === selectedCategory)?.name || 'Selected Category';
   }, [customCategoryName, isCustomCategory, selectedCategory]);
+
+  const displayedImagePreviews = useMemo(
+    () => [...existingImageUrls, ...imagePreviews],
+    [existingImageUrls, imagePreviews]
+  );
+
+  useEffect(() => {
+    if (!editId) return;
+
+    const loadGigForEdit = async () => {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL;
+      const token = localStorage.getItem('auth_token');
+
+      if (!apiBase || !token) return;
+
+      setIsLoadingGig(true);
+      try {
+        const response = await fetch(`${apiBase}/api/gigs/mine`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload?.success) return;
+
+        const allGigs: LoadedGig[] = [
+          ...(Array.isArray(payload?.data?.publishedGigs) ? payload.data.publishedGigs : []),
+          ...(Array.isArray(payload?.data?.pendingRequests) ? payload.data.pendingRequests : []),
+        ];
+        const gig = allGigs.find((item) => item._id === editId);
+        if (!gig) return;
+
+        setGigTitle(gig.title || '');
+        const isExistingCustom = Boolean(gig.customCategoryName || gig.customCategoryDescription);
+        setSelectedCategory(isExistingCustom ? 'create-your-own-category' : (gig.categorySlug || DEFAULT_CATEGORIES[0]?.slug || 'cleaning'));
+        setIsCustomCategory(Boolean(gig.categorySlug === 'create-your-own-category' || gig.customCategoryName || gig.customCategoryDescription));
+        setCustomCategoryName(gig.customCategoryName || '');
+        setCustomCategoryDescription(gig.customCategoryDescription || '');
+        setPackages(
+          (gig.packages?.length
+            ? gig.packages.map((pkg, index) => ({
+                name: pkg.name || PACKAGE_NAMES[index] || `Package ${index + 1}`,
+                title: pkg.title || '',
+                description: pkg.description || '',
+                deliveryTime: pkg.deliveryTime || String(index + 1),
+                price: String(pkg.price ?? ''),
+              }))
+            : INITIAL_PACKAGES) as PackageState[]
+        );
+        setExistingImageUrls(Array.isArray(gig.images) ? gig.images : []);
+        setImagePreviews([]);
+        setImages([]);
+        setGigDescription(gig.description || '');
+        setGigRequirements(gig.requirements || '');
+        setBaseCity(gig.baseCity || '');
+        setSelectedRadius(String(gig.travelRadiusKm || 25));
+        setSelectedMapCoords({
+          lat: typeof gig.locationLat === 'number' ? gig.locationLat : DEFAULT_CENTER.lat,
+          lng: typeof gig.locationLng === 'number' ? gig.locationLng : DEFAULT_CENTER.lng,
+        });
+        setStep(1);
+      } finally {
+        setIsLoadingGig(false);
+      }
+    };
+
+    void loadGigForEdit();
+  }, [editId]);
 
   const updatePackage = (index: number, field: keyof PackageState, value: string) => {
     setPackages((prev) => prev.map((pkg, pkgIndex) => (pkgIndex === index ? { ...pkg, [field]: value } : pkg)));
@@ -68,7 +156,7 @@ export default function CreateGigPage() {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
 
-    const remainingSlots = MAX_IMAGE_COUNT - images.length;
+    const remainingSlots = MAX_IMAGE_COUNT - existingImageUrls.length - images.length;
     if (remainingSlots <= 0) {
       toast.error(`You can select up to ${MAX_IMAGE_COUNT} images only.`);
       if (imageInputRef.current) imageInputRef.current.value = '';
@@ -112,7 +200,7 @@ export default function CreateGigPage() {
       }
     }
 
-    if (step === 3 && images.length < 1) {
+    if (step === 3 && displayedImagePreviews.length < 1) {
       toast.error('Please select at least 1 image.');
       return;
     }
@@ -175,12 +263,13 @@ export default function CreateGigPage() {
       formData.append('locationLat', String(selectedMapCoords.lat));
       formData.append('locationLng', String(selectedMapCoords.lng));
       formData.append('travelRadiusKm', String(Number(selectedRadius) || 0));
+      formData.append('images', JSON.stringify(existingImageUrls));
       images.forEach((file) => {
         formData.append('images', file);
       });
 
-      const response = await fetch(`${apiBase}/api/gigs`, {
-        method: 'POST',
+      const response = await fetch(editId ? `${apiBase}/api/gigs/${editId}` : `${apiBase}/api/gigs`, {
+        method: editId ? 'PUT' : 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -195,6 +284,8 @@ export default function CreateGigPage() {
 
       if (payload?.data?.gigRequest?.status === 'pending_approval') {
         toast.success('Your gig is under admin review');
+      } else if (editId) {
+        toast.success('Your gig has been updated');
       } else {
         toast.success('Your gig has been published');
       }
@@ -252,7 +343,14 @@ export default function CreateGigPage() {
           ))}
         </div>
 
-        <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-sm min-h-[500px]">
+          <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-sm min-h-[500px]">
+            {isLoadingGig ? (
+              <div className="flex min-h-[420px] items-center justify-center text-sm font-semibold text-slate-500">
+                Loading gig details...
+              </div>
+            ) : null}
+            {!isLoadingGig ? (
+              <>
           {step === 1 && (
             <div className="animate-in fade-in duration-500 space-y-6">
               <h2 className="text-2xl font-bold text-slate-900">Gig Basics</h2>
@@ -390,14 +488,19 @@ export default function CreateGigPage() {
                 <p className="text-sm text-slate-500 mt-2">Upload up to 4 JPG or PNG images.</p>
               </button>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {imagePreviews.map((image, index) => (
+                {displayedImagePreviews.map((image, index) => (
                   <div key={`${image}-${index}`} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                     <Image src={image} alt={`Gig preview ${index + 1}`} fill className="object-cover" unoptimized />
                     <button
                       type="button"
                       onClick={() => {
-                        setImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
-                        setImagePreviews((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
+                        if (index < existingImageUrls.length) {
+                          setExistingImageUrls((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
+                        } else {
+                          const fileIndex = index - existingImageUrls.length;
+                          setImages((prev) => prev.filter((_, imageIndex) => imageIndex !== fileIndex));
+                          setImagePreviews((prev) => prev.filter((_, imageIndex) => imageIndex !== fileIndex));
+                        }
                       }}
                       className="absolute right-2 top-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center"
                     >
@@ -405,7 +508,7 @@ export default function CreateGigPage() {
                     </button>
                   </div>
                 ))}
-                {Array.from({ length: Math.max(0, MAX_IMAGE_COUNT - imagePreviews.length) }).map((_, index) => (
+                {Array.from({ length: Math.max(0, MAX_IMAGE_COUNT - displayedImagePreviews.length) }).map((_, index) => (
                   <div key={`empty-${index}`} className="aspect-[4/3] rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-sm">
                     Empty slot
                   </div>
@@ -506,12 +609,14 @@ export default function CreateGigPage() {
                 <div className="flex justify-between gap-4"><span>Title:</span> <span className="font-semibold text-slate-900 text-right">{gigTitle || 'Untitled Gig'}</span></div>
                 <div className="flex justify-between gap-4"><span>Category:</span> <span className="font-semibold text-slate-900 text-right">{selectedCategoryName}</span></div>
                 <div className="flex justify-between gap-4"><span>Packages:</span> <span className="font-semibold text-slate-900 text-right">{packages.length} tiers</span></div>
-                <div className="flex justify-between gap-4"><span>Images:</span> <span className="font-semibold text-slate-900 text-right">{imagePreviews.length} selected</span></div>
+                <div className="flex justify-between gap-4"><span>Images:</span> <span className="font-semibold text-slate-900 text-right">{displayedImagePreviews.length} selected</span></div>
                 <div className="flex justify-between gap-4"><span>Location:</span> <span className="font-semibold text-slate-900 text-right">{baseCity}</span></div>
                 <div className="flex justify-between gap-4"><span>Radius:</span> <span className="font-semibold text-slate-900 text-right">{selectedRadius} km</span></div>
               </div>
             </div>
           )}
+              </>
+            ) : null}
         </div>
 
         <div className="flex justify-between items-center mt-6">
@@ -524,7 +629,7 @@ export default function CreateGigPage() {
             </Button>
           ) : (
             <Button onClick={handlePublish} disabled={isSubmitting} className="w-48 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg text-white text-lg">
-              {isSubmitting ? 'Publishing...' : 'Publish Gig Now'}
+              {isSubmitting ? (editId ? 'Updating...' : 'Publishing...') : editId ? 'Update Gig Now' : 'Publish Gig Now'}
             </Button>
           )}
         </div>

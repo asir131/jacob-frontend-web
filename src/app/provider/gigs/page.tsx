@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, PauseCircle, Play, Trash2, Eye, MoreHorizontal, Star, TrendingUp, BarChart3, Zap, Clock, Sparkles, ShieldCheck } from 'lucide-react';
+import { Plus, Edit2, Play, Trash2, Eye, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,8 +46,15 @@ type PendingRequest = {
   title: string;
   categoryName: string;
   customCategoryName?: string;
+  gigRef?: string | { _id?: string } | null;
   status: string;
   createdAt?: string;
+};
+
+type DeleteTarget = {
+  id: string;
+  type: 'gig' | 'request';
+  title: string;
 };
 
 const containerVariants = {
@@ -71,48 +78,102 @@ export default function ProviderGigsPage() {
   const [publishedGigs, setPublishedGigs] = useState<MyGig[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    const loadMyGigs = async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-      const token = localStorage.getItem('auth_token');
+  const loadMyGigs = useCallback(async () => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+    const token = localStorage.getItem('auth_token');
 
-      if (!apiBase || !token) {
-        setLoading(false);
-        return;
+    if (!apiBase || !token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiBase}/api/gigs/mine`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await response.json();
+      if (response.ok && payload?.success) {
+        setPublishedGigs(Array.isArray(payload?.data?.publishedGigs) ? payload.data.publishedGigs : []);
+        setPendingRequests(Array.isArray(payload?.data?.pendingRequests) ? payload.data.pendingRequests : []);
       }
-
-      try {
-        const response = await fetch(`${apiBase}/api/gigs/mine`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const payload = await response.json();
-        if (response.ok && payload?.success) {
-          setPublishedGigs(Array.isArray(payload?.data?.publishedGigs) ? payload.data.publishedGigs : []);
-          setPendingRequests(Array.isArray(payload?.data?.pendingRequests) ? payload.data.pendingRequests : []);
-        }
-      } catch {
-        // keep empty state
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadMyGigs();
+    } catch {
+      // keep empty state
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void loadMyGigs();
+  }, [loadMyGigs]);
+
+  const pendingGigRefSet = useMemo(() => {
+    return new Set(
+      pendingRequests
+        .filter((request) => request.status === 'pending_approval')
+        .map((request) => {
+          if (!request.gigRef) return null;
+          if (typeof request.gigRef === 'string') return request.gigRef;
+          if (typeof request.gigRef === 'object' && request.gigRef._id) return String(request.gigRef._id);
+          return String(request.gigRef);
+        })
+        .filter((gigRef): gigRef is string => Boolean(gigRef)),
+    );
+  }, [pendingRequests]);
+
+  const visiblePublishedGigs = useMemo(() => {
+    return publishedGigs.filter((gig) => gig.status === 'published' && !pendingGigRefSet.has(String(gig._id)));
+  }, [pendingGigRefSet, publishedGigs]);
+
   const activeItems = useMemo(() => {
-    if (activeTab === 'published') return publishedGigs.filter((gig) => gig.status === 'published');
+    if (activeTab === 'published') return visiblePublishedGigs;
     if (activeTab === 'pending') return pendingRequests.filter((gig) => gig.status === 'pending_approval');
     return publishedGigs.filter((gig) => gig.status === 'rejected' || gig.status === 'draft');
-  }, [activeTab, pendingRequests, publishedGigs]);
+  }, [activeTab, pendingRequests, publishedGigs, visiblePublishedGigs]);
 
   const tabCounts = {
-    published: publishedGigs.filter((gig) => gig.status === 'published').length,
+    published: visiblePublishedGigs.length,
     pending: pendingRequests.filter((gig) => gig.status === 'pending_approval').length,
     rejected: publishedGigs.filter((gig) => gig.status === 'rejected' || gig.status === 'draft').length,
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+    const token = localStorage.getItem('auth_token');
+    if (!apiBase || !token) return;
+
+    setIsDeleting(true);
+    try {
+      const endpoint = deleteTarget.type === 'request'
+        ? `${apiBase}/api/gigs/requests/${deleteTarget.id}`
+        : `${apiBase}/api/gigs/${deleteTarget.id}`;
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.message || 'Failed to delete gig.');
+      }
+
+      await loadMyGigs();
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('Failed to delete gig:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -179,9 +240,11 @@ export default function ProviderGigsPage() {
                           </Badge>
                         </div>
                         <div className="absolute top-4 right-4 flex gap-2">
-                          <Button variant="secondary" size="icon" className="h-9 w-9 bg-white/90 backdrop-blur shadow-xl hover:bg-white active:scale-90 transition-all">
-                            <Edit2 size={16} />
-                          </Button>
+                          <Link href={`/provider/gigs/create?editId=${gig._id}`}>
+                            <Button variant="secondary" size="icon" className="h-9 w-9 bg-white/90 backdrop-blur shadow-xl hover:bg-white active:scale-90 transition-all">
+                              <Edit2 size={16} />
+                            </Button>
+                          </Link>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="secondary" size="icon" className="h-9 w-9 bg-white/90 backdrop-blur shadow-xl hover:bg-white active:scale-90 transition-all">
@@ -205,14 +268,25 @@ export default function ProviderGigsPage() {
                                   <Play size={16} className="mr-3" /> Activate Listing
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem className="cursor-pointer py-3 rounded-lg text-red-600 focus:text-red-600 focus:bg-red-50">
+                              <DropdownMenuItem
+                                className="cursor-pointer py-3 rounded-lg text-red-600 focus:text-red-600 focus:bg-red-50"
+                                onClick={() => {
+                                  setDeleteTarget({
+                                    id: gig._id,
+                                    type: isPending ? 'request' : 'gig',
+                                    title: gig.title,
+                                  });
+                                }}
+                              >
                                 <Trash2 size={16} className="mr-3" /> Permanent Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                         <div className="absolute bottom-4 left-4 right-4 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                          <Button className="w-full bg-white text-slate-900 hover:bg-slate-100 font-bold shadow-xl">Fast Edit Details</Button>
+                          <Link href={`/provider/gigs/create?editId=${gig._id}`}>
+                            <Button className="w-full bg-white text-slate-900 hover:bg-slate-100 font-bold shadow-xl">Fast Edit Details</Button>
+                          </Link>
                         </div>
                       </div>
 
@@ -283,6 +357,47 @@ export default function ProviderGigsPage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {deleteTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+            <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                  <AlertTriangle size={22} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-black text-slate-900">Delete this gig permanently?</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    <span className="font-semibold text-slate-700">{deleteTarget.title}</span> will be removed permanently.
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="rounded-xl bg-red-600 text-white hover:bg-red-700"
+                  onClick={() => {
+                    void handleDeleteConfirm();
+                  }}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete permanently'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {!loading && activeItems.length === 0 ? (
           <motion.div

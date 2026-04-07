@@ -29,6 +29,11 @@ const item = {
 
 export default function ClientDashboardClient() {
   const { user } = useAuth();
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
+    user?.name ||
+    'Member';
+  const firstName = displayName.split(' ')[0] || 'Member';
 
   return (
     <div className="min-h-screen bg-slate-50/50 py-10">
@@ -41,7 +46,7 @@ export default function ClientDashboardClient() {
           className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6"
         >
            <div>
-             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Welcome back, {user?.name.split(' ')[0] || 'Member'} 👋</h1>
+             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Welcome back, {firstName} 👋</h1>
              <p className="text-slate-500 mt-2 text-lg">Manage your ongoing services and explore new opportunities on {BRAND.name}.</p>
            </div>
            <div className="flex gap-4">
