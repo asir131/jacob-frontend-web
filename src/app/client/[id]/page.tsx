@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -21,14 +21,18 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import ReviewFilter from '@/components/ui/ReviewFilter';
 
 export default function ClientPublicProfile() {
   const { id } = useParams();
+  const [reviewFilter, setReviewFilter] = useState(0);
   
+  const decodedName = typeof id === 'string' ? decodeURIComponent(id).replace(/-/g, ' ') : 'Ahmed Rashid';
+
   // Mock client data (in a real app, this would be a separate API call)
   const client = {
     id: id,
-    name: 'Ahmed Rashid',
+    name: decodedName,
     avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267045',
     location: 'Dhaka, BD',
     joined: 'October 2023',
@@ -74,9 +78,6 @@ export default function ClientPublicProfile() {
                        <MessageSquare size={18} /> Message
                     </Button>
                   </Link>
-                  <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 text-slate-400">
-                    <MoreHorizontal size={20} />
-                  </Button>
                 </div>
               </div>
 
@@ -112,54 +113,55 @@ export default function ClientPublicProfile() {
              <h2 className="text-2xl font-black text-slate-900 mb-6">Introduction</h2>
              <p className="text-slate-600 font-medium text-lg leading-relaxed">{client.bio}</p>
            </div>
-
-           <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-sm">
-             <h2 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
+           
+           <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-sm mt-8">
+             <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
                Reviews From Professionals
                <Badge className="bg-[#2286BE]/5 text-[#2286BE] border-none font-black text-xs px-3 py-1">{client.reviewsCount}</Badge>
              </h2>
-             <div className="space-y-8">
-               {[
-                 { 
-                   name: 'QuickFix Team', 
-                   role: 'Provider', 
-                   rating: 5, 
-                   date: 'Jan 20, 2024', 
-                   text: 'Ahmed is a great client! Clear communication and provided easy access to the workspace. Highly recommended.',
-                   avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267042'
-                 },
-                 { 
-                   name: 'Sarah Khan', 
-                   role: 'Lead Cleaner', 
-                   rating: 5, 
-                   date: 'Dec 15, 2023', 
-                   text: 'Very polite and helpful. The instructions were precise, making the job much smoother.',
-                   avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267046'
-                 }
-               ].map((review, i) => (
-                 <div key={i} className="border-b border-slate-50 last:border-0 pb-8 last:pb-0">
-                   <div className="flex items-center justify-between mb-4">
-                     <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12 border border-slate-100 shadow-sm">
-                          <AvatarImage src={review.avatar} />
-                          <AvatarFallback className="font-bold">{review.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-black text-slate-900">{review.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{review.role} • {review.date}</p>
-                        </div>
+             {(() => {
+               const allReviews = [
+                 { name: 'QuickFix Team', role: 'Provider', rating: 5, date: 'Jan 20, 2024', text: 'Clear communication and provided easy access to the workspace. Highly recommended.', avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267042' },
+                 { name: 'Sarah Khan', role: 'Lead Cleaner', rating: 5, date: 'Dec 15, 2023', text: 'Very polite and helpful. The instructions were precise, making the job much smoother.', avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267046' },
+                 { name: 'Rafi Hasan', role: 'Handyman', rating: 4, date: 'Nov 10, 2023', text: 'Great client, very accommodating. Provided all necessary access without any hassle.', avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267048' },
+               ];
+               const counts = allReviews.reduce((acc, r) => { acc[r.rating] = (acc[r.rating] || 0) + 1; return acc; }, {} as Record<number, number>);
+               const filtered = reviewFilter === 0 ? allReviews : allReviews.filter(r => r.rating === reviewFilter);
+               return (
+                 <>
+                   <ReviewFilter selected={reviewFilter} onChange={setReviewFilter} counts={counts} total={allReviews.length} />
+                   {filtered.length === 0 ? (
+                     <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                       <Star size={28} className="text-slate-200 mx-auto mb-3" />
+                       <p className="text-slate-400 font-bold">No reviews for this rating.</p>
                      </div>
-                     <div className="flex items-center gap-1">
-                        {[...Array(review.rating)].map((_, j) => <Star key={j} size={14} className="text-amber-400 fill-amber-400" />)}
+                   ) : (
+                     <div className="space-y-8">
+                       {filtered.map((review, i) => (
+                         <div key={i} className="border-b border-slate-50 last:border-0 pb-8 last:pb-0">
+                           <div className="flex items-center justify-between mb-4">
+                             <div className="flex items-center gap-3">
+                               <Avatar className="h-12 w-12 border border-slate-100 shadow-sm">
+                                 <AvatarImage src={review.avatar} />
+                                 <AvatarFallback className="font-bold">{review.name[0]}</AvatarFallback>
+                               </Avatar>
+                               <div>
+                                 <p className="font-black text-slate-900">{review.name}</p>
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{review.role} • {review.date}</p>
+                               </div>
+                             </div>
+                             <div className="flex items-center gap-1">
+                               {[...Array(review.rating)].map((_, j) => <Star key={j} size={14} className="text-amber-400 fill-amber-400" />)}
+                             </div>
+                           </div>
+                           <p className="text-slate-600 font-medium leading-relaxed">{review.text}</p>
+                         </div>
+                       ))}
                      </div>
-                   </div>
-                   <p className="text-slate-600 font-medium leading-relaxed">{review.text}</p>
-                 </div>
-               ))}
-               <Button variant="ghost" className="w-full text-slate-400 font-bold hover:text-[#2286BE] hover:bg-primary-soft transition-all">
-                  Show All Reviews
-               </Button>
-             </div>
+                   )}
+                 </>
+               );
+             })()}
            </div>
         </div>
 

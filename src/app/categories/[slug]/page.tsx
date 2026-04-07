@@ -7,13 +7,21 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+const humanizeSlug = (slug: string) =>
+  slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const category = CATEGORY_MAP[slug];
   
   if (!category) {
     return {
-      title: `Category Not Found | ${BRAND.name}`,
+      title: `${humanizeSlug(slug)} Services | ${BRAND.name}`,
+      description: `Browse ${humanizeSlug(slug)} services on ${BRAND.name}.`,
     };
   }
 

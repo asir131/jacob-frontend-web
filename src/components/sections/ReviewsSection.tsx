@@ -25,7 +25,7 @@ export default function ReviewsSection() {
       location: 'Glenview, IL',
       rating: 5,
       review: "Absolutely game-changing! The platform's efficiency saved me 15% on window washing, and the professional was stellar. Highly recommended for any homeowner looking to save time.",
-      avatar: '/review.png'
+      avatar: '/avatar-michael.png'
     },
     {
       id: 2,
@@ -34,7 +34,7 @@ export default function ReviewsSection() {
       location: 'Oak Park, IL',
       rating: 5,
       review: "I've used several house cleaning services, but the quality of pros on this platform is unmatched. Detailed, punctual, and very easy to communicate with via the app.",
-      avatar: '/review.png'
+      avatar: '/avatar-sarah.png'
     },
     {
       id: 3,
@@ -43,7 +43,7 @@ export default function ReviewsSection() {
       location: 'Evanston, IL',
       rating: 4,
       review: "The appliance repair technician arrived within 2 hours of my request. Very professional service and the pricing was прозрачный. Great addition to our neighborhood.",
-      avatar: '/review.png'
+      avatar: '/avatar-david.png'
     }
   ];
 
@@ -62,7 +62,7 @@ export default function ReviewsSection() {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FBBC05]/10 border border-[#FBBC05]/20 mb-4">
               <Star size={12} className="text-[#FBBC05] fill-[#FBBC05]" />
-              <span className="text-[10px] uppercase font-black tracking-widest text-slate-600">4.9/5 Average Rating</span>
+              <span className="text-[10px] uppercase font-black tracking-widest text-slate-700">4.9/5 Average Rating</span>
             </div>
             <h2 className="text-[38px] font-black text-slate-900 sm:text-[48px] leading-[1.1] tracking-tight">
               What neighbors are saying about our professionals.
@@ -104,7 +104,7 @@ export default function ReviewsSection() {
               <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/60 to-transparent flex items-end p-8">
                  <div>
                     <p className="text-white font-black text-xl leading-none">{reviews[activeIndex].name}</p>
-                    <p className="text-white/80 text-[13px] font-bold mt-1.5 uppercase tracking-widest">{reviews[activeIndex].role}</p>
+                    <p className="text-white font-bold mt-1.5 uppercase tracking-widest text-[11px] opacity-90">{reviews[activeIndex].role}</p>
                  </div>
               </div>
             </div>
@@ -140,7 +140,7 @@ export default function ReviewsSection() {
                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
                   <div>
-                     <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest mb-0.5">Location</p>
+                     <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest mb-0.5">Location</p>
                      <p className="text-[15px] font-black text-slate-900">{reviews[activeIndex].location}</p>
                   </div>
                </div>
@@ -152,10 +152,12 @@ export default function ReviewsSection() {
                  <button
                    key={i}
                    onClick={() => setActiveIndex(i)}
-                   className={`h-2 rounded-full transition-all duration-300 ${i === activeIndex ? 'w-10 bg-[#2286BE]' : 'w-2 bg-slate-200 hover:bg-slate-300'}`}
+                   className="group p-2 -m-2 outline-none"
                    aria-label={`Go to review ${i + 1}`}
                    aria-pressed={i === activeIndex}
-                 />
+                 >
+                   <div className={`h-2.5 rounded-full transition-all duration-300 ${i === activeIndex ? 'w-10 bg-[#1b6da0]' : 'w-2.5 bg-slate-300 group-hover:bg-slate-400'}`} />
+                 </button>
                ))}
             </div>
           </div>

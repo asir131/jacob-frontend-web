@@ -28,6 +28,28 @@ export interface CategoryData {
   services: Service[];
 }
 
+export interface CategoryCard {
+  name: string;
+  slug: string;
+  iconName: string;
+  color: string;
+  count: number;
+}
+
+export const DEFAULT_CATEGORIES: CategoryCard[] = [
+  { name: 'LocallyServe Pro', slug: 'locallyserve-pro', iconName: 'ShieldCheck', color: 'bg-indigo-100 text-indigo-600', count: 3 },
+  { name: 'Cleaning', slug: 'cleaning', iconName: 'Droplets', color: 'bg-blue-50 text-blue-500', count: 124 },
+  { name: 'Plumbing', slug: 'plumbing', iconName: 'Wrench', color: 'bg-orange-50 text-orange-500', count: 86 },
+  { name: 'Electrical', slug: 'electrical', iconName: 'Zap', color: 'bg-yellow-50 text-yellow-500', count: 92 },
+  { name: 'Painting', slug: 'painting', iconName: 'Paintbrush', color: 'bg-pink-50 text-pink-500', count: 45 },
+  { name: 'Pest Control', slug: 'pest-control', iconName: 'Trash2', color: 'bg-green-50 text-green-500', count: 38 },
+  { name: 'Appliance Repair', slug: 'appliance-repair', iconName: 'Cpu', color: 'bg-indigo-50 text-indigo-500', count: 112 },
+  { name: 'Carpentry', slug: 'carpentry', iconName: 'Hammer', color: 'bg-amber-50 text-amber-500', count: 64 },
+  { name: 'Shifting', slug: 'shifting', iconName: 'Truck', color: 'bg-purple-50 text-purple-500', count: 57 },
+  { name: 'Beauty', slug: 'beauty', iconName: 'Scissors', color: 'bg-rose-50 text-rose-500', count: 142 },
+  { name: 'Personal Care', slug: 'personal-care', iconName: 'Heart', color: 'bg-red-50 text-red-500', count: 78 },
+];
+
 export const CATEGORY_MAP: Record<string, CategoryData> = {
   'locallyserve-pro': {
     name: 'LocallyServe Pro',
@@ -166,6 +188,6 @@ export const getIconByName = (name: string, props: any = {}) => {
     Paintbrush, Wrench, Zap, Trash2, Heart, 
     Cpu, Hammer, Truck, Droplets, Scissors, ShieldCheck
   };
-  const Icon = icons[name] || Heart;
+  const Icon = icons[name] || ShieldCheck;
   return React.createElement(Icon, props);
 };

@@ -2,24 +2,92 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ChevronLeft, ChevronRight, UploadCloud, MapPin, Search } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, UploadCloud, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
+import { DEFAULT_CATEGORIES } from '@/data/categories';
 
 export default function CreateGigPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const totalSteps = 6;
+  const [gigTitle, setGigTitle] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORIES[1]?.slug || 'cleaning');
+  const [customCategoryName, setCustomCategoryName] = useState('');
+  const [customCategoryDescription, setCustomCategoryDescription] = useState('');
+  const [gigDescription, setGigDescription] = useState('');
+  const [gigRequirements, setGigRequirements] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [selectedRadius, setSelectedRadius] = useState('25');
+  const [baseCity, setBaseCity] = useState('Dhaka, Bangladesh');
 
   const handleNext = () => setStep(s => Math.min(totalSteps, s + 1));
   const handleBack = () => setStep(s => Math.max(1, s - 1));
 
-  const handlePublish = () => {
-    toast.success('Gig successfully published! It is now live in your active gigs.');
-    router.push('/provider/gigs');
+  const handlePublish = async () => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+    const token = localStorage.getItem('auth_token');
+
+    if (!apiBase || !token) {
+      toast.error('Missing API configuration or auth token.');
+      return;
+    }
+
+    if (!gigTitle.trim()) {
+      toast.error('Please add a gig title.');
+      setStep(1);
+      return;
+    }
+
+    if (isCustomCategory && !customCategoryName.trim()) {
+      toast.error('Please enter your custom category name.');
+      setStep(1);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${apiBase}/api/gigs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: gigTitle.trim(),
+          categorySlug: isCustomCategory ? 'create-your-own-category' : selectedCategory,
+          categoryName: isCustomCategory
+            ? 'Create your own category'
+            : DEFAULT_CATEGORIES.find((category) => category.slug === selectedCategory)?.name || selectedCategory,
+          customCategoryName: isCustomCategory ? customCategoryName.trim() : '',
+          customCategoryDescription: isCustomCategory ? customCategoryDescription.trim() : '',
+          description: gigDescription.trim(),
+          requirements: gigRequirements.trim(),
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        toast.error(payload?.message || 'Failed to publish gig.');
+        return;
+      }
+
+      if (payload?.data?.gigRequest?.status === 'pending_approval') {
+        toast.success('Custom category sent for admin approval. Your gig will publish after review.');
+      } else {
+        toast.success('Gig successfully published! It is now live in your active gigs.');
+      }
+
+      router.push('/provider/gigs');
+    } catch {
+      toast.error('Could not publish gig right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -69,33 +137,68 @@ export default function CreateGigPage() {
                <div className="space-y-6">
                  <div>
                    <label className="text-sm font-bold text-slate-800 mb-2 block">Gig Title</label>
-                   <Input placeholder="I will do professional deep house cleaning..." className="h-14 lg:text-lg focus-visible:ring-[#2286BE]" />
+                   <Input
+                     value={gigTitle}
+                     onChange={(e) => setGigTitle(e.target.value)}
+                     placeholder="I will do professional deep house cleaning..."
+                     className="h-14 lg:text-lg focus-visible:ring-[#2286BE]"
+                   />
                    <p className="text-xs text-slate-500 mt-2 text-right">0/80 max</p>
                  </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="text-sm font-bold text-slate-800 mb-2 block">Category</label>
-                      <Select defaultValue="cleaning">
+                      <Select
+                        value={selectedCategory}
+                        onValueChange={(value) => {
+                          if (value === 'create-your-own-category') {
+                            setIsCustomCategory(true);
+                          } else {
+                            setIsCustomCategory(false);
+                            setCustomCategoryName('');
+                            setCustomCategoryDescription('');
+                          }
+                          setSelectedCategory(value);
+                        }}
+                      >
                         <SelectTrigger className="h-12"><SelectValue placeholder="Select Category" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="cleaning">Cleaning</SelectItem>
-                          <SelectItem value="plumbing">Plumbing</SelectItem>
-                          <SelectItem value="electric">Electrical</SelectItem>
+                          {DEFAULT_CATEGORIES.map((category) => (
+                            <SelectItem key={category.slug} value={category.slug}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="create-your-own-category">Create your own category</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <label className="text-sm font-bold text-slate-800 mb-2 block">Sub-Category</label>
-                      <Select defaultValue="house">
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Select Sub-Category" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="house">House Cleaning</SelectItem>
-                          <SelectItem value="office">Office Cleaning</SelectItem>
-                          <SelectItem value="deep">Deep Cleaning</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                 </div>
+                    {isCustomCategory ? (
+                      <div>
+                        <label className="text-sm font-bold text-slate-800 mb-2 block">Custom Category Name</label>
+                        <Input
+                          value={customCategoryName}
+                          onChange={(e) => setCustomCategoryName(e.target.value)}
+                          placeholder="Example: Aquarium Cleaning"
+                          className="h-12 focus-visible:ring-[#2286BE]"
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                        You can create your own category as well.
+                      </div>
+                    )}
+                  </div>
+                 {isCustomCategory && (
+                   <div>
+                     <label className="text-sm font-bold text-slate-800 mb-2 block">Custom Category Short Description</label>
+                     <textarea
+                       value={customCategoryDescription}
+                       onChange={(e) => setCustomCategoryDescription(e.target.value)}
+                       className="w-full min-h-[100px] border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-[#2286BE] outline-none text-sm"
+                       placeholder="Explain what this custom category is about..."
+                     />
+                   </div>
+                 )}
                </div>
              </div>
            )}
@@ -176,13 +279,23 @@ export default function CreateGigPage() {
                
                <div className="mb-6">
                  <label className="text-sm font-bold text-slate-800 mb-2 block">Briefly Describe your Gig</label>
-                 <textarea className="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-[#2286BE] outline-none min-h-[150px] text-sm" placeholder="Hi, I am an expert with 5 years of experience..."></textarea>
+                 <textarea
+                   value={gigDescription}
+                   onChange={(e) => setGigDescription(e.target.value)}
+                   className="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-[#2286BE] outline-none min-h-[150px] text-sm"
+                   placeholder="Hi, I am an expert with 5 years of experience..."
+                 ></textarea>
                </div>
 
                <div>
                  <label className="text-sm font-bold text-slate-800 mb-2 block">Requirements from the Client</label>
                  <p className="text-xs text-slate-500 mb-2">Tell your buyer what you need in order to begin work (e.g. access to water, specific address details, etc).</p>
-                 <textarea className="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-[#2286BE] outline-none min-h-[100px] text-sm" placeholder="I need clear access to the premises and..."></textarea>
+                 <textarea
+                   value={gigRequirements}
+                   onChange={(e) => setGigRequirements(e.target.value)}
+                   className="w-full border border-slate-300 rounded-xl p-4 focus:ring-2 focus:ring-[#2286BE] outline-none min-h-[100px] text-sm"
+                   placeholder="I need clear access to the premises and..."
+                 ></textarea>
                </div>
              </div>
            )}
@@ -195,14 +308,14 @@ export default function CreateGigPage() {
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                   <div>
-                    <label className="text-sm font-bold text-slate-800 mb-2 block">Base City/Area</label>
-                    <div className="relative">
-                      <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <Input defaultValue="Dhaka, Bangladesh" className="h-12 pl-10 focus-visible:ring-[#2286BE]" />
+                   <label className="text-sm font-bold text-slate-800 mb-2 block">Base City/Area</label>
+                   <div className="relative">
+                     <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input value={baseCity} onChange={(e) => setBaseCity(e.target.value)} className="h-12 pl-10 focus-visible:ring-[#2286BE]" />
                     </div>
 
                     <label className="text-sm font-bold text-slate-800 mb-2 block mt-6">Maximum Travel Radius</label>
-                    <RadioGroup defaultValue="25" className="grid grid-cols-2 gap-3">
+                    <RadioGroup value={selectedRadius} onValueChange={setSelectedRadius} className="grid grid-cols-2 gap-3">
                       {['5', '10', '25', '50'].map(rad => (
                         <div key={rad} className="relative">
                           <RadioGroupItem value={rad} id={`rad-${rad}`} className="peer sr-only" />
@@ -237,9 +350,10 @@ export default function CreateGigPage() {
                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-md mx-auto mb-8 shadow-sm">
                  <h4 className="font-bold text-slate-900 mb-2">Gig Summary</h4>
                  <div className="space-y-2 text-sm text-slate-600">
-                   <div className="flex justify-between"><span>Title:</span> <span className="font-semibold text-slate-900 truncate max-w-[200px]">House Cleaning...</span></div>
-                   <div className="flex justify-between"><span>Starting Price:</span> <span className="font-semibold text-slate-900">$15.00</span></div>
-                   <div className="flex justify-between"><span>Radius:</span> <span className="font-semibold text-slate-900">25 km</span></div>
+                   <div className="flex justify-between"><span>Title:</span> <span className="font-semibold text-slate-900 truncate max-w-[200px]">{gigTitle || 'House Cleaning...'}</span></div>
+                   <div className="flex justify-between"><span>Category:</span> <span className="font-semibold text-slate-900">{isCustomCategory ? customCategoryName || 'Custom Category' : DEFAULT_CATEGORIES.find((category) => category.slug === selectedCategory)?.name || 'Selected Category'}</span></div>
+                   <div className="flex justify-between"><span>Radius:</span> <span className="font-semibold text-slate-900">{selectedRadius} km</span></div>
+                   <div className="flex justify-between"><span>Base City:</span> <span className="font-semibold text-slate-900 truncate max-w-[200px]">{baseCity}</span></div>
                  </div>
                </div>
              </div>
@@ -257,8 +371,8 @@ export default function CreateGigPage() {
                Save & Next <ChevronRight size={18} className="ml-1" />
              </Button>
            ) : (
-             <Button onClick={handlePublish} className="w-48 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg text-white text-lg animate-bounce">
-               Publish Gig Now
+             <Button onClick={handlePublish} disabled={isSubmitting} className="w-48 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg text-white text-lg animate-bounce">
+               {isSubmitting ? 'Publishing...' : 'Publish Gig Now'}
              </Button>
            )}
         </div>

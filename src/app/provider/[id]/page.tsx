@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { MOCK_SERVICES } from '@/data/mock-services';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Star, 
   ShieldCheck, 
@@ -14,37 +14,48 @@ import {
   CheckCircle2, 
   MessageSquare, 
   Share2, 
-  MoreHorizontal,
   ThumbsUp,
-  Award
+  Award,
+  X,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Copy
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ReviewFilter from '@/components/ui/ReviewFilter';
 
 export default function ProviderPublicProfile() {
   const { id } = useParams();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState(0);
   
+  const decodedName = typeof id === 'string' ? decodeURIComponent(id).replace(/-/g, ' ') : '';
+
   // Find provider info from mock services (in a real app, this would be a separate API call)
   const providerServices = useMemo(() => {
-    return MOCK_SERVICES.filter(s => s.provider.id === id);
-  }, [id]);
-
-  const provider = providerServices[0]?.provider;
-
-  if (!provider) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
-        <h1 className="text-4xl font-black text-slate-900 mb-4">Expert Not Found</h1>
-        <p className="text-slate-500 max-w-md mx-auto mb-8 font-medium">The professional profile you're looking for doesn't exist or has been moved.</p>
-        <Link href="/services">
-          <Button className="bg-[#2286BE] hover:bg-[#1b6da0] h-12 px-8 rounded-xl font-bold">Browse All Experts</Button>
-        </Link>
-      </div>
+    return MOCK_SERVICES.filter(s => 
+      s.provider.id === id || 
+      s.provider.name.toLowerCase() === decodedName.toLowerCase()
     );
-  }
+  }, [id, decodedName]);
+
+  const provider = providerServices[0]?.provider || {
+    id: id as string,
+    name: decodedName || 'Expert Provider',
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(decodedName)}&background=2286BE&color=fff`,
+    level: 'Top Rated',
+    rating: 4.8,
+    reviews: 120,
+    memberSince: '2023',
+    hourlyRate: 25,
+    bio: `Hi, I am ${decodedName}, an experienced professional dedicated to providing high-quality service. I ensure every job is done with precision and care.`
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
@@ -76,16 +87,12 @@ export default function ProviderPublicProfile() {
                 <div className="flex gap-2">
                   <Button 
                     onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                      toast.success('Profile link copied to clipboard!');
+                      setIsShareModalOpen(true);
                     }}
                     variant="outline" 
                     className="flex-1 h-12 rounded-xl border-slate-200 text-slate-600 font-bold gap-2 hover:bg-slate-50 transition-all"
                   >
                     <Share2 size={16} /> Share
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
-                    <MoreHorizontal size={20} />
                   </Button>
                 </div>
               </div>
@@ -95,7 +102,7 @@ export default function ProviderPublicProfile() {
             <div className="flex-1">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">{provider.name}</h1>
                     {provider.badge === 'Verified' && (
                       <Badge className="bg-blue-50 text-[#2286BE] border-blue-100 px-3 py-1 rounded-full flex items-center gap-1">
@@ -103,6 +110,13 @@ export default function ProviderPublicProfile() {
                         <span className="text-[10px] uppercase font-black tracking-widest leading-none mt-0.5">Verified Pro</span>
                       </Badge>
                     )}
+                    <Badge className={`border-none font-black text-[10px] px-3 py-1 rounded-full ${
+                      (providerServices[0]?.provider.type || 'Solo') === 'Agency' ? 'bg-purple-50 text-purple-600' :
+                      (providerServices[0]?.provider.type || 'Solo') === 'Team' ? 'bg-blue-50 text-blue-600' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {(providerServices[0]?.provider.type || 'Solo') === 'Agency' ? '🏢' : (providerServices[0]?.provider.type || 'Solo') === 'Team' ? '👥' : '👤'} {providerServices[0]?.provider.type || 'Solo'}
+                    </Badge>
                   </div>
                   <p className="text-slate-500 font-medium text-lg mb-4 italic">&quot;Professional {providerServices[0]?.category} Expert delivering top-tier results.&quot;</p>
                   
@@ -196,32 +210,49 @@ export default function ProviderPublicProfile() {
 
           <TabsContent value="reviews">
             <div className="bg-white rounded-[2rem] border border-slate-100 p-8">
-              <h2 className="text-xl font-black text-slate-900 mb-8">What Clients Are Saying</h2>
-              <div className="space-y-8">
-                {[
-                  { name: 'Michael Chen', rating: 5, date: '2 weeks ago', text: 'Rahim is hands down the best cleaning expert I have ever hired. Punctual and very thorough!' },
+              <h2 className="text-xl font-black text-slate-900 mb-6">What Clients Are Saying</h2>
+              {(() => {
+                const allReviews = [
+                  { name: 'Michael Chen', rating: 5, date: '2 weeks ago', text: 'Hands down the best expert I have ever hired. Punctual and very thorough!' },
                   { name: 'Sarah J.', rating: 4, date: '1 month ago', text: 'Great service, very professional. Would hire again for deep cleaning.' },
-                  { name: 'Robert P.', rating: 5, date: '2 months ago', text: 'Exceptional quality of work. My home is sparkling!' }
-                ].map((review, i) => (
-                  <div key={i} className="border-b border-slate-50 last:border-0 pb-8 last:pb-0">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border border-slate-100 shadow-sm">
-                          <AvatarFallback className="font-bold">{review.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-black text-slate-900">{review.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase">{review.date}</p>
-                        </div>
+                  { name: 'Robert P.', rating: 5, date: '2 months ago', text: 'Exceptional quality of work. My home is sparkling!' },
+                ];
+                const counts = allReviews.reduce((acc, r) => { acc[r.rating] = (acc[r.rating] || 0) + 1; return acc; }, {} as Record<number, number>);
+                const filtered = reviewFilter === 0 ? allReviews : allReviews.filter(r => r.rating === reviewFilter);
+                return (
+                  <>
+                    <ReviewFilter selected={reviewFilter} onChange={setReviewFilter} counts={counts} total={allReviews.length} />
+                    {filtered.length === 0 ? (
+                      <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                        <Star size={28} className="text-slate-200 mx-auto mb-3" />
+                        <p className="text-slate-400 font-bold">No reviews for this rating.</p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        {[...Array(review.rating)].map((_, j) => <Star key={j} size={14} className="text-amber-400 fill-amber-400" />)}
+                    ) : (
+                      <div className="space-y-8">
+                        {filtered.map((review, i) => (
+                          <div key={i} className="border-b border-slate-50 last:border-0 pb-8 last:pb-0">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10 border border-slate-100 shadow-sm">
+                                  <AvatarFallback className="font-bold">{review.name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="text-sm font-black text-slate-900">{review.name}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase">{review.date}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {[...Array(review.rating)].map((_, j) => <Star key={j} size={14} className="text-amber-400 fill-amber-400" />)}
+                              </div>
+                            </div>
+                            <p className="text-slate-600 font-medium leading-relaxed">{review.text}</p>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <p className="text-slate-600 font-medium leading-relaxed">{review.text}</p>
-                  </div>
-                ))}
-              </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </TabsContent>
 
@@ -283,6 +314,70 @@ export default function ProviderPublicProfile() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Share Modal Overlay */}
+      <AnimatePresence>
+        {isShareModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+             <motion.div 
+               initial={{ opacity: 0 }} 
+               animate={{ opacity: 1 }} 
+               exit={{ opacity: 0 }} 
+               onClick={() => setIsShareModalOpen(false)}
+               className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" 
+             />
+             <motion.div 
+               initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+               animate={{ opacity: 1, y: 0, scale: 1 }} 
+               exit={{ opacity: 0, y: 20, scale: 0.95 }} 
+               className="relative bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-3xl overflow-hidden border-8 border-white/20"
+             >
+                <div className="absolute top-6 right-6">
+                   <button onClick={() => setIsShareModalOpen(false)} className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
+                      <X size={20} />
+                   </button>
+                </div>
+                
+                <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Share this Profile</h3>
+                <p className="text-slate-500 font-medium mb-8">Spread the word about {provider.name}&apos;s expertise.</p>
+
+                <div className="space-y-6">
+                   {/* Copy Link */}
+                   <div className="p-2 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
+                      <div className="flex-1 px-4 text-sm font-bold text-slate-400 truncate tracking-tight">
+                         {typeof window !== 'undefined' ? window.location.href : 'locallyserve.com/provider/001'}
+                      </div>
+                      <Button 
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            navigator.clipboard.writeText(window.location.href);
+                            toast.success('Link copied to clipboard!');
+                          }
+                        }}
+                        className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-100 h-12 px-5 rounded-xl font-black text-xs uppercase tracking-widest shadow-sm"
+                      >
+                         <Copy size={16} className="mr-2 text-[#2286BE]" /> Copy
+                      </Button>
+                   </div>
+
+                   {/* Social Grid */}
+                   <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { name: 'Facebook', icon: <Facebook size={20} />, color: 'hover:bg-blue-600 hover:text-white' },
+                        { name: 'X', icon: <Twitter size={20} />, color: 'hover:bg-black hover:text-white' },
+                        { name: 'LinkedIn', icon: <Linkedin size={20} />, color: 'hover:bg-blue-700 hover:text-white' }
+                      ].map((social) => (
+                        <button key={social.name} onClick={() => toast.success(`Sharing on ${social.name}...`)} className={`flex flex-col items-center justify-center gap-3 p-6 bg-slate-50 rounded-2xl border border-slate-100 transition-all ${social.color} group`}>
+                           <div className="transition-transform group-hover:scale-110">{social.icon}</div>
+                           <span className="text-[10px] font-black uppercase tracking-widest">{social.name}</span>
+                        </button>
+                      ))}
+                   </div>
+                </div>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { BRAND } from '@/lib/constants';
 import { toast } from 'sonner';
 import { Copy, Facebook, Twitter, Linkedin, X } from 'lucide-react';
+import ReviewFilter from '@/components/ui/ReviewFilter';
 
 const container = {
   hidden: { opacity: 0 },
@@ -43,6 +44,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   const [isFavorited, setIsFavorited] = React.useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
+  const [reviewFilter, setReviewFilter] = useState(0);
 
   // Fallback if images empty
   React.useEffect(() => {
@@ -168,8 +170,8 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                           <div key={idx} className="flex items-center gap-4 p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
                             <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center flex-shrink-0" aria-hidden="true">{feat.icon}</div>
                             <div>
-                              <h4 className="font-black text-slate-900 leading-none mb-1">{feat.title}</h4>
-                              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{feat.subtitle}</p>
+                              <h3 className="font-black text-slate-900 leading-none mb-1 text-[15px]">{feat.title}</h3>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{feat.subtitle}</p>
                             </div>
                           </div>
                         ))}
@@ -177,9 +179,9 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
 
                       {service.requirements && (
                         <div className="bg-amber-50/50 border border-amber-100 rounded-3xl p-8 not-prose">
-                           <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2">
-                              <ShieldCheck size={20} className="text-[#2286BE]" /> Requirements from Client
-                           </h4>
+                           <h2 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-xl">
+                              <ShieldCheck size={20} className="text-[#1b6da0]" /> Requirements from Client
+                           </h2>
                            <p className="text-slate-600 font-medium leading-relaxed">{service.requirements}</p>
                         </div>
                       )}
@@ -203,25 +205,52 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
 
                 <TabsContent value="reviews">
                    <div className="space-y-6">
-                      {[1, 2].map((r) => (
-                        <div key={r} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                           <div className="flex items-center justify-between mb-6">
-                              <div className="flex items-center gap-4">
-                                 <Avatar className="h-12 w-12 border-2 border-white shadow-md">
-                                   <AvatarFallback className="bg-slate-100 text-[10px] font-black">C{r}</AvatarFallback>
-                                 </Avatar>
-                                 <div>
-                                    <p className="font-black text-slate-900">Premium Customer</p>
-                                    <div className="flex items-center text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                                        Dhaka • 2 days ago
-                                    </div>
-                                 </div>
+                      {(() => {
+                        const allReviews = [
+                          { name: 'Michael Chen', rating: 5, date: '2 weeks ago', text: 'Exceptional service! Arrived right on time and provided high-quality work.' },
+                          { name: 'Sarah J.', rating: 4, date: '1 month ago', text: 'Very professional experience. The quality was top-notch.' },
+                          { name: 'Robert P.', rating: 5, date: '2 months ago', text: 'Will definitely book again for my next project!' }
+                        ];
+                        const counts = allReviews.reduce((acc, r) => { acc[r.rating] = (acc[r.rating] || 0) + 1; return acc; }, {} as Record<number, number>);
+                        const filtered = reviewFilter === 0 ? allReviews : allReviews.filter(r => r.rating === reviewFilter);
+                        return (
+                          <>
+                            <ReviewFilter selected={reviewFilter} onChange={setReviewFilter} counts={counts} total={allReviews.length} />
+                            {filtered.length === 0 ? (
+                              <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                                <Star size={28} className="text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-bold">No reviews for this rating.</p>
                               </div>
-                              <div className="flex text-amber-400 gap-0.5" aria-hidden="true"><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/><Star fill="currentColor" size={14}/></div>
-                           </div>
-                           <p className="text-slate-600 leading-relaxed text-lg font-medium">&quot;Exceptional service! Arrived right on time and provided high-quality work. Will definitely book again for my next project.&quot;</p>
-                        </div>
-                      ))}
+                            ) : (
+                              <div className="space-y-6">
+                                {filtered.map((r, idx) => (
+                                  <div key={idx} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                                     <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-4">
+                                           <Avatar className="h-12 w-12 border-2 border-white shadow-md">
+                                             <AvatarFallback className="bg-slate-100 text-[10px] font-black">{r.name[0]}</AvatarFallback>
+                                           </Avatar>
+                                           <div>
+                                              <p className="font-black text-slate-900">{r.name}</p>
+                                              <div className="flex items-center text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                                                  Dhaka • {r.date}
+                                              </div>
+                                           </div>
+                                        </div>
+                                        <div className="flex text-amber-400 gap-0.5">
+                                          {[...Array(5)].map((_, i) => (
+                                            <Star key={i} fill={i < r.rating ? "currentColor" : "none"} size={14}/>
+                                          ))}
+                                        </div>
+                                     </div>
+                                     <p className="text-slate-600 leading-relaxed text-lg font-medium">&quot;{r.text}&quot;</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                    </div>
                 </TabsContent>
               </Tabs>
@@ -297,6 +326,13 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                      <h4 className="font-black text-slate-900 text-xl leading-none mb-1.5">{service.provider.name}</h4>
                      <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest py-0.5 border-slate-100 text-slate-400">Level 2</Badge>
+                        <Badge className={`border-none font-black text-[10px] px-2 py-0.5 rounded-full ${
+                          (service.provider.type || 'Solo') === 'Agency' ? 'bg-purple-100 text-purple-600' :
+                          (service.provider.type || 'Solo') === 'Team' ? 'bg-blue-100 text-blue-600' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {service.provider.type || 'Solo'}
+                        </Badge>
                         <div className="flex items-center text-amber-400"><Star fill="currentColor" size={14}/> <span className="text-slate-900 font-black ml-1 text-xs">{service.provider.rating}</span></div>
                      </div>
                    </div>
@@ -406,12 +442,13 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
         )}
       </AnimatePresence>
 
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
         title="Save this Service"
         subtitle="Join LocallyServe to save your favorite services and build your dream team."
       />
+
     </div>
   );
 }

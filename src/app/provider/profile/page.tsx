@@ -25,9 +25,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
-
-const formatAddress = (area: string, district: string, zip: string) =>
-  [area || 'Area unavailable', district || 'District unavailable', zip || 'ZIP N/A'].join(', ');
+import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
 
 export default function ProviderProfilePage() {
   const { user, role, logout, updateProfile } = useAuth();
@@ -91,80 +89,9 @@ export default function ProviderProfilePage() {
     }
   };
 
-  const getAddressFromCoordinates = async (lat: number, lng: number) => {
-    const fallbackText = formatAddress('', '', '');
-
-    if (!mapboxToken) {
-      try {
-        const fallbackRes = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
-        );
-
-        if (!fallbackRes.ok) return fallbackText;
-        const fallbackData = (await fallbackRes.json()) as {
-          locality?: string;
-          city?: string;
-          principalSubdivision?: string;
-          postcode?: string;
-        };
-
-        return formatAddress(
-          fallbackData.locality || fallbackData.city || '',
-          fallbackData.principalSubdivision || '',
-          fallbackData.postcode || ''
-        );
-      } catch {
-        return fallbackText;
-      }
-    }
-
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?language=en&limit=10&access_token=${mapboxToken}`
-      );
-      if (!response.ok) return fallbackText;
-
-      const data = (await response.json()) as {
-        features?: Array<{
-          id: string;
-          text: string;
-          place_type?: string[];
-          context?: Array<{ id: string; text: string }>;
-        }>;
-      };
-
-      const features = data.features || [];
-      const topFeature = features[0];
-      const contexts = topFeature?.context || [];
-
-      const fromContext = (prefix: string) =>
-        contexts.find((item) => item.id?.startsWith(prefix))?.text || '';
-      const fromFeature = (type: string) =>
-        features.find((item) => item.place_type?.includes(type))?.text || '';
-
-      const area =
-        fromFeature('neighborhood') ||
-        fromFeature('locality') ||
-        topFeature?.text ||
-        fromFeature('address') ||
-        fromFeature('place');
-      const district =
-        fromContext('district.') ||
-        fromFeature('district') ||
-        fromContext('place.') ||
-        fromFeature('place') ||
-        fromContext('region.');
-      const zip = fromContext('postcode.') || fromFeature('postcode');
-
-      return formatAddress(area || '', district || '', zip || '');
-    } catch {
-      return fallbackText;
-    }
-  };
-
   const saveCoordinatesAsServiceCity = async (lat: number, lng: number, successMessage: string) => {
     setIsResolvingCity(true);
-    const nextCity = await getAddressFromCoordinates(lat, lng);
+    const nextCity = await resolveAddressFromCoordinates(lat, lng, mapboxToken);
     setServiceCityDraft(nextCity);
     setSelectedMapCoords({ lat, lng });
     updateProfile({

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -20,8 +20,8 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 const item = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 
 export default function CategoryClient({ slug }: { slug: string }) {
-  const cat = CATEGORY_MAP[slug];
-  
+  const [cat, setCat] = useState(CATEGORY_MAP[slug]);
+  const [isLoadingCategory, setIsLoadingCategory] = useState(!CATEGORY_MAP[slug]);
   const { city, coordinates, radius } = useLocation();
   const { isAuthenticated } = useAuth();
   
@@ -34,6 +34,49 @@ export default function CategoryClient({ slug }: { slug: string }) {
   const [minRating, setMinRating] = useState<number>(0);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (CATEGORY_MAP[slug]) {
+      setCat(CATEGORY_MAP[slug]);
+      setIsLoadingCategory(false);
+      return;
+    }
+
+    const loadCategory = async () => {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiBase) {
+        setIsLoadingCategory(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${apiBase}/api/categories`);
+        const payload = await response.json();
+        if (response.ok && payload?.success && Array.isArray(payload.data)) {
+          const resolvedCategory = payload.data.find((item: { slug?: string }) => item.slug === slug);
+          if (resolvedCategory) {
+            setCat({
+              name: resolvedCategory.name,
+              slug: resolvedCategory.slug,
+              iconName: resolvedCategory.iconName || 'ShieldCheck',
+              description:
+                resolvedCategory.description ||
+                `Explore ${resolvedCategory.name} services from verified professionals.`,
+              color: resolvedCategory.color || 'text-slate-600',
+              bgGradient: resolvedCategory.bgGradient || 'from-slate-100 to-white',
+              services: [],
+            });
+          }
+        }
+      } catch {
+        // ignore fetch errors and fall back to not found
+      } finally {
+        setIsLoadingCategory(false);
+      }
+    };
+
+    void loadCategory();
+  }, [slug]);
 
   const SORT_LABELS: Record<string, string> = {
     relevance: 'Relevance',
@@ -79,6 +122,17 @@ export default function CategoryClient({ slug }: { slug: string }) {
 
     return result;
   }, [cat, searchQuery, minRating, selectedLevels, providerTypes, sortBy, coordinates]);
+
+  if (isLoadingCategory) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#2286BE]/20 border-t-[#2286BE]" />
+          <p className="text-slate-500 font-medium">Loading category...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!cat) {
     return (
