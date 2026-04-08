@@ -110,6 +110,14 @@ export const apiSlice = createApi({
         body: payload,
       }),
     }),
+    submitProviderPayoutInfo: builder.mutation<ApiEnvelope<{ user?: Record<string, unknown> }>, FormData>({
+      query: (formData) => ({
+        url: '/api/profile/provider/payout-info',
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: ['Profile'],
+    }),
     login: builder.mutation<ApiEnvelope<unknown>, LoginPayload>({
       query: (payload) => ({
         url: '/api/auth/login',
@@ -144,6 +152,7 @@ export const {
   useUpdateProfileMutation,
   useUploadAvatarMutation,
   useChangePasswordMutation,
+  useSubmitProviderPayoutInfoMutation,
   useLoginMutation,
   useSignupMutation,
   useVerifySignupOtpMutation,

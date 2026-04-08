@@ -30,6 +30,7 @@ import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
 import {
   useChangePasswordMutation,
+  useSubmitProviderPayoutInfoMutation,
   useUpdateProfileMutation,
   useUploadAvatarMutation,
 } from '@/store/services/apiSlice';
@@ -66,10 +67,22 @@ export default function ProviderProfilePage() {
   const [updateProfileMutation] = useUpdateProfileMutation();
   const [uploadAvatarMutation] = useUploadAvatarMutation();
   const [changePasswordMutation] = useChangePasswordMutation();
+  const [submitProviderPayoutInfoMutation] = useSubmitProviderPayoutInfoMutation();
   const [selectedMapCoords, setSelectedMapCoords] = useState<{ lat: number; lng: number }>({
     lat: 40.7128,
     lng: -74.006,
   });
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [routingNumber, setRoutingNumber] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountType, setAccountType] = useState<'checking' | 'savings' | ''>('');
+  const [nidFrontFile, setNidFrontFile] = useState<File | null>(null);
+  const [nidBackFile, setNidBackFile] = useState<File | null>(null);
+  const [nidFrontPreview, setNidFrontPreview] = useState('');
+  const [nidBackPreview, setNidBackPreview] = useState('');
+  const [isSubmittingPayoutVerification, setIsSubmittingPayoutVerification] = useState(false);
+  const [isPayoutEditMode, setIsPayoutEditMode] = useState(false);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -78,6 +91,23 @@ export default function ProviderProfilePage() {
   const defaultExperience = user?.experienceLevel || '';
   const defaultServiceCity = user?.serviceCity || '';
   const defaultAvatarSrc = user?.avatar || '';
+  const payoutStatus = user?.payoutVerificationStatus || 'unverified';
+  const canEditPayout =
+    payoutStatus === 'unverified' || payoutStatus === 'rejected' || isPayoutEditMode;
+
+  useEffect(() => {
+    setAccountHolderName(user?.payoutInfo?.accountHolderName || '');
+    setBankAccountNumber(user?.payoutInfo?.bankAccountNumber || '');
+    setRoutingNumber(user?.payoutInfo?.routingNumber || '');
+    setBankName(user?.payoutInfo?.bankName || '');
+    setAccountType((user?.payoutInfo?.accountType as 'checking' | 'savings' | '') || '');
+    setNidFrontPreview(user?.payoutInfo?.nidFrontImageUrl || '');
+    setNidBackPreview(user?.payoutInfo?.nidBackImageUrl || '');
+  }, [user?.payoutInfo]);
+
+  useEffect(() => {
+    setIsPayoutEditMode(false);
+  }, [payoutStatus]);
 
   const contactName = contactNameDraft ?? defaultContactName;
   const businessBio = bioDraft ?? defaultBusinessBio;
@@ -323,6 +353,85 @@ export default function ProviderProfilePage() {
     }
   };
 
+  const handleNidFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    side: 'front' | 'back'
+  ) => {
+    if (!canEditPayout) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file for NID.');
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    if (side === 'front') {
+      setNidFrontFile(file);
+      setNidFrontPreview(previewUrl);
+    } else {
+      setNidBackFile(file);
+      setNidBackPreview(previewUrl);
+    }
+  };
+
+  const handleVerifyPayoutInfo = async () => {
+    if (!canEditPayout) return;
+    if (!accountHolderName.trim() || !bankAccountNumber.trim() || !routingNumber.trim() || !bankName.trim() || !accountType) {
+      toast.error('Please fill all payout fields before verification.');
+      return;
+    }
+
+    if (!nidFrontPreview || !nidBackPreview) {
+      toast.error('Please upload both NID front and back images.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('accountHolderName', accountHolderName.trim());
+    formData.append('bankAccountNumber', bankAccountNumber.trim());
+    formData.append('routingNumber', routingNumber.trim());
+    formData.append('bankName', bankName.trim());
+    formData.append('accountType', accountType);
+    if (nidFrontFile) formData.append('nidFront', nidFrontFile);
+    if (nidBackFile) formData.append('nidBack', nidBackFile);
+
+    setIsSubmittingPayoutVerification(true);
+    try {
+      const payload = await submitProviderPayoutInfoMutation(formData).unwrap();
+      if (!payload?.success) {
+        toast.error(payload?.message || 'Failed to submit payout verification.');
+        return;
+      }
+
+      const nextUser = payload?.data?.user as Record<string, unknown> | undefined;
+      updateProfile({
+        payoutVerificationStatus:
+          (nextUser?.payoutVerificationStatus as 'unverified' | 'pending' | 'verified' | 'rejected') ||
+          'pending',
+        payoutInfo: (nextUser?.payoutInfo as Record<string, unknown>) || {
+          accountHolderName: accountHolderName.trim(),
+          bankAccountNumber: bankAccountNumber.trim(),
+          routingNumber: routingNumber.trim(),
+          bankName: bankName.trim(),
+          accountType,
+          nidFrontImageUrl: nidFrontPreview,
+          nidBackImageUrl: nidBackPreview,
+          submittedAt: new Date().toISOString(),
+          reviewedAt: null,
+          rejectionReason: '',
+        },
+      });
+      setNidFrontFile(null);
+      setNidBackFile(null);
+      setIsPayoutEditMode(false);
+      toast.success(payload?.message || 'Verification request sent to admin.');
+    } catch {
+      toast.error('Could not submit payout verification right now.');
+    } finally {
+      setIsSubmittingPayoutVerification(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] py-16">
@@ -392,7 +501,9 @@ export default function ProviderProfilePage() {
               </div>
 
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">{contactName || user.name}</h2>
-              <p className="text-sm font-bold text-[#2286BE] uppercase tracking-widest mt-1">Verified Provider</p>
+              <p className="text-sm font-bold text-[#2286BE] uppercase tracking-widest mt-1">
+                {payoutStatus === 'verified' ? 'Verified Provider' : 'Provider Account'}
+              </p>
 
               <div className="mt-10 space-y-2">
                 {[
@@ -441,6 +552,33 @@ export default function ProviderProfilePage() {
               className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
             >
               <div className="p-8 md:p-12 space-y-8">
+                {(payoutStatus === 'unverified' || payoutStatus === 'rejected') && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+                    <p className="text-sm font-black text-amber-700">
+                      You have to verify your account from Payout Info.
+                    </p>
+                    {payoutStatus === 'rejected' && user?.payoutInfo?.rejectionReason ? (
+                      <p className="mt-2 text-xs font-semibold text-amber-700/90">
+                        Last rejection reason: {user.payoutInfo.rejectionReason}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+
+                {payoutStatus === 'pending' && (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
+                    <p className="text-sm font-black text-blue-700">
+                      Your account is under review to verify.
+                    </p>
+                  </div>
+                )}
+
+                {payoutStatus === 'verified' && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                    <p className="text-sm font-black text-emerald-700">Your account is verified</p>
+                  </div>
+                )}
+
                 {activeTab === 'profile' && (
                   <>
                     <div>
@@ -678,10 +816,122 @@ export default function ProviderProfilePage() {
                   <div className="space-y-6">
                     <div>
                       <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Payout Info</h3>
-                      <p className="text-slate-500 font-medium">Manage your payout account details.</p>
+                      <p className="text-slate-500 font-medium">Add bank details and upload NID front/back for admin verification.</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
-                      <p className="text-sm text-slate-700 font-semibold">Payout setup UI restored placeholder.</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Account Holder Name</label>
+                        <Input
+                          value={accountHolderName}
+                          onChange={(e) => setAccountHolderName(e.target.value)}
+                          disabled={!canEditPayout}
+                          placeholder="Account holder full name"
+                          className="h-14 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold disabled:bg-slate-100 disabled:text-slate-500"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Bank Account Number</label>
+                        <Input
+                          value={bankAccountNumber}
+                          onChange={(e) => setBankAccountNumber(e.target.value)}
+                          disabled={!canEditPayout}
+                          placeholder="Bank account number"
+                          className="h-14 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold disabled:bg-slate-100 disabled:text-slate-500"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Routing Number (ABA Routing Number)</label>
+                        <Input
+                          value={routingNumber}
+                          onChange={(e) => setRoutingNumber(e.target.value)}
+                          disabled={!canEditPayout}
+                          placeholder="Routing number"
+                          className="h-14 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold disabled:bg-slate-100 disabled:text-slate-500"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Bank Name</label>
+                        <Input
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          disabled={!canEditPayout}
+                          placeholder="Bank name"
+                          className="h-14 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold disabled:bg-slate-100 disabled:text-slate-500"
+                        />
+                      </div>
+
+                      <div className="space-y-3 md:col-span-2">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Account Type</label>
+                        <select
+                          value={accountType}
+                          onChange={(e) => setAccountType(e.target.value as 'checking' | 'savings' | '')}
+                          disabled={!canEditPayout}
+                          className="w-full h-14 px-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#2286BE] outline-none font-bold bg-white disabled:bg-slate-100 disabled:text-slate-500"
+                        >
+                          <option value="">Select account type</option>
+                          <option value="checking">Checking</option>
+                          <option value="savings">Savings</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 rounded-2xl border border-slate-200 p-6 bg-slate-50">
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">NID Front Part</label>
+                        <Input type="file" accept="image/*" disabled={!canEditPayout} onChange={(e) => handleNidFileChange(e, 'front')} />
+                        {nidFrontPreview ? (
+                          <img src={nidFrontPreview} alt="NID front" className="h-44 w-full rounded-xl object-cover border border-slate-200" />
+                        ) : (
+                          <div className="h-44 w-full rounded-xl border border-dashed border-slate-300 bg-white flex items-center justify-center text-sm font-semibold text-slate-400">
+                            No front image selected
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">NID Back Part</label>
+                        <Input type="file" accept="image/*" disabled={!canEditPayout} onChange={(e) => handleNidFileChange(e, 'back')} />
+                        {nidBackPreview ? (
+                          <img src={nidBackPreview} alt="NID back" className="h-44 w-full rounded-xl object-cover border border-slate-200" />
+                        ) : (
+                          <div className="h-44 w-full rounded-xl border border-dashed border-slate-300 bg-white flex items-center justify-center text-sm font-semibold text-slate-400">
+                            No back image selected
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {user?.payoutInfo?.submittedAt ? (
+                      <p className="text-xs font-semibold text-slate-500">
+                        Last submitted: {new Date(user.payoutInfo.submittedAt).toLocaleString()}
+                      </p>
+                    ) : null}
+
+                    <div className="pt-2 flex justify-end">
+                      {payoutStatus === 'verified' && !isPayoutEditMode ? (
+                        <Button
+                          onClick={() => setIsPayoutEditMode(true)}
+                          className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-xl px-10 h-12 shadow-xl shadow-[#2286BE]/20"
+                        >
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleVerifyPayoutInfo}
+                          disabled={isSubmittingPayoutVerification}
+                          className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-xl px-10 h-12 shadow-xl shadow-[#2286BE]/20"
+                        >
+                          {isSubmittingPayoutVerification
+                            ? 'Submitting...'
+                            : payoutStatus === 'verified' && isPayoutEditMode
+                              ? 'Submit Again for Verification'
+                              : 'Verify Now'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}

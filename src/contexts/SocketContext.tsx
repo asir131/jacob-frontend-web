@@ -24,7 +24,7 @@ type SocketContextValue = {
 const SocketContext = createContext<SocketContextValue | undefined>(undefined);
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, updateProfile } = useAuth();
   const dispatch = useAppDispatch();
   const notifications = useAppSelector((state) => state.notifications.items);
   const socketConnected = useAppSelector((state) => state.notifications.socketConnected);
@@ -62,6 +62,27 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         createdAt: notification.createdAt || new Date().toISOString(),
       };
       dispatch(addNotification(normalized));
+      const notificationData = (normalized.data || {}) as {
+        notificationType?: string;
+      };
+      if (notificationData.notificationType === 'provider_verification_approved') {
+        updateProfile({
+          payoutVerificationStatus: 'verified',
+          payoutInfo: {
+            rejectionReason: '',
+            reviewedAt: normalized.createdAt,
+          },
+        });
+      }
+      if (notificationData.notificationType === 'provider_verification_rejected') {
+        updateProfile({
+          payoutVerificationStatus: 'rejected',
+          payoutInfo: {
+            rejectionReason: normalized.description || '',
+            reviewedAt: normalized.createdAt,
+          },
+        });
+      }
       toast.info(normalized.title, { description: normalized.description });
     });
 
@@ -69,7 +90,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       socket.disconnect();
       dispatch(setSocketConnectedState(false));
     };
-  }, [dispatch, isAuthenticated]);
+  }, [dispatch, isAuthenticated, updateProfile]);
 
   const unreadCount = useMemo(() => notifications.filter((item) => item.unread).length, [notifications]);
 

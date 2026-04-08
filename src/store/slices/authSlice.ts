@@ -20,6 +20,19 @@ export interface AuthUser {
   serviceCity?: string;
   serviceLocationLat?: number;
   serviceLocationLng?: number;
+  payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  payoutInfo?: {
+    accountHolderName?: string;
+    bankAccountNumber?: string;
+    routingNumber?: string;
+    bankName?: string;
+    accountType?: 'checking' | 'savings' | '';
+    nidFrontImageUrl?: string;
+    nidBackImageUrl?: string;
+    submittedAt?: string | null;
+    reviewedAt?: string | null;
+    rejectionReason?: string;
+  };
 }
 
 interface AuthState {

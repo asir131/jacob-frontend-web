@@ -37,6 +37,19 @@ type LoginResponse = {
       serviceCity?: string;
       serviceLocationLat?: number | null;
       serviceLocationLng?: number | null;
+      payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
+      payoutInfo?: {
+        accountHolderName?: string;
+        bankAccountNumber?: string;
+        routingNumber?: string;
+        bankName?: string;
+        accountType?: 'checking' | 'savings' | '';
+        nidFrontImageUrl?: string;
+        nidBackImageUrl?: string;
+        submittedAt?: string | null;
+        reviewedAt?: string | null;
+        rejectionReason?: string;
+      };
     };
   };
 };
@@ -102,6 +115,8 @@ export default function LoginClient() {
         serviceCity: data.data.user.serviceCity,
         serviceLocationLat: data.data.user.serviceLocationLat ?? undefined,
         serviceLocationLng: data.data.user.serviceLocationLng ?? undefined,
+        payoutVerificationStatus: data.data.user.payoutVerificationStatus || 'unverified',
+        payoutInfo: data.data.user.payoutInfo,
       });
       toast.success(`Welcome back to ${BRAND.name}!`);
       router.push('/');

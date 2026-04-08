@@ -31,6 +31,19 @@ interface LoginPayload {
   serviceCity?: string;
   serviceLocationLat?: number | null;
   serviceLocationLng?: number | null;
+  payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  payoutInfo?: {
+    accountHolderName?: string;
+    bankAccountNumber?: string;
+    routingNumber?: string;
+    bankName?: string;
+    accountType?: 'checking' | 'savings' | '';
+    nidFrontImageUrl?: string;
+    nidBackImageUrl?: string;
+    submittedAt?: string | null;
+    reviewedAt?: string | null;
+    rejectionReason?: string;
+  };
 }
 
 interface AuthState {
@@ -127,6 +140,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         typeof payload?.serviceLocationLat === 'number' ? payload.serviceLocationLat : undefined,
       serviceLocationLng:
         typeof payload?.serviceLocationLng === 'number' ? payload.serviceLocationLng : undefined,
+      payoutVerificationStatus: payload?.payoutVerificationStatus || 'unverified',
+      payoutInfo: payload?.payoutInfo || {
+        accountHolderName: '',
+        bankAccountNumber: '',
+        routingNumber: '',
+        bankName: '',
+        accountType: '',
+        nidFrontImageUrl: '',
+        nidBackImageUrl: '',
+        submittedAt: null,
+        reviewedAt: null,
+        rejectionReason: '',
+      },
     };
 
     dispatch(loginSuccess(nextUser));
