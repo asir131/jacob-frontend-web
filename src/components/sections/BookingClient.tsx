@@ -51,6 +51,42 @@ interface BookingClientProps {
 
 export default function BookingClient({ service }: BookingClientProps) {
   const router = useRouter();
+  const sourcePackages = Array.isArray(service?.packages) ? service.packages : [];
+  const byName = new Map(
+    sourcePackages
+      .filter((item: any) => item && typeof item === 'object')
+      .map((item: any) => [String(item.name || '').toLowerCase(), item])
+  );
+  const packageOptions = ['basic', 'standard', 'premium'].map((key) => {
+    const fromApi = byName.get(key) || {};
+    const fallbackPrice =
+      key === 'basic'
+        ? Number(service?.startingPrice) || 0
+        : key === 'standard'
+          ? Math.round((Number(service?.startingPrice) || 0) * 1.8)
+          : Math.round((Number(service?.startingPrice) || 0) * 3.2);
+
+    return {
+      key,
+      label: `${key.charAt(0).toUpperCase() + key.slice(1)} Package`,
+      title: String(fromApi.title || `${key.charAt(0).toUpperCase() + key.slice(1)} package`),
+      description:
+        String(fromApi.description || '') ||
+        (key === 'basic'
+          ? 'Standard on-site service with essentials covered.'
+          : key === 'standard'
+            ? 'Comprehensive service with premium materials and double duration.'
+            : 'VIP priority service, team of experts, and full cleanup guarantee.'),
+      deliveryTime:
+        String(fromApi.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
+      price: Number(fromApi.price) || fallbackPrice,
+    };
+  });
+
+  const getPackageData = (key: string) => {
+    return packageOptions.find((item) => item.key === key) || packageOptions[0];
+  };
+
   const [[step, direction], setStep] = useState([1, 0]);
   const [pkg, setPkg] = useState('standard');
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -82,8 +118,8 @@ export default function BookingClient({ service }: BookingClientProps) {
     );
   };
 
-  const basePrice = service.startingPrice;
-  const price = pkg === 'basic' ? basePrice : pkg === 'standard' ? Math.round(basePrice * 1.8) : Math.round(basePrice * 3.2);
+  const selectedPackage = getPackageData(pkg);
+  const price = selectedPackage?.price || 0;
   const platformFee = 5;
   const total = price + platformFee;
 
@@ -157,7 +193,9 @@ export default function BookingClient({ service }: BookingClientProps) {
                       <p className="text-slate-400 font-medium mb-10">Select the plan that best fits your requirements.</p>
                       
                       <RadioGroup value={pkg} onValueChange={setPkg} className="space-y-4">
-                        {['basic', 'standard', 'premium'].map(p => (
+                        {['basic', 'standard', 'premium'].map(p => {
+                          const option = getPackageData(p);
+                          return (
                           <motion.div 
                             key={p} 
                             whileHover={{ scale: 1.01 }}
@@ -169,16 +207,16 @@ export default function BookingClient({ service }: BookingClientProps) {
                                <div className="flex items-center gap-4">
                                  <RadioGroupItem value={p} id={`pkg-${p}`} className="mt-0.5 text-[#2286BE] focus:ring-[#2286BE] border-2" />
                                  <div>
-                                   <label htmlFor={`pkg-${p}`} className="font-black text-xl text-slate-900 capitalize cursor-pointer">{p} Package</label>
+                                   <label htmlFor={`pkg-${p}`} className="font-black text-xl text-slate-900 capitalize cursor-pointer">{option?.label || `${p} package`}</label>
                                    <div className="flex items-center gap-3 mt-1.5">
                                       <span className="text-slate-400 font-bold uppercase tracking-tighter text-[10px] flex items-center gap-1 font-medium">
-                                        <Clock size={12} className="text-[#2286BE]" /> {p === 'basic' ? '24 Hours' : '48 Hours'} Delivery
+                                        <Clock size={12} className="text-[#2286BE]" /> {option?.deliveryTime || '1 Day'} Delivery
                                       </span>
                                    </div>
                                  </div>
                                </div>
                                <div className="text-right">
-                                  <span className="font-black text-2xl text-slate-900">${p === 'basic' ? basePrice : p === 'standard' ? Math.round(basePrice * 1.8) : Math.round(basePrice * 3.2)}</span>
+                                  <span className="font-black text-2xl text-slate-900">${option?.price || 0}</span>
                                   {p === 'standard' && <div className="text-[9px] font-black text-white bg-[#2286BE] px-2 py-0.5 rounded-full uppercase mt-1">Popular</div>}
                                </div>
                              </div>
@@ -191,7 +229,7 @@ export default function BookingClient({ service }: BookingClientProps) {
                                  ))}
                              </div>
                           </motion.div>
-                        ))}
+                        )})}
                       </RadioGroup>
                     </div>
                   )}
@@ -371,7 +409,7 @@ export default function BookingClient({ service }: BookingClientProps) {
                  <h4 className="font-black text-slate-900 line-clamp-2 leading-snug text-base mb-1">{service.title}</h4>
                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{service.provider.name}</p>
                  <div className="mt-3">
-                   <Badge className="bg-slate-900 text-white border-none font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-lg">{pkg} Plan</Badge>
+                   <Badge className="bg-slate-900 text-white border-none font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-lg">{selectedPackage?.title || `${pkg} Plan`}</Badge>
                  </div>
                </div>
              </div>

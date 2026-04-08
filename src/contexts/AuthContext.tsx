@@ -175,7 +175,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = (payload: Partial<AuthUser>) => {
     if (!user) return;
-    const nextUser = { ...user, ...payload };
+    const nextUser: AuthUser = {
+      ...user,
+      ...payload,
+      payoutInfo:
+        payload.payoutInfo === undefined
+          ? user.payoutInfo
+          : { ...(user.payoutInfo || {}), ...payload.payoutInfo },
+    };
     dispatch(updateAuthProfile(payload));
     if (typeof window !== 'undefined') {
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));

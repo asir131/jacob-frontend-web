@@ -69,7 +69,11 @@ const authSlice = createSlice({
     },
     updateAuthProfile: (state, action: PayloadAction<Partial<AuthUser>>) => {
       if (!state.user) return;
-      state.user = { ...state.user, ...action.payload };
+      const mergedPayoutInfo =
+        action.payload.payoutInfo === undefined
+          ? state.user.payoutInfo
+          : { ...(state.user.payoutInfo || {}), ...action.payload.payoutInfo };
+      state.user = { ...state.user, ...action.payload, payoutInfo: mergedPayoutInfo };
       state.role = state.user.role;
       state.isAuthenticated = true;
     },

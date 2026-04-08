@@ -40,7 +40,14 @@ interface ServiceDetailClientProps {
 export default function ServiceDetailClient({ service }: ServiceDetailClientProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
-  const [selectedImage, setSelectedImage] = React.useState(service.images[0] || '');
+  const galleryImages = React.useMemo(
+    () =>
+      Array.isArray(service.images) && service.images.length > 0
+        ? service.images
+        : ['https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'],
+    [service.images]
+  );
+  const [selectedImage, setSelectedImage] = React.useState(galleryImages[0] || '');
   const [isFavorited, setIsFavorited] = React.useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
@@ -48,10 +55,44 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
 
   // Fallback if images empty
   React.useEffect(() => {
-    if (service.images && service.images.length > 0 && !selectedImage) {
-      setSelectedImage(service.images[0]);
+    if (galleryImages.length > 0 && !selectedImage) {
+      setSelectedImage(galleryImages[0]);
     }
-  }, [service.images, selectedImage]);
+  }, [galleryImages, selectedImage]);
+
+  const packageTabs = React.useMemo(() => {
+    const sourcePackages = Array.isArray(service.packages) ? service.packages : [];
+    const byName = new Map(
+      sourcePackages
+        .filter((item: any) => item && typeof item === 'object')
+        .map((item: any) => [String(item.name || '').toLowerCase(), item])
+    );
+
+    return ['basic', 'standard', 'premium'].map((key) => {
+      const fromApi = byName.get(key) || {};
+      const fallbackPrice =
+        key === 'basic'
+          ? Number(service.startingPrice) || 0
+          : key === 'standard'
+            ? Math.round((Number(service.startingPrice) || 0) * 1.8)
+            : Math.round((Number(service.startingPrice) || 0) * 3.2);
+
+      return {
+        key,
+        name: key.charAt(0).toUpperCase() + key.slice(1),
+        title: String(fromApi.title || `${key.charAt(0).toUpperCase() + key.slice(1)} package`),
+        description:
+          String(fromApi.description || '') ||
+          (key === 'basic'
+            ? 'Standard on-site service with essentials covered.'
+            : key === 'standard'
+              ? 'Comprehensive service with premium materials and double duration.'
+              : 'VIP priority service, team of experts, and full cleanup guarantee.'),
+        deliveryTime: String(fromApi.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
+        price: Number(fromApi.price) || fallbackPrice,
+      };
+    });
+  }, [service.packages, service.startingPrice]);
 
   const handleBooking = () => {
     router.push(`/book/${service.id}`);
@@ -135,7 +176,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                    </div>
                </div>
                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-                  {service.images.map((img: string, i: number) => (
+                  {galleryImages.map((img: string, i: number) => (
                      <motion.div 
                       key={i} 
                       onClick={() => setSelectedImage(img)}
@@ -266,30 +307,28 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                transition={{ delay: 0.4 }}
                className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl shadow-slate-200/50 overflow-hidden"
              >
-                <Tabs defaultValue="standard" className="w-full">
+                <Tabs defaultValue="basic" className="w-full">
                     <TabsList className="w-full grid grid-cols-3 bg-slate-50/80 h-16 p-1.5 rounded-none border-b border-slate-100">
                        <TabsTrigger value="basic" className="text-[11px] uppercase tracking-widest font-black data-[state=active]:text-[#2286BE] data-[state=active]:bg-white/80 rounded-xl transition-all duration-300 shadow-none data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-slate-100">Basic</TabsTrigger>
                        <TabsTrigger value="standard" className="text-[11px] uppercase tracking-widest font-black data-[state=active]:text-[#2286BE] data-[state=active]:bg-white/80 rounded-xl transition-all duration-300 shadow-none data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-slate-100">Standard</TabsTrigger>
                        <TabsTrigger value="premium" className="text-[11px] uppercase tracking-widest font-black data-[state=active]:text-[#2286BE] data-[state=active]:bg-white/80 rounded-xl transition-all duration-300 shadow-none data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-slate-100">Premium</TabsTrigger>
                     </TabsList>
                    
-                   {['basic', 'standard', 'premium'].map((pkg) => (
-                     <TabsContent key={pkg} value={pkg} className="m-0 p-8">
+                   {packageTabs.map((pkg) => (
+                     <TabsContent key={pkg.key} value={pkg.key} className="m-0 p-8">
                         <div className="flex justify-between items-start mb-6">
-                            <h3 className="font-black text-slate-900 text-2xl capitalize">{pkg} Plan</h3>
-                            <span className="text-3xl font-black text-[#2286BE] tracking-tighter">${pkg === 'basic' ? service.startingPrice : pkg === 'standard' ? Math.round(service.startingPrice * 1.8) : Math.round(service.startingPrice * 3.2)}</span>
+                            <h3 className="font-black text-slate-900 text-2xl">{pkg.title}</h3>
+                            <span className="text-3xl font-black text-[#2286BE] tracking-tighter">${pkg.price}</span>
                         </div>
                         <p className="text-slate-500 font-medium leading-relaxed mb-10">
-                           {pkg === 'basic' && 'Standard on-site service with essentials covered.'}
-                           {pkg === 'standard' && 'Comprehensive service with premium materials and double duration.'}
-                           {pkg === 'premium' && 'VIP priority service, team of experts, and full cleanup guarantee.'}
+                           {pkg.description}
                         </p>
                         
                         <div className="space-y-4 mb-10">
                            {[
-                             { label: 'Delivery Time', value: pkg === 'basic' ? service.deliveryTime?.basic || '1 Day' : pkg === 'standard' ? service.deliveryTime?.standard || '2 Days' : service.deliveryTime?.premium || '3 Days' },
-                             { label: 'Service Duration', value: pkg === 'basic' ? '1 hr' : pkg === 'standard' ? '3 hrs' : 'Full Day' },
-                             { label: 'Team Size', value: pkg === 'premium' ? '2 Experts' : '1 Expert' }
+                             { label: 'Delivery Time', value: pkg.deliveryTime },
+                             { label: 'Service Duration', value: pkg.key === 'basic' ? '1 hr' : pkg.key === 'standard' ? '3 hrs' : 'Full Day' },
+                             { label: 'Team Size', value: pkg.key === 'premium' ? '2 Experts' : '1 Expert' }
                            ].map((spec, i) => (
                              <div key={i} className="flex justify-between items-center text-sm">
                                 <span className="text-slate-400 font-bold uppercase tracking-wider">{spec.label}</span>
@@ -325,7 +364,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                    <div>
                      <h4 className="font-black text-slate-900 text-xl leading-none mb-1.5">{service.provider.name}</h4>
                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest py-0.5 border-slate-100 text-slate-400">Level 2</Badge>
+                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest py-0.5 border-slate-100 text-slate-400">{service.provider.level || 'Level 2'}</Badge>
                         <Badge className={`border-none font-black text-[10px] px-2 py-0.5 rounded-full ${
                           (service.provider.type || 'Solo') === 'Agency' ? 'bg-purple-100 text-purple-600' :
                           (service.provider.type || 'Solo') === 'Team' ? 'bg-blue-100 text-blue-600' :
@@ -339,7 +378,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 </div>
                 
                 <p className="text-slate-500 font-medium text-sm leading-relaxed mb-8">
-                   Professional service provider with over 150+ successful local projects on {BRAND.name}. Specializing in high-end domestic tasks.
+                   Professional service provider with over {service.provider.completedOrders || 0}+ successful local projects on {BRAND.name}. Specializing in high-end domestic tasks.
                 </p>
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
@@ -348,7 +387,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg. Reply</div>
                    </div>
                    <div className="bg-slate-50 p-4 rounded-2xl text-center">
-                      <div className="text-xl font-black text-slate-900 leading-none mb-1">158</div>
+                      <div className="text-xl font-black text-slate-900 leading-none mb-1">{service.provider.completedOrders || 0}</div>
                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Done</div>
                    </div>
                 </div>
