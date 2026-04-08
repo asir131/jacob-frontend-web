@@ -17,6 +17,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  useDeleteGigMutation,
+  useDeleteGigRequestMutation,
+  useLazyGetMyGigsQuery,
+} from '@/store/services/apiSlice';
 
 type GigPackage = {
   name: string;
@@ -80,33 +85,27 @@ export default function ProviderGigsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [getMyGigs] = useLazyGetMyGigsQuery();
+  const [deleteGig] = useDeleteGigMutation();
+  const [deleteGigRequest] = useDeleteGigRequestMutation();
 
   const loadMyGigs = useCallback(async () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL;
-    const token = localStorage.getItem('auth_token');
-
-    if (!apiBase || !token) {
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch(`${apiBase}/api/gigs/mine`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const payload = await response.json();
-      if (response.ok && payload?.success) {
-        setPublishedGigs(Array.isArray(payload?.data?.publishedGigs) ? payload.data.publishedGigs : []);
-        setPendingRequests(Array.isArray(payload?.data?.pendingRequests) ? payload.data.pendingRequests : []);
+      const payload = await getMyGigs().unwrap();
+      if (payload?.success) {
+        setPublishedGigs(
+          Array.isArray(payload?.data?.publishedGigs) ? (payload.data.publishedGigs as MyGig[]) : []
+        );
+        setPendingRequests(
+          Array.isArray(payload?.data?.pendingRequests) ? (payload.data.pendingRequests as PendingRequest[]) : []
+        );
       }
     } catch {
       // keep empty state
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getMyGigs]);
 
   useEffect(() => {
     void loadMyGigs();
@@ -145,26 +144,12 @@ export default function ProviderGigsPage() {
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL;
-    const token = localStorage.getItem('auth_token');
-    if (!apiBase || !token) return;
-
     setIsDeleting(true);
     try {
-      const endpoint = deleteTarget.type === 'request'
-        ? `${apiBase}/api/gigs/requests/${deleteTarget.id}`
-        : `${apiBase}/api/gigs/${deleteTarget.id}`;
-
-      const response = await fetch(endpoint, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const payload = await response.json();
-      if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || 'Failed to delete gig.');
+      if (deleteTarget.type === 'request') {
+        await deleteGigRequest(deleteTarget.id).unwrap();
+      } else {
+        await deleteGig(deleteTarget.id).unwrap();
       }
 
       await loadMyGigs();

@@ -14,6 +14,8 @@ import {
   Mail,
   MapPin,
   Navigation,
+  Eye,
+  EyeOff,
   Save,
   Shield,
   User,
@@ -26,10 +28,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
+import {
+  useChangePasswordMutation,
+  useUpdateProfileMutation,
+  useUploadAvatarMutation,
+} from '@/store/services/apiSlice';
+
+const normalizeAddressText = (value: string) => {
+  const trimmed = value.trim();
+  const isLatLng = /^lat\s*-?\d+(\.\d+)?\s*,\s*lng\s*-?\d+(\.\d+)?$/i.test(trimmed);
+  if (!isLatLng) return value;
+  return 'Area unavailable, District unavailable, ZIP N/A';
+};
 
 export default function ProviderProfilePage() {
   const { user, role, logout, updateProfile } = useAuth();
-  const { city, coordinates, detectLocation } = useLocation();
+  const { detectLocation } = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [activeTab, setActiveTab] = useState('profile');
@@ -42,6 +56,16 @@ export default function ProviderProfilePage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isResolvingCity, setIsResolvingCity] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [updateProfileMutation] = useUpdateProfileMutation();
+  const [uploadAvatarMutation] = useUploadAvatarMutation();
+  const [changePasswordMutation] = useChangePasswordMutation();
   const [selectedMapCoords, setSelectedMapCoords] = useState<{ lat: number; lng: number }>({
     lat: 40.7128,
     lng: -74.006,
@@ -52,30 +76,23 @@ export default function ProviderProfilePage() {
   const defaultContactName = user ? user.name || `${user.firstName} ${user.lastName}`.trim() : '';
   const defaultBusinessBio = user?.businessBio || '';
   const defaultExperience = user?.experienceLevel || '';
-  const defaultServiceCity = user?.serviceCity || city;
+  const defaultServiceCity = user?.serviceCity || '';
   const defaultAvatarSrc = user?.avatar || '';
 
   const contactName = contactNameDraft ?? defaultContactName;
   const businessBio = bioDraft ?? defaultBusinessBio;
   const experienceLevel = experienceDraft ?? defaultExperience;
-  const serviceCity = serviceCityDraft ?? defaultServiceCity;
+  const rawServiceCity = serviceCityDraft ?? defaultServiceCity;
+  const serviceCity = normalizeAddressText(rawServiceCity);
   const avatar = avatarDraft ?? defaultAvatarSrc;
 
   const savedServiceLat = typeof user?.serviceLocationLat === 'number' ? user.serviceLocationLat : null;
   const savedServiceLng = typeof user?.serviceLocationLng === 'number' ? user.serviceLocationLng : null;
-  const coordLat = coordinates?.lat ?? null;
-  const coordLng = coordinates?.lng ?? null;
-
   useEffect(() => {
     if (savedServiceLat !== null && savedServiceLng !== null) {
       setSelectedMapCoords({ lat: savedServiceLat, lng: savedServiceLng });
-      return;
     }
-
-    if (coordLat !== null && coordLng !== null) {
-      setSelectedMapCoords({ lat: coordLat, lng: coordLng });
-    }
-  }, [coordLat, coordLng, savedServiceLat, savedServiceLng]);
+  }, [savedServiceLat, savedServiceLng]);
 
   const resetDrafts = () => {
     setContactNameDraft(null);
@@ -89,18 +106,44 @@ export default function ProviderProfilePage() {
     }
   };
 
+  const persistServiceLocation = async (nextCity: string, lat: number, lng: number) => {
+    try {
+      const payload = await updateProfileMutation({
+        serviceCity: nextCity,
+        serviceLocationLat: lat,
+        serviceLocationLng: lng,
+      }).unwrap();
+      if (!payload?.success) return false;
+
+      const nextUser = payload?.data?.user;
+      updateProfile({
+        serviceCity: typeof nextUser?.serviceCity === 'string' ? nextUser.serviceCity : nextCity,
+        serviceLocationLat:
+          typeof nextUser?.serviceLocationLat === 'number' ? nextUser.serviceLocationLat : lat,
+        serviceLocationLng:
+          typeof nextUser?.serviceLocationLng === 'number' ? nextUser.serviceLocationLng : lng,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const saveCoordinatesAsServiceCity = async (lat: number, lng: number, successMessage: string) => {
     setIsResolvingCity(true);
     const nextCity = await resolveAddressFromCoordinates(lat, lng, mapboxToken);
     setServiceCityDraft(nextCity);
     setSelectedMapCoords({ lat, lng });
-    updateProfile({
-      serviceCity: nextCity,
-      serviceLocationLat: lat,
-      serviceLocationLng: lng,
-    });
+    const persisted = await persistServiceLocation(nextCity, lat, lng);
+    if (!persisted) {
+      updateProfile({
+        serviceCity: nextCity,
+        serviceLocationLat: lat,
+        serviceLocationLng: lng,
+      });
+    }
     setIsResolvingCity(false);
-    toast.success(successMessage);
+    toast.success(persisted ? successMessage : `${successMessage} (Saved locally. Press Save to persist if needed.)`);
   };
 
   const handleUseCurrentLocation = async () => {
@@ -116,31 +159,13 @@ export default function ProviderProfilePage() {
           );
         },
         async () => {
-          if (coordinates) {
-            await saveCoordinatesAsServiceCity(
-              coordinates.lat,
-              coordinates.lng,
-              'Service city updated from current location.'
-            );
-            return;
-          }
-
-          setServiceCityDraft(city);
-          updateProfile({ serviceCity: city });
-          toast.success('Service city set from detected city.');
+          toast.error('Could not detect your current location. Please allow location permission and try again.');
         }
       );
       return;
     }
 
-    if (coordinates) {
-      await saveCoordinatesAsServiceCity(coordinates.lat, coordinates.lng, 'Service city updated.');
-      return;
-    }
-
-    setServiceCityDraft(city);
-    updateProfile({ serviceCity: city });
-    toast.success('Service city set from detected city.');
+    toast.error('Geolocation is not available in this browser.');
   };
 
   const handleSetCenterAsServiceCity = async () => {
@@ -161,29 +186,13 @@ export default function ProviderProfilePage() {
     }
 
     const uploadAvatar = async () => {
-      const token = localStorage.getItem('auth_token');
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-
-      if (!apiBase || !token) {
-        toast.error('Missing API configuration or auth token.');
-        return;
-      }
-
       const formData = new FormData();
       formData.append('image', file);
 
       setIsUploadingAvatar(true);
       try {
-        const response = await fetch(`${apiBase}/api/profile/avatar`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        const payload = await response.json();
-        if (!response.ok || !payload?.success) {
+        const payload = await uploadAvatarMutation(formData).unwrap();
+        if (!payload?.success) {
           toast.error(payload?.message || 'Failed to upload profile image.');
           return;
         }
@@ -220,36 +229,19 @@ export default function ProviderProfilePage() {
     const [firstName, ...rest] = cleanContactName.split(' ').filter(Boolean);
     const lastName = rest.join(' ');
 
-    const token = localStorage.getItem('auth_token');
-    const apiBase = process.env.NEXT_PUBLIC_API_URL;
-
-    if (!token || !apiBase) {
-      toast.error('Missing API configuration or auth token.');
-      return;
-    }
-
     setIsSavingProfile(true);
 
     try {
-      const response = await fetch(`${apiBase}/api/profile/me`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          businessBio: businessBio.trim(),
-          experienceLevel: experienceLevel.trim(),
-          serviceCity: serviceCity.trim(),
-          serviceLocationLat: selectedMapCoords.lat,
-          serviceLocationLng: selectedMapCoords.lng,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok || !payload?.success) {
+      const payload = await updateProfileMutation({
+        firstName,
+        lastName,
+        businessBio: businessBio.trim(),
+        experienceLevel: experienceLevel.trim(),
+        serviceCity: serviceCity.trim(),
+        serviceLocationLat: selectedMapCoords.lat,
+        serviceLocationLng: selectedMapCoords.lng,
+      }).unwrap();
+      if (!payload?.success) {
         toast.error(payload?.message || 'Failed to save business profile.');
         return;
       }
@@ -286,6 +278,49 @@ export default function ProviderProfilePage() {
   const handleCancel = () => {
     resetDrafts();
     toast.info('Changes discarded.');
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error('Please fill all password fields.');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('New password and confirm password do not match.');
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      toast.error('New password must be different from current password.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const payload = await changePasswordMutation({
+        currentPassword,
+        newPassword,
+      }).unwrap();
+      if (!payload?.success) {
+        toast.error(payload?.message || 'Failed to update password.');
+        return;
+      }
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success(payload?.message || 'Password updated successfully.');
+    } catch {
+      toast.error('Could not update password right now.');
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   if (!user) {
@@ -486,6 +521,7 @@ export default function ProviderProfilePage() {
                           <Input
                             value={serviceCity}
                             onChange={(e) => setServiceCityDraft(e.target.value)}
+                            placeholder="Banani, Dhaka, 1213"
                             className="h-14 pl-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold"
                           />
                         </div>
@@ -543,12 +579,85 @@ export default function ProviderProfilePage() {
                   <div className="space-y-6">
                     <div>
                       <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Security</h3>
-                      <p className="text-slate-500 font-medium">Use client security tab if you need password changes.</p>
+                      <p className="text-slate-500 font-medium">Update password and keep your provider account secure.</p>
                     </div>
+
+                    <div className="space-y-5 max-w-xl">
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Current Password</label>
+                        <div className="relative">
+                          <Input
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Enter current password"
+                            className="h-14 pr-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword((prev) => !prev)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">New Password</label>
+                        <div className="relative">
+                          <Input
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Min. 8 characters"
+                            className="h-14 pr-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword((prev) => !prev)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Confirm Password</label>
+                        <div className="relative">
+                          <Input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Re-enter new password"
+                            className="h-14 pr-12 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((prev) => !prev)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
                       <p className="text-sm text-slate-600 font-semibold">
-                        Security API already available at `POST /api/profile/change-password`.
+                        Use your current password and set a new strong password (minimum 8 characters).
                       </p>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <Button
+                        onClick={handleChangePassword}
+                        disabled={isChangingPassword}
+                        className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-xl px-10 h-12 shadow-xl shadow-[#2286BE]/20"
+                      >
+                        {isChangingPassword ? 'Updating...' : 'Update Password'}
+                      </Button>
                     </div>
                   </div>
                 )}

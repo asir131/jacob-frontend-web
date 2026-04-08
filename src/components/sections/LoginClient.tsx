@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { useLoginMutation } from '@/store/services/apiSlice';
 
 type LoginView = 'login' | 'forgot-email' | 'forgot-otp' | 'new-password' | 'success';
 type LoginResponse = {
@@ -44,6 +44,7 @@ type LoginResponse = {
 export default function LoginClient() {
   const { login } = useAuth();
   const router = useRouter();
+  const [loginMutation] = useLoginMutation();
   const [view, setView] = useState<LoginView>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -74,14 +75,8 @@ export default function LoginClient() {
 
     setIsLoading(true);
     try {
-      const { data, error } = await api.post<LoginResponse>('/api/auth/login', loginPayload);
-
-      if (error) {
-        toast.error(error);
-        return;
-      }
-
-      if (!data?.success || !data.data) {
+      const data = (await loginMutation(loginPayload).unwrap()) as LoginResponse;
+      if (!data?.success || !data?.data) {
         toast.error(data?.message || 'Login failed. Please try again.');
         return;
       }

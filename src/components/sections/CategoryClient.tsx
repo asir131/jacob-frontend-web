@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -15,15 +15,15 @@ import { MOCK_SERVICES, calculateDistance } from '@/data/mock-services';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthModal from '@/components/ui/AuthModal';
+import { useGetCategoriesQuery } from '@/store/services/apiSlice';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
 const item = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 
 export default function CategoryClient({ slug }: { slug: string }) {
-  const [cat, setCat] = useState(CATEGORY_MAP[slug]);
-  const [isLoadingCategory, setIsLoadingCategory] = useState(!CATEGORY_MAP[slug]);
   const { city, coordinates, radius } = useLocation();
   const { isAuthenticated } = useAuth();
+  const { data: categoriesPayload, isFetching: isCategoriesLoading } = useGetCategoriesQuery();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('relevance');
@@ -35,48 +35,37 @@ export default function CategoryClient({ slug }: { slug: string }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (CATEGORY_MAP[slug]) {
-      setCat(CATEGORY_MAP[slug]);
-      setIsLoadingCategory(false);
-      return;
-    }
+  const cat = useMemo(() => {
+    if (CATEGORY_MAP[slug]) return CATEGORY_MAP[slug];
 
-    const loadCategory = async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-      if (!apiBase) {
-        setIsLoadingCategory(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${apiBase}/api/categories`);
-        const payload = await response.json();
-        if (response.ok && payload?.success && Array.isArray(payload.data)) {
-          const resolvedCategory = payload.data.find((item: { slug?: string }) => item.slug === slug);
-          if (resolvedCategory) {
-            setCat({
-              name: resolvedCategory.name,
-              slug: resolvedCategory.slug,
-              iconName: resolvedCategory.iconName || 'ShieldCheck',
-              description:
-                resolvedCategory.description ||
-                `Explore ${resolvedCategory.name} services from verified professionals.`,
-              color: resolvedCategory.color || 'text-slate-600',
-              bgGradient: resolvedCategory.bgGradient || 'from-slate-100 to-white',
-              services: [],
-            });
-          }
+    const categoryList = Array.isArray(categoriesPayload?.data) ? categoriesPayload.data : [];
+    const resolvedCategory = categoryList.find((entry: { slug?: string }) => entry.slug === slug) as
+      | {
+          name: string;
+          slug: string;
+          iconName?: string;
+          description?: string;
+          color?: string;
+          bgGradient?: string;
         }
-      } catch {
-        // ignore fetch errors and fall back to not found
-      } finally {
-        setIsLoadingCategory(false);
-      }
-    };
+      | undefined;
 
-    void loadCategory();
-  }, [slug]);
+    if (!resolvedCategory) return null;
+
+    return {
+      name: resolvedCategory.name,
+      slug: resolvedCategory.slug,
+      iconName: resolvedCategory.iconName || 'ShieldCheck',
+      description:
+        resolvedCategory.description ||
+        `Explore ${resolvedCategory.name} services from verified professionals.`,
+      color: resolvedCategory.color || 'text-slate-600',
+      bgGradient: resolvedCategory.bgGradient || 'from-slate-100 to-white',
+      services: [],
+    };
+  }, [categoriesPayload, slug]);
+
+  const isLoadingCategory = !CATEGORY_MAP[slug] && isCategoriesLoading;
 
   const SORT_LABELS: Record<string, string> = {
     relevance: 'Relevance',

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { DEFAULT_CATEGORIES, getIconByName } from '@/data/categories';
+import { useGetCategoriesQuery } from '@/store/services/apiSlice';
 
 type ApiCategory = {
   _id?: string;
@@ -17,32 +18,11 @@ type ApiCategory = {
 };
 
 export default function CategoriesPage() {
-  const [approvedCategories, setApprovedCategories] = useState<ApiCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadCategories = async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-      if (!apiBase) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${apiBase}/api/categories`);
-        const payload = await response.json();
-        if (response.ok && payload?.success && Array.isArray(payload.data)) {
-          setApprovedCategories(payload.data);
-        }
-      } catch {
-        // keep default categories only
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadCategories();
-  }, []);
+  const { data, isLoading } = useGetCategoriesQuery();
+  const approvedCategories = useMemo(
+    () => (Array.isArray(data?.data) ? (data.data as ApiCategory[]) : []),
+    [data]
+  );
 
   const visibleCategories = useMemo(() => {
     const defaultSlugs = new Set(DEFAULT_CATEGORIES.map((category) => category.slug));
@@ -87,7 +67,7 @@ export default function CategoriesPage() {
           >
             Find the perfect professional for every house task from our wide range of service categories.
           </motion.p>
-          {loading ? (
+          {isLoading ? (
             <p className="mt-4 text-sm font-semibold text-slate-400">Loading approved custom categories...</p>
           ) : null}
         </header>

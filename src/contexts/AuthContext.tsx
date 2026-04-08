@@ -11,6 +11,8 @@ import {
   setAuthRole,
   updateAuthProfile,
 } from '@/store/slices/authSlice';
+import { store } from '@/store';
+import { apiSlice } from '@/store/services/apiSlice';
 
 interface LoginPayload {
   id?: string;
@@ -86,24 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
 
       const token = localStorage.getItem('auth_token');
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-      if (token && apiBase) {
+      if (token) {
         try {
-          const response = await fetch(`${apiBase}/api/profile/me`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ role: nextRole }),
-          });
-
-          const payload = await response.json();
-          if (response.ok && payload?.success && payload?.data?.user) {
-            const updatedUser = payload.data.user as AuthUser;
-            dispatch(updateAuthProfile(updatedUser));
-            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
-          }
+          await store.dispatch(
+            apiSlice.endpoints.updateProfile.initiate({ role: nextRole })
+          ).unwrap();
         } catch {
           // keep local switch even if backend sync fails
         }

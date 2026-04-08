@@ -12,10 +12,12 @@ export interface LiveNotification {
 
 interface NotificationState {
   items: LiveNotification[];
+  socketConnected: boolean;
 }
 
 const initialState: NotificationState = {
   items: [],
+  socketConnected: false,
 };
 
 const notificationSlice = createSlice({
@@ -31,8 +33,16 @@ const notificationSlice = createSlice({
     clearNotifications: (state) => {
       state.items = [];
     },
+    setSocketConnectedState: (state, action: PayloadAction<boolean>) => {
+      state.socketConnected = action.payload;
+    },
   },
 });
 
-export const { addNotification, markAllNotificationsAsRead, clearNotifications } = notificationSlice.actions;
+export const {
+  addNotification,
+  markAllNotificationsAsRead,
+  clearNotifications,
+  setSocketConnectedState,
+} = notificationSlice.actions;
 export default notificationSlice.reducer;

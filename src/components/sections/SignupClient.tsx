@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
-import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useSignupMutation } from '@/store/services/apiSlice';
 
 type SignupForm = {
   firstName: string;
@@ -29,6 +29,7 @@ type SignupResponse = {
 
 export default function SignupClient() {
   const router = useRouter();
+  const [signupMutation] = useSignupMutation();
   const [role, setRole] = useState<'client' | 'provider'>('client');
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<SignupForm>({
@@ -71,13 +72,7 @@ export default function SignupClient() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await api.post<SignupResponse>('/api/auth/signup', payload);
-
-      if (error) {
-        toast.error(error);
-        return;
-      }
-
+      const data = (await signupMutation(payload).unwrap()) as SignupResponse;
       if (!data?.success) {
         toast.error(data?.message || 'Registration failed. Please try again.');
         return;

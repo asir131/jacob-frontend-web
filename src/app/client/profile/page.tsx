@@ -26,6 +26,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
+import {
+  useChangePasswordMutation,
+  useUpdateProfileMutation,
+  useUploadAvatarMutation,
+} from '@/store/services/apiSlice';
 
 const normalizeAddressText = (value: string) => {
   const trimmed = value.trim();
@@ -36,7 +41,7 @@ const normalizeAddressText = (value: string) => {
 
 export default function ClientProfilePage() {
   const { user, role, logout, updateProfile } = useAuth();
-  const { city, coordinates, detectLocation } = useLocation();
+  const { detectLocation } = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [activeTab, setActiveTab] = useState('profile');
@@ -55,6 +60,9 @@ export default function ClientProfilePage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [updateProfileMutation] = useUpdateProfileMutation();
+  const [uploadAvatarMutation] = useUploadAvatarMutation();
+  const [changePasswordMutation] = useChangePasswordMutation();
   const [selectedMapCoords, setSelectedMapCoords] = useState<{ lat: number; lng: number }>({
     lat: 40.7128,
     lng: -74.006,
@@ -64,7 +72,7 @@ export default function ClientProfilePage() {
 
   const defaultFullName = user ? user.name || `${user.firstName} ${user.lastName}`.trim() : '';
   const defaultPhone = user?.phone || '';
-  const defaultAddress = user?.address || city;
+  const defaultAddress = user?.address || '';
   const defaultPreferredLanguage = user?.preferredLanguage || 'English (US)';
   const defaultAvatarSrc = user?.avatar || '';
 
@@ -77,25 +85,14 @@ export default function ClientProfilePage() {
   const savedLocationLat = typeof user?.locationLat === 'number' ? user.locationLat : null;
   const savedLocationLng = typeof user?.locationLng === 'number' ? user.locationLng : null;
 
-  const coordLat = coordinates?.lat ?? null;
-  const coordLng = coordinates?.lng ?? null;
-
   useEffect(() => {
     if (savedLocationLat !== null && savedLocationLng !== null) {
       setSelectedMapCoords({
         lat: savedLocationLat,
         lng: savedLocationLng,
       });
-      return;
     }
-
-    if (coordLat !== null && coordLng !== null) {
-      setSelectedMapCoords({
-        lat: coordLat,
-        lng: coordLng,
-      });
-    }
-  }, [coordLat, coordLng, savedLocationLat, savedLocationLng]);
+  }, [savedLocationLat, savedLocationLng]);
 
   const resetDrafts = () => {
     setFullNameDraft(null);
@@ -135,29 +132,13 @@ export default function ClientProfilePage() {
     }
 
     const uploadAvatar = async () => {
-      const token = localStorage.getItem('auth_token');
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-
-      if (!apiBase || !token) {
-        toast.error('Missing API configuration or auth token.');
-        return;
-      }
-
       const formData = new FormData();
       formData.append('image', file);
 
       setIsUploadingAvatar(true);
       try {
-        const response = await fetch(`${apiBase}/api/profile/avatar`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        const payload = await response.json();
-        if (!response.ok || !payload?.success) {
+        const payload = await uploadAvatarMutation(formData).unwrap();
+        if (!payload?.success) {
           toast.error(payload?.message || 'Failed to upload profile image.');
           return;
         }
@@ -197,26 +178,13 @@ export default function ClientProfilePage() {
           );
         },
         async () => {
-          if (coordinates) {
-            await saveCoordinatesAsAddress(coordinates.lat, coordinates.lng, 'Current location saved.');
-            return;
-          }
-          setAddressDraft(city);
-          updateProfile({ address: city });
-          toast.success('Current city saved.');
+          toast.error('Could not detect your current location. Please allow location permission and try again.');
         }
       );
       return;
     }
 
-    if (coordinates) {
-      await saveCoordinatesAsAddress(coordinates.lat, coordinates.lng, 'Current location saved.');
-      return;
-    }
-
-    setAddressDraft(city);
-    updateProfile({ address: city });
-    toast.success('Current city saved.');
+    toast.error('Geolocation is not available in this browser.');
   };
 
   const handleSetMapCenterAsLocation = async () => {
@@ -242,34 +210,18 @@ export default function ClientProfilePage() {
     const [firstName, ...rest] = cleanFullName.split(' ').filter(Boolean);
     const lastName = rest.join(' ');
 
-    const token = localStorage.getItem('auth_token');
-    const apiBase = process.env.NEXT_PUBLIC_API_URL;
-    if (!token || !apiBase) {
-      toast.error('Missing API configuration or auth token.');
-      return;
-    }
-
     setIsSavingProfile(true);
     try {
-      const response = await fetch(`${apiBase}/api/profile/me`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          phone: phone.trim(),
-          address: address.trim(),
-          preferredLanguage: preferredLanguage.trim(),
-          locationLat: selectedMapCoords.lat,
-          locationLng: selectedMapCoords.lng,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok || !payload?.success) {
+      const payload = await updateProfileMutation({
+        firstName,
+        lastName,
+        phone: phone.trim(),
+        address: address.trim(),
+        preferredLanguage: preferredLanguage.trim(),
+        locationLat: selectedMapCoords.lat,
+        locationLng: selectedMapCoords.lng,
+      }).unwrap();
+      if (!payload?.success) {
         toast.error(payload?.message || 'Failed to save profile.');
         return;
       }
@@ -303,14 +255,6 @@ export default function ClientProfilePage() {
   };
 
   const handleChangePassword = async () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL;
-    const token = localStorage.getItem('auth_token');
-
-    if (!apiBase || !token) {
-      toast.error('Missing API configuration or auth token.');
-      return;
-    }
-
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error('Please fill all password fields.');
       return;
@@ -333,20 +277,11 @@ export default function ClientProfilePage() {
 
     setIsChangingPassword(true);
     try {
-      const response = await fetch(`${apiBase}/api/profile/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok || !payload?.success) {
+      const payload = await changePasswordMutation({
+        currentPassword,
+        newPassword,
+      }).unwrap();
+      if (!payload?.success) {
         toast.error(payload?.message || 'Failed to update password.');
         return;
       }

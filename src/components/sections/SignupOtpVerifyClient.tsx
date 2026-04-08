@@ -7,9 +7,9 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { BRAND } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLoginMutation, useVerifySignupOtpMutation } from '@/store/services/apiSlice';
 
 type VerifyOtpResponse = {
   success: boolean;
@@ -54,6 +54,8 @@ export default function SignupOtpVerifyClient() {
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [verifySignupOtpMutation] = useVerifySignupOtpMutation();
+  const [loginMutation] = useLoginMutation();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,18 +98,13 @@ export default function SignupOtpVerifyClient() {
     setIsSubmitting(true);
 
     try {
-      const verifyRes = await api.post<VerifyOtpResponse>('/api/auth/verify-signup-otp', {
+      const verifyRes = (await verifySignupOtpMutation({
         email,
         otp,
-      });
+      }).unwrap()) as VerifyOtpResponse;
 
-      if (verifyRes.error) {
-        toast.error(verifyRes.error);
-        return;
-      }
-
-      if (!verifyRes.data?.success) {
-        toast.error(verifyRes.data?.message || 'OTP verification failed.');
+      if (!verifyRes?.success) {
+        toast.error(verifyRes?.message || 'OTP verification failed.');
         return;
       }
 
@@ -129,37 +126,37 @@ export default function SignupOtpVerifyClient() {
         return;
       }
 
-      const loginRes = await api.post<LoginResponse>('/api/auth/login', {
+      const loginRes = (await loginMutation({
         email: pendingAuth.email,
         password: pendingAuth.password,
-      });
+      }).unwrap()) as LoginResponse;
 
-      if (loginRes.error || !loginRes.data?.success || !loginRes.data.data) {
+      if (!loginRes?.success || !loginRes?.data) {
         toast.success('OTP verified. Please login to continue.');
         router.push('/login');
         return;
       }
 
-      localStorage.setItem('auth_token', loginRes.data.data.accessToken);
-      localStorage.setItem('refresh_token', loginRes.data.data.refreshToken);
-      const normalizedRole = loginRes.data.data.user.role === 'provider' ? 'provider' : 'client';
+      localStorage.setItem('auth_token', loginRes.data.accessToken);
+      localStorage.setItem('refresh_token', loginRes.data.refreshToken);
+      const normalizedRole = loginRes.data.user.role === 'provider' ? 'provider' : 'client';
       login({
-        id: loginRes.data.data.user.id,
-        firstName: loginRes.data.data.user.firstName,
-        lastName: loginRes.data.data.user.lastName,
-        email: loginRes.data.data.user.email,
+        id: loginRes.data.user.id,
+        firstName: loginRes.data.user.firstName,
+        lastName: loginRes.data.user.lastName,
+        email: loginRes.data.user.email,
         role: normalizedRole,
-        avatar: loginRes.data.data.user.avatar,
-        phone: loginRes.data.data.user.phone,
-        address: loginRes.data.data.user.address,
-        preferredLanguage: loginRes.data.data.user.preferredLanguage,
-        locationLat: loginRes.data.data.user.locationLat ?? undefined,
-        locationLng: loginRes.data.data.user.locationLng ?? undefined,
-        businessBio: loginRes.data.data.user.businessBio,
-        experienceLevel: loginRes.data.data.user.experienceLevel,
-        serviceCity: loginRes.data.data.user.serviceCity,
-        serviceLocationLat: loginRes.data.data.user.serviceLocationLat ?? undefined,
-        serviceLocationLng: loginRes.data.data.user.serviceLocationLng ?? undefined,
+        avatar: loginRes.data.user.avatar,
+        phone: loginRes.data.user.phone,
+        address: loginRes.data.user.address,
+        preferredLanguage: loginRes.data.user.preferredLanguage,
+        locationLat: loginRes.data.user.locationLat ?? undefined,
+        locationLng: loginRes.data.user.locationLng ?? undefined,
+        businessBio: loginRes.data.user.businessBio,
+        experienceLevel: loginRes.data.user.experienceLevel,
+        serviceCity: loginRes.data.user.serviceCity,
+        serviceLocationLat: loginRes.data.user.serviceLocationLat ?? undefined,
+        serviceLocationLng: loginRes.data.user.serviceLocationLng ?? undefined,
       });
 
       sessionStorage.removeItem('pending_signup_auth');

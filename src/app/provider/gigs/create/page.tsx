@@ -12,6 +12,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
+import {
+  useCreateGigMutation,
+  useLazyGetMyGigsQuery,
+  useUpdateGigMutation,
+} from '@/store/services/apiSlice';
 
 type PackageState = {
   name: string;
@@ -74,6 +79,9 @@ export default function CreateGigPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const [isLoadingGig, setIsLoadingGig] = useState(false);
+  const [getMyGigs] = useLazyGetMyGigsQuery();
+  const [createGig] = useCreateGigMutation();
+  const [updateGig] = useUpdateGigMutation();
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -91,22 +99,14 @@ export default function CreateGigPage() {
     if (!editId) return;
 
     const loadGigForEdit = async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-      const token = localStorage.getItem('auth_token');
-
-      if (!apiBase || !token) return;
-
       setIsLoadingGig(true);
       try {
-        const response = await fetch(`${apiBase}/api/gigs/mine`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload?.success) return;
+        const payload = await getMyGigs().unwrap();
+        if (!payload?.success) return;
 
         const allGigs: LoadedGig[] = [
-          ...(Array.isArray(payload?.data?.publishedGigs) ? payload.data.publishedGigs : []),
-          ...(Array.isArray(payload?.data?.pendingRequests) ? payload.data.pendingRequests : []),
+          ...(Array.isArray(payload?.data?.publishedGigs) ? (payload.data.publishedGigs as LoadedGig[]) : []),
+          ...(Array.isArray(payload?.data?.pendingRequests) ? (payload.data.pendingRequests as LoadedGig[]) : []),
         ];
         const gig = allGigs.find((item) => item._id === editId);
         if (!gig) return;
@@ -146,7 +146,7 @@ export default function CreateGigPage() {
     };
 
     void loadGigForEdit();
-  }, [editId]);
+  }, [editId, getMyGigs]);
 
   const updatePackage = (index: number, field: keyof PackageState, value: string) => {
     setPackages((prev) => prev.map((pkg, pkgIndex) => (pkgIndex === index ? { ...pkg, [field]: value } : pkg)));
@@ -233,14 +233,6 @@ export default function CreateGigPage() {
   };
 
   const handlePublish = async () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL;
-    const token = localStorage.getItem('auth_token');
-
-    if (!apiBase || !token) {
-      toast.error('Missing API configuration or auth token.');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -268,16 +260,10 @@ export default function CreateGigPage() {
         formData.append('images', file);
       });
 
-      const response = await fetch(editId ? `${apiBase}/api/gigs/${editId}` : `${apiBase}/api/gigs`, {
-        method: editId ? 'PUT' : 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const payload = await response.json();
-      if (!response.ok || !payload?.success) {
+      const payload = editId
+        ? await updateGig({ id: editId, formData }).unwrap()
+        : await createGig(formData).unwrap();
+      if (!payload?.success) {
         toast.error(payload?.message || 'Failed to publish gig.');
         return;
       }

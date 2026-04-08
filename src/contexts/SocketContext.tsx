@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
@@ -10,6 +10,7 @@ import {
   clearNotifications as clearNotificationsAction,
   LiveNotification,
   markAllNotificationsAsRead as markAllNotificationsAsReadAction,
+  setSocketConnectedState,
 } from '@/store/slices/notificationSlice';
 
 type SocketContextValue = {
@@ -26,7 +27,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   const dispatch = useAppDispatch();
   const notifications = useAppSelector((state) => state.notifications.items);
-  const [socketConnected, setSocketConnected] = useState(false);
+  const socketConnected = useAppSelector((state) => state.notifications.socketConnected);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -45,11 +46,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on('connect', () => {
-      setSocketConnected(true);
+      dispatch(setSocketConnectedState(true));
     });
 
     socket.on('disconnect', () => {
-      setSocketConnected(false);
+      dispatch(setSocketConnectedState(false));
     });
 
     socket.on('notification:new', (notification: LiveNotification) => {
@@ -66,7 +67,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       socket.disconnect();
-      setSocketConnected(false);
+      dispatch(setSocketConnectedState(false));
     };
   }, [dispatch, isAuthenticated]);
 
