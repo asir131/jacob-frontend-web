@@ -137,7 +137,7 @@ export default function ClientDashboardClient() {
               </div>
               
               <div className="space-y-4">
-                  {[{ id: 'ORD-2026-001', title: 'Expert Plumbing & Pipe Repair', status: 'In Progress', amount: '1,100', provider: 'QuickFix Team', time: 'Tomorrow, 10:00 AM', icon: 0 }, { id: 'ORD-2026-002', title: 'Professional Deep House Cleaning', status: 'Delivered', amount: '1,550', provider: 'Rahim Uddin', time: 'Oct 24, 2025', icon: 1 }].map((order, idx) => (
+                  {[{ id: 'ORD-2026-001', title: 'Expert Plumbing & Pipe Repair', category: 'Plumbing', status: 'In Progress', amount: '1,100', provider: 'QuickFix Team', time: 'Tomorrow, 10:00 AM', icon: 0 }, { id: 'ORD-2026-002', title: 'Professional Deep House Cleaning', category: 'Cleaning', status: 'Delivered', amount: '1,550', provider: 'Rahim Uddin', time: 'Oct 24, 2025', icon: 1 }].map((order, idx) => (
                    <motion.div 
                     key={idx}
                     whileHover={{ x: 8 }}
@@ -152,6 +152,9 @@ export default function ClientDashboardClient() {
                           <div className="flex flex-col sm:flex-row sm:justify-between items-start mb-3">
                              <div>
                                 <h3 className="font-bold text-slate-900 text-lg group-hover:text-[#2286BE] transition-colors">{order.title}</h3>
+                                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mt-1">
+                                  Category: {order.category}
+                                </p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs font-bold text-slate-400">#{order.id}</span>
                                   <Badge variant="secondary" className={`text-[10px] font-bold uppercase border-none px-2 rounded-md ${idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-[#2286BE]/5 text-[#2286BE]'}`}>

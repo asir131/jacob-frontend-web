@@ -24,6 +24,7 @@ type ProviderOrder = {
   orderNumber: string;
   conversationId?: string | null;
   orderName: string;
+  categoryName?: string;
   status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
   packagePrice: number;
   serviceAddress: string;
@@ -207,6 +208,9 @@ export default function ProviderOrdersPage() {
                         <h3 className="font-black text-xl text-slate-900 leading-tight mb-4 group-hover:text-[#2286BE] transition-colors">
                           {order.orderName}
                         </h3>
+                        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-4">
+                          Category: {order.categoryName || 'General'}
+                        </p>
                         <div className="space-y-3">
                           <div className="flex items-start gap-3 text-slate-500">
                             <MapPin size={16} className="mt-0.5 text-slate-300 flex-shrink-0" />

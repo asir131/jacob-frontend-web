@@ -38,8 +38,8 @@ const item = {
 
 export default function ProviderDashboardClient() {
   const [requests, setRequests] = React.useState([
-    { id: 'ORD-101', title: 'Deep House Cleaning - Premium Package', customer: 'Ahmed Rashid', location: 'Dhaka, Bangladesh', time: '2 hrs ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=64&h=64&auto=format&fit=crop', clientId: 'USR-001' },
-    { id: 'ORD-102', title: 'Garden Maintenance & Landscaping', customer: 'Sadia Rahman', location: 'Banani, Dhaka', time: '5 hrs ago', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=64&h=64&auto=format&fit=crop', clientId: 'USR-002' }
+    { id: 'ORD-101', title: 'Deep House Cleaning - Premium Package', category: 'Cleaning', customer: 'Ahmed Rashid', location: 'Dhaka, Bangladesh', time: '2 hrs ago', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=64&h=64&auto=format&fit=crop', clientId: 'USR-001' },
+    { id: 'ORD-102', title: 'Garden Maintenance & Landscaping', category: 'Gardening', customer: 'Sadia Rahman', location: 'Banani, Dhaka', time: '5 hrs ago', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=64&h=64&auto=format&fit=crop', clientId: 'USR-002' }
   ]);
 
   const handleAction = (id: string, action: 'accept' | 'decline') => {
@@ -222,6 +222,9 @@ export default function ProviderDashboardClient() {
                                   <span className="text-slate-400">{req.time}</span>
                                </div>
                                <h4 className="font-bold text-slate-900 mb-3 leading-snug group-hover:text-[#2286BE] transition-colors line-clamp-2">{req.title}</h4>
+                               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-3">
+                                 Category: {req.category}
+                               </p>
                                <div className="flex items-center gap-2 mb-5">
                                   <Avatar className="h-8 w-8 border-2 border-white ring-2 ring-slate-50 shadow-sm">
                                      <AvatarImage src={req.avatar} alt="Customer" />

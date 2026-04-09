@@ -29,6 +29,7 @@ type ProviderOrder = {
   orderNumber: string;
   conversationId?: string | null;
   orderName: string;
+  categoryName?: string;
   status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
   packagePrice: number;
   packageTitle: string;
@@ -171,6 +172,9 @@ export default function ProviderOrderDetailPage() {
                   </Badge>
                 </div>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{order.orderName}</h1>
+                <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3">
+                  Category: {order.categoryName || 'General'}
+                </p>
                 <div className="flex items-center gap-4 text-sm font-bold text-slate-400">
                   <div className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(order.scheduledDate).toLocaleDateString()}</div>
                   <div className="flex items-center gap-1.5"><Clock size={14} /> {order.scheduledTime}</div>

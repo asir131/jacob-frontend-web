@@ -362,7 +362,7 @@ export default function MessagesPage() {
         </ScrollArea>
 
         <footer className="p-6 bg-white border-t border-slate-100">
-          <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-slate-50 h-16 px-4 rounded-[2rem] border border-slate-100 focus-within:border-[#2286BE] focus-within:ring-4 focus-within:ring-[#2286BE]/5 transition-all">
+          <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-slate-50 h-16 px-4 rounded-[2rem] border border-slate-100  transition-all">
             <Button type="button" variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
               <Paperclip size={20} />
             </Button>
@@ -373,7 +373,7 @@ export default function MessagesPage() {
               onFocus={() => setIsInfoPanelOpen(false)}
               onClick={() => messageInputRef.current?.focus()}
               placeholder="Type your message here..."
-              className="flex-1 bg-transparent border-none focus-visible:ring-0 shadow-none font-medium text-slate-700 h-full cursor-text"
+              className="flex-1 bg-transparent border-none outline-none focus:border-none focus:outline-none focus-visible:ring-0 focus-visible:outline-none shadow-none font-medium text-slate-700 h-full cursor-text rounded-none"
             />
             <Button type="button" variant="ghost" size="icon" className="hidden sm:inline-flex rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
               <Smile size={20} />

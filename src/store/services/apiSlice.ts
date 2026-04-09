@@ -49,6 +49,13 @@ type ProviderOrdersQuery = {
   status?: string;
 };
 
+type ClientOrdersQuery = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiSlice = createApi({
@@ -143,6 +150,34 @@ export const apiSlice = createApi({
         return `/api/orders/provider?${params.toString()}`;
       },
       providesTags: ['Orders'],
+    }),
+    getClientOrders: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        pagination?: {
+          page: number;
+          limit: number;
+          totalItems: number;
+          totalPages: number;
+          hasNextPage: boolean;
+          hasPrevPage: boolean;
+        };
+      }>,
+      ClientOrdersQuery
+    >({
+      query: ({ page = 1, limit = 8, search = '', status = 'all' }) => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+        params.set('status', status || 'all');
+        if (search.trim()) params.set('search', search.trim());
+        return `/api/orders/client?${params.toString()}`;
+      },
+      providesTags: ['Orders'],
+    }),
+    getClientOrderDetail: builder.query<ApiEnvelope<{ order?: Record<string, unknown> }>, string>({
+      query: (id) => `/api/orders/client/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Orders', id }],
     }),
     getProviderOrderDetail: builder.query<ApiEnvelope<{ order?: Record<string, unknown> }>, string>({
       query: (id) => `/api/orders/provider/${id}`,
@@ -313,6 +348,8 @@ export const {
   useGetPublicServiceByIdQuery,
   useCreateOrderMutation,
   useGetProviderOrdersQuery,
+  useGetClientOrdersQuery,
+  useGetClientOrderDetailQuery,
   useGetProviderOrderDetailQuery,
   useAcceptProviderOrderMutation,
   useDeclineProviderOrderMutation,
