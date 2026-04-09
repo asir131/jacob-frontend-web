@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,8 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useParams, useRouter } from 'next/navigation';
-import { useGetProviderOrderDetailQuery, useSubmitProviderDeliveryMutation } from '@/store/services/apiSlice';
+import { useGetProviderOrderDetailQuery, useRespondProviderRevisionMutation, useSubmitProviderDeliveryMutation } from '@/store/services/apiSlice';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 
 type ProviderOrder = {
   id: string;
@@ -30,7 +31,7 @@ type ProviderOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
+  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
   packagePrice: number;
   packageTitle: string;
   scheduledDate: string;
@@ -39,6 +40,10 @@ type ProviderOrder = {
   specialInstructions: string;
   deliveryNote: string;
   deliveryImages: string[];
+  revisionRequestNote?: string;
+  revisionResponseNote?: string;
+  revisionRequestedAt?: string | null;
+  revisionRespondedAt?: string | null;
   createdAt: string;
   requirementSubmittedAt?: string | null;
   orderStartedAt?: string | null;
@@ -57,6 +62,8 @@ type ProviderOrder = {
 const statusText = (status: ProviderOrder['status']) => {
   if (status === 'accepted') return 'In Progress';
   if (status === 'accepting_delivery') return 'Accepting Delivery';
+  if (status === 'revision_requested') return 'Request Revision';
+  if (status === 'under_revision') return 'Under Revision';
   if (status === 'completed') return 'Order Finalized';
   if (status === 'declined') return 'Declined';
   return 'Pending';
@@ -81,11 +88,38 @@ export default function ProviderOrderDetailPage() {
   const [deliveryNote, setDeliveryNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [showProfile, setShowProfile] = useState(false);
+  const { notifications } = useSocketNotifications();
+  const lastHandledNotificationIdRef = useRef<string | null>(null);
 
   const { data, isLoading, refetch } = useGetProviderOrderDetailQuery(id, { skip: !id });
   const [submitDelivery, { isLoading: isDelivering }] = useSubmitProviderDeliveryMutation();
+  const [respondRevision, { isLoading: isRespondingRevision }] = useRespondProviderRevisionMutation();
 
   const order = useMemo(() => (data?.data?.order || null) as ProviderOrder | null, [data]);
+
+  useEffect(() => {
+    if (!notifications.length || !id) return;
+    const latest = notifications[0] as {
+      id?: string;
+      data?: { notificationType?: string; orderId?: string };
+    };
+    if (!latest?.id || latest.id === lastHandledNotificationIdRef.current) return;
+
+    const type = latest?.data?.notificationType;
+    const notificationOrderId = String(latest?.data?.orderId || '');
+    const isSameOrder = notificationOrderId === id;
+    const shouldRefreshByType =
+      type === 'order_revision_requested' ||
+      type === 'order_revision_cancelled' ||
+      type === 'order_finalized' ||
+      type === 'order_accepted' ||
+      type === 'order_created';
+
+    if (isSameOrder || shouldRefreshByType) {
+      lastHandledNotificationIdRef.current = latest.id;
+      refetch();
+    }
+  }, [notifications, id, refetch]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -96,23 +130,35 @@ export default function ProviderOrderDetailPage() {
   };
 
   const handleDeliver = async () => {
-    if (!order || order.status !== 'accepted') return;
-    if (!deliveryNote.trim()) {
+    if (!order || !['accepted', 'under_revision', 'accepting_delivery'].includes(order.status)) return;
+    const noteToSubmit = order.status === 'under_revision' ? (order.deliveryNote || '').trim() : deliveryNote.trim();
+    if (!noteToSubmit) {
       toast.error('Please provide a delivery note.');
       return;
     }
 
     try {
       const formData = new FormData();
-      formData.append('deliveryNote', deliveryNote.trim());
+      formData.append('deliveryNote', noteToSubmit);
       files.forEach((file) => formData.append('deliveryImages', file));
       await submitDelivery({ id: order.id, formData }).unwrap();
-      toast.success('Work delivered! Waiting for client review.');
+      toast.success(order.status === 'under_revision' ? 'Revision submitted. Waiting for client review.' : 'Work delivered! Waiting for client review.');
       setFiles([]);
       setDeliveryNote('');
       await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to submit delivery.');
+    }
+  };
+
+  const handleRevisionResponse = async (action: 'accept' | 'decline') => {
+    if (!order || order.status !== 'revision_requested') return;
+    try {
+      await respondRevision({ id: order.id, action }).unwrap();
+      toast.success(action === 'accept' ? 'Revision request accepted.' : 'Revision request declined.');
+      await refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to respond to revision.');
     }
   };
 
@@ -131,7 +177,10 @@ export default function ProviderOrderDetailPage() {
     { status: 'Requirement Submitted', time: fmtDate(order.requirementSubmittedAt || order.createdAt), completed: true },
     { status: 'Order Started', time: fmtDate(order.orderStartedAt), completed: Boolean(order.orderStartedAt) },
     { status: 'Delivery Pending', time: fmtDate(order.deliveryPendingAt), completed: Boolean(order.deliveryPendingAt) },
+    { status: 'Revision Requested', time: fmtDate(order.revisionRequestedAt), completed: Boolean(order.revisionRequestedAt) },
+    { status: 'Revision Responded', time: fmtDate(order.revisionRespondedAt), completed: Boolean(order.revisionRespondedAt) },
   ];
+  const isDeliveryEditable = order.status === 'accepted';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-12">
@@ -261,22 +310,31 @@ export default function ProviderOrderDetailPage() {
                           <textarea
                             className="w-full h-48 rounded-[2rem] bg-slate-50 border-none p-8 text-slate-700 font-medium focus:ring-2 focus:ring-[#2286BE] transition-all"
                             placeholder="Explain the work you've done..."
-                            value={order.status === 'accepted' ? deliveryNote : (order.deliveryNote || '')}
+                            value={isDeliveryEditable ? deliveryNote : (order.deliveryNote || '')}
                             onChange={(e) => setDeliveryNote(e.target.value)}
-                            disabled={order.status !== 'accepted'}
+                            disabled={!isDeliveryEditable}
                           />
                         </div>
+
+                        {order.status === 'revision_requested' && (
+                          <div className="rounded-3xl border border-orange-100 bg-orange-50 p-6">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-orange-500 mb-2">Revision Note From Client</p>
+                            <p className="text-sm font-semibold text-orange-900">
+                              {order.revisionRequestNote || 'Client requested revision.'}
+                            </p>
+                          </div>
+                        )}
 
                         <div className="space-y-4">
                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-2">Project Files & Proof</label>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {(order.status === 'accepted' ? files.map((f) => f.name) : (order.deliveryImages || [])).slice(0, 4).map((name, i) => (
+                            {(isDeliveryEditable ? files.map((f) => f.name) : (order.deliveryImages || [])).slice(0, 4).map((name, i) => (
                               <div key={i} className="aspect-square bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center p-4 text-center">
                                 <ImageIcon size={24} className="text-slate-300 mb-2" />
                                 <p className="text-[10px] font-bold text-slate-400 truncate w-full">{typeof name === 'string' ? name : 'image'}</p>
                               </div>
                             ))}
-                            {order.status === 'accepted' && (
+                            {isDeliveryEditable && (
                               <label className="aspect-square bg-[#2286BE]/5 hover:bg-[#2286BE]/10 rounded-3xl border-2 border-dashed border-[#2286BE]/20 flex flex-col items-center justify-center p-6 text-center group cursor-pointer transition-all active:scale-95">
                                 <Upload size={24} className="text-[#2286BE] mb-2 group-hover:scale-110 transition-transform" />
                                 <p className="text-[10px] font-black text-[#2286BE] uppercase tracking-[0.1em]">Upload</p>
@@ -287,16 +345,39 @@ export default function ProviderOrderDetailPage() {
                         </div>
 
                         <div className="pt-6 border-t border-slate-50">
+                          {order.status === 'revision_requested' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                              <Button
+                                onClick={() => handleRevisionResponse('decline')}
+                                disabled={isRespondingRevision}
+                                variant="outline"
+                                className="h-14 rounded-2xl font-black uppercase tracking-widest text-[11px] border-red-100 text-red-600"
+                              >
+                                Decline Revision
+                              </Button>
+                              <Button
+                                onClick={() => handleRevisionResponse('accept')}
+                                disabled={isRespondingRevision}
+                                className="h-14 rounded-2xl font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white"
+                              >
+                                Accept Revision
+                              </Button>
+                            </div>
+                          ) : null}
                           <Button
                             onClick={handleDeliver}
-                            disabled={isDelivering || order.status !== 'accepted'}
+                            disabled={isDelivering || !['accepted', 'under_revision', 'accepting_delivery'].includes(order.status)}
                             className="w-full h-16 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-lg shadow-xl shadow-[#2286BE]/20 transition-all flex items-center justify-center gap-3"
                           >
                             {order.status === 'completed'
                               ? 'Order Finalized'
-                              : order.status === 'accepting_delivery'
-                                ? 'Waiting for client acceptance'
-                                : isDelivering
+                              : order.status === 'under_revision'
+                                ? isDelivering
+                                  ? 'Submitting...'
+                                  : 'Submit Revision'
+                              : order.status === 'revision_requested'
+                                ? 'Respond to revision request first'
+                              : isDelivering
                                   ? 'Submitting...'
                                   : 'Submit Delivery'}
                             <ChevronRight size={20} />

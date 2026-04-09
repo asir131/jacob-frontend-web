@@ -205,6 +205,39 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Orders'],
     }),
+    respondProviderRevision: builder.mutation<
+      ApiEnvelope<unknown>,
+      { id: string; action: 'accept' | 'decline'; note?: string }
+    >({
+      query: ({ id, action, note = '' }) => ({
+        url: `/api/orders/provider/${id}/revision-response`,
+        method: 'PATCH',
+        body: { action, note },
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    requestClientRevision: builder.mutation<ApiEnvelope<unknown>, { id: string; note: string }>({
+      query: ({ id, note }) => ({
+        url: `/api/orders/client/${id}/request-revision`,
+        method: 'PATCH',
+        body: { note },
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    cancelClientRevision: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/orders/client/${id}/cancel-revision`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    sendClientResolutionMessage: builder.mutation<ApiEnvelope<{ conversationId?: string }>, { id: string; text?: string }>({
+      query: ({ id, text = '' }) => ({
+        url: `/api/orders/client/${id}/resolution-message`,
+        method: 'POST',
+        body: { text },
+      }),
+    }),
     finalizeClientOrder: builder.mutation<ApiEnvelope<unknown>, string>({
       query: (id) => ({
         url: `/api/orders/client/${id}/finalize`,
@@ -354,6 +387,10 @@ export const {
   useAcceptProviderOrderMutation,
   useDeclineProviderOrderMutation,
   useSubmitProviderDeliveryMutation,
+  useRespondProviderRevisionMutation,
+  useRequestClientRevisionMutation,
+  useCancelClientRevisionMutation,
+  useSendClientResolutionMessageMutation,
   useFinalizeClientOrderMutation,
   useGetConversationsQuery,
   useEnsureConversationByOrderMutation,

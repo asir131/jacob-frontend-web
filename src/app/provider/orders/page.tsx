@@ -25,7 +25,7 @@ type ProviderOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
+  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
   packagePrice: number;
   serviceAddress: string;
   scheduledDate: string;
@@ -47,6 +47,8 @@ const STATUS_LABEL: Record<ProviderOrder['status'], string> = {
   accepted: 'In Progress',
   declined: 'Declined',
   accepting_delivery: 'Accepting Delivery',
+  revision_requested: 'Request Revision',
+  under_revision: 'Under Revision',
   completed: 'Completed',
 };
 
@@ -120,7 +122,13 @@ export default function ProviderOrdersPage() {
     if (!latest?.id || latest.id === lastHandledNotificationIdRef.current) return;
 
     const type = latest?.data?.notificationType;
-    if (type === 'order_created' || type === 'order_accepted' || type === 'order_finalized') {
+    if (
+      type === 'order_created' ||
+      type === 'order_accepted' ||
+      type === 'order_finalized' ||
+      type === 'order_revision_requested' ||
+      type === 'order_revision_cancelled'
+    ) {
       lastHandledNotificationIdRef.current = latest.id;
       refetch();
     }
@@ -160,6 +168,8 @@ export default function ProviderOrdersPage() {
               <option value="pending">Pending</option>
               <option value="accepted">Accepted</option>
               <option value="accepting_delivery">Accepting Delivery</option>
+              <option value="request_revision">Request Revision</option>
+              <option value="under_revision">Under Revision</option>
               <option value="completed">Completed</option>
               <option value="declined">Declined</option>
             </select>
@@ -196,6 +206,8 @@ export default function ProviderOrdersPage() {
                             order.status === 'accepted' ? 'bg-[#2286BE]/10 text-[#2286BE]' :
                             order.status === 'pending' ? 'bg-blue-50 text-blue-600' :
                             order.status === 'accepting_delivery' ? 'bg-amber-50 text-amber-600' :
+                            order.status === 'revision_requested' ? 'bg-orange-50 text-orange-600' :
+                            order.status === 'under_revision' ? 'bg-violet-50 text-violet-600' :
                             'bg-red-50 text-red-600'}
                         `}
                       >
@@ -289,6 +301,14 @@ export default function ProviderOrdersPage() {
                           <Link href={`/provider/orders/${order.id}`} className="block">
                             <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-amber-100 text-amber-700 rounded-2xl">
                               Delivery Submitted
+                            </Button>
+                          </Link>
+                        )}
+
+                        {(order.status === 'revision_requested' || order.status === 'under_revision') && (
+                          <Link href={`/provider/orders/${order.id}`} className="block">
+                            <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-violet-100 text-violet-700 rounded-2xl">
+                              Open Revision
                             </Button>
                           </Link>
                         )}

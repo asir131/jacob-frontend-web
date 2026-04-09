@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useGetClientOrdersQuery } from '@/store/services/apiSlice';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,7 +34,7 @@ type ClientOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
+  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
   packagePrice: number;
   scheduledDate: string;
   scheduledTime: string;
@@ -50,6 +51,8 @@ const STATUS_LABEL: Record<ClientOrder['status'], string> = {
   pending: 'Pending',
   accepted: 'In Progress',
   accepting_delivery: 'Payment Pending',
+  revision_requested: 'Request Revision',
+  under_revision: 'Under Revision',
   completed: 'Completed',
   declined: 'Cancelled',
 };
@@ -58,6 +61,8 @@ export default function ClientOrdersPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [page, setPage] = useState(1);
+  const { notifications } = useSocketNotifications();
+  const lastHandledNotificationIdRef = useRef<string | null>(null);
   const statusParamMap: Record<string, string> = {
     all: 'all',
     pending: 'pending',
@@ -67,7 +72,7 @@ export default function ClientOrdersPage() {
     cancelled: 'cancelled',
   };
 
-  const { data, isLoading, isFetching } = useGetClientOrdersQuery(
+  const { data, isLoading, isFetching, refetch } = useGetClientOrdersQuery(
     {
       page,
       limit: 6,
@@ -95,6 +100,30 @@ export default function ClientOrdersPage() {
     return orders;
   }, [orders, activeTab]);
   const pagination = data?.data?.pagination;
+
+  useEffect(() => {
+    if (!notifications.length) return;
+    const latest = notifications[0] as {
+      id?: string;
+      data?: { notificationType?: string };
+    };
+    if (!latest?.id || latest.id === lastHandledNotificationIdRef.current) return;
+
+    const type = latest?.data?.notificationType;
+    if (
+      type === 'order_created' ||
+      type === 'order_accepted' ||
+      type === 'order_delivery_submitted' ||
+      type === 'order_revision_requested' ||
+      type === 'order_revision_accepted' ||
+      type === 'order_revision_declined' ||
+      type === 'order_revision_cancelled_self' ||
+      type === 'order_finalized'
+    ) {
+      lastHandledNotificationIdRef.current = latest.id;
+      refetch();
+    }
+  }, [notifications, refetch]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-12 pb-28">

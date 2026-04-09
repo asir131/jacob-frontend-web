@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,7 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useParams } from 'next/navigation';
-import { useFinalizeClientOrderMutation, useGetClientOrderDetailQuery } from '@/store/services/apiSlice';
+import {
+  useCancelClientRevisionMutation,
+  useFinalizeClientOrderMutation,
+  useGetClientOrderDetailQuery,
+  useRequestClientRevisionMutation,
+  useSendClientResolutionMessageMutation,
+} from '@/store/services/apiSlice';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 
 type ClientOrder = {
   id: string;
@@ -21,7 +28,7 @@ type ClientOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
+  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
   packagePrice: number;
   scheduledDate: string;
   scheduledTime: string;
@@ -29,6 +36,8 @@ type ClientOrder = {
   specialInstructions?: string;
   deliveryNote?: string;
   deliveryImages?: string[];
+  revisionRequestNote?: string;
+  revisionResponseNote?: string;
   provider: {
     id: string;
     name: string;
@@ -40,6 +49,8 @@ type ClientOrder = {
 const statusLabel = (status: ClientOrder['status']) => {
   if (status === 'completed') return 'Completed';
   if (status === 'accepting_delivery') return 'Payment Pending';
+  if (status === 'revision_requested') return 'Request Revision';
+  if (status === 'under_revision') return 'Under Revision';
   if (status === 'accepted') return 'In Progress';
   if (status === 'declined') return 'Cancelled';
   return 'Pending';
@@ -56,9 +67,14 @@ export default function OrderTrackingPage() {
   const [revisionText, setRevisionText] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelText, setCancelText] = useState('');
+  const { notifications } = useSocketNotifications();
+  const lastHandledNotificationIdRef = useRef<string | null>(null);
 
   const { data, isLoading, refetch } = useGetClientOrderDetailQuery(orderIdOrNumber, { skip: !orderIdOrNumber });
   const [finalizeOrder, { isLoading: isFinalizing }] = useFinalizeClientOrderMutation();
+  const [requestRevision, { isLoading: isRequestingRevision }] = useRequestClientRevisionMutation();
+  const [cancelRevision, { isLoading: isCancelingRevision }] = useCancelClientRevisionMutation();
+  const [sendResolutionMessage, { isLoading: isSendingResolution }] = useSendClientResolutionMessageMutation();
 
   const order = useMemo(() => (data?.data?.order || null) as ClientOrder | null, [data]);
   const orderStatus = order?.status || 'pending';
@@ -68,6 +84,30 @@ export default function OrderTrackingPage() {
       ? `/messages?conversationId=${String(order.conversationId)}&orderId=${order.id}`
       : `/messages?orderId=${order.id}&user=${order.provider?.id || ''}`
     : '/messages';
+
+  useEffect(() => {
+    if (!notifications.length) return;
+    const latest = notifications[0] as {
+      id?: string;
+      data?: { notificationType?: string; orderId?: string };
+    };
+    if (!latest?.id || latest.id === lastHandledNotificationIdRef.current) return;
+
+    const type = latest?.data?.notificationType;
+    const notificationOrderId = String(latest?.data?.orderId || '');
+    const isSameOrder = Boolean(order?.id) && notificationOrderId === String(order?.id);
+    const isRelevantType =
+      type === 'order_delivery_submitted' ||
+      type === 'order_revision_accepted' ||
+      type === 'order_revision_declined' ||
+      type === 'order_revision_cancelled_self' ||
+      type === 'order_finalized';
+
+    if (isSameOrder || isRelevantType) {
+      lastHandledNotificationIdRef.current = latest.id;
+      refetch();
+    }
+  }, [notifications, order?.id, refetch]);
 
   const handleCompleteOrder = async () => {
     if (!order) return;
@@ -89,14 +129,56 @@ export default function OrderTrackingPage() {
 
   const handleRequestRevision = () => {
     if (!revisionText) return toast.error('Please provide details for the revision.');
-    setActiveModal(null);
-    toast.success('Revision request sent to the provider.');
+    if (!order || order.status !== 'accepting_delivery') {
+      toast.error('Revision can be requested only when delivery is pending your approval.');
+      return;
+    }
+    requestRevision({ id: order.id, note: revisionText.trim() })
+      .unwrap()
+      .then(async () => {
+        setActiveModal(null);
+        setRevisionText('');
+        toast.success('Revision request sent to the provider.');
+        await refetch();
+      })
+      .catch((error: any) => {
+        toast.error(error?.data?.message || 'Failed to request revision.');
+      });
   };
 
-  const handleCancelOrder = () => {
-    if (!cancelReason || !cancelText) return toast.error('Please complete all fields to request a cancellation.');
-    setActiveModal(null);
-    toast.success('Cancellation request submitted for review.');
+  const handleCancelRevision = () => {
+    if (!order) return;
+    if (!['revision_requested', 'under_revision'].includes(order.status)) {
+      toast.error('No active revision request to cancel.');
+      return;
+    }
+    if (!cancelReason || !cancelText) return toast.error('Please complete all fields to cancel the revision request.');
+    cancelRevision(order.id)
+      .unwrap()
+      .then(async () => {
+        setActiveModal(null);
+      toast.success('Revision request cancelled. Order is back to delivery approval.');
+        await refetch();
+      })
+      .catch((error: any) => {
+      toast.error(error?.data?.message || 'Failed to cancel revision request.');
+      });
+  };
+
+  const handleTalkWithProvider = async () => {
+    if (!order) return;
+    try {
+      const text = `Resolution discussion for ${order.orderNumber || order.id}: ${order.revisionRequestNote || 'Please review my latest concern.'}`;
+      const res = await sendResolutionMessage({ id: order.id, text }).unwrap();
+      const conversationId = String((res?.data as any)?.conversationId || '');
+      if (conversationId) {
+        window.location.href = `/messages?conversationId=${conversationId}&orderId=${order.id}`;
+      } else {
+        window.location.href = messagePath;
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to send resolution message.');
+    }
   };
 
   const closeModal = () => {
@@ -268,30 +350,36 @@ export default function OrderTrackingPage() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#2286BE]/5 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl group-hover:bg-[#2286BE]/10 transition-colors" />
             </div>
 
-            {order.status === 'accepted' && (
+            {['revision_requested', 'under_revision'].includes(order.status) && (
               <div className="bg-red-50/50 rounded-[2.5rem] p-8 border border-red-100 relative overflow-hidden">
                 <div className="relative z-10">
                   <h4 className="text-sm font-black text-red-900 mb-2 uppercase tracking-widest flex items-center">
                     <AlertTriangle size={14} className="mr-2 text-red-500" /> Resolution Center
                   </h4>
-                  <p className="text-xs font-medium text-red-700/80 leading-relaxed mb-6">
-                    Having issues with this order? Our dispute system can help you resolve conflicts or request a refund.
+                  <p className="text-xs font-medium text-red-700/80 leading-relaxed mb-2">
+                    {order.status === 'under_revision'
+                      ? 'Your order is under revision. You can talk with provider or cancel revision request.'
+                      : 'Revision request sent. You can talk with provider or cancel revision request.'}
                   </p>
+                  {order.revisionRequestNote ? (
+                    <p className="text-xs font-bold text-red-800/80 mb-4">Revision note: {order.revisionRequestNote}</p>
+                  ) : null}
                   <div className="space-y-3">
                     <Button
                       onClick={() => setActiveModal('cancel')}
+                      disabled={isCancelingRevision}
                       className="w-full h-12 bg-white text-red-600 hover:bg-red-600 hover:text-white border-2 border-red-100 hover:border-red-600 rounded-xl font-black transition-all shadow-sm"
                     >
-                      Request Cancellation
+                      {isCancelingRevision ? 'Canceling...' : 'Request Cancellation'}
                     </Button>
-                    <Link href="/resolution-center" className="block">
-                      <Button
-                        variant="ghost"
-                        className="w-full h-12 bg-transparent text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 font-black rounded-xl transition-all"
-                      >
-                        Open Resolution Hub
-                      </Button>
-                    </Link>
+                    <Button
+                      onClick={handleTalkWithProvider}
+                      disabled={isSendingResolution}
+                      variant="ghost"
+                      className="w-full h-12 bg-transparent text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 font-black rounded-xl transition-all"
+                    >
+                      {isSendingResolution ? 'Sending...' : 'Talk with Provider'}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -321,7 +409,7 @@ export default function OrderTrackingPage() {
                 <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
                   {activeModal === 'complete' && <><CheckCircle2 size={24} className="text-[#2286BE]" /> Complete Order</>}
                   {activeModal === 'revision' && <><HelpCircle size={24} className="text-amber-500" /> Request Revision</>}
-                  {activeModal === 'cancel' && <><AlertTriangle size={24} className="text-red-500" /> Cancel Order</>}
+                  {activeModal === 'cancel' && <><AlertTriangle size={24} className="text-red-500" /> Cancel Revision Request</>}
                 </h2>
                 <button onClick={closeModal} className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 shadow-sm border border-slate-100 transition-colors">
                   <X size={20} />
@@ -373,8 +461,12 @@ export default function OrderTrackingPage() {
                       value={revisionText}
                       onChange={(e) => setRevisionText(e.target.value)}
                     />
-                    <Button onClick={handleRequestRevision} className="w-full h-16 rounded-2xl bg-amber-500 hover:bg-amber-600 font-black text-lg shadow-xl shadow-amber-500/20">
-                      Send Revision Request
+                    <Button
+                      onClick={handleRequestRevision}
+                      disabled={isRequestingRevision}
+                      className="w-full h-16 rounded-2xl bg-amber-500 hover:bg-amber-600 font-black text-lg shadow-xl shadow-amber-500/20"
+                    >
+                      {isRequestingRevision ? 'Sending...' : 'Send Revision Request'}
                     </Button>
                   </div>
                 )}
@@ -384,11 +476,11 @@ export default function OrderTrackingPage() {
                     <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-4">
                       <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
                       <p className="text-xs font-bold text-red-700 leading-relaxed">
-                        Cancellation requests go to the Resolution Center. If the provider disagrees, the support team will mediate.
+                        This will only cancel your revision request. Your order will not be cancelled, and status will return to delivery approval.
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Reason for cancellation</label>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Reason for cancelling revision</label>
                       <select
                         className="w-full h-12 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-red-500 font-bold px-4"
                         value={cancelReason}
@@ -397,18 +489,18 @@ export default function OrderTrackingPage() {
                         <option value="">Select a reason</option>
                         <option value="unresponsive">Provider is unresponsive</option>
                         <option value="poor-quality">Poor quality work</option>
-                        <option value="late">Service is late / missed</option>
+                        <option value="late">Revision is delayed</option>
                         <option value="other">Other</option>
                       </select>
                     </div>
                     <textarea
-                      placeholder="Provide detailed context for your cancellation request..."
+                      placeholder="Provide detailed context for cancelling this revision request..."
                       className="w-full h-32 p-6 rounded-3xl bg-slate-50 border-none focus:ring-2 focus:ring-red-500 font-medium resize-none shadow-inner"
                       value={cancelText}
                       onChange={(e) => setCancelText(e.target.value)}
                     />
-                    <Button onClick={handleCancelOrder} className="w-full h-16 rounded-2xl bg-red-600 hover:bg-red-700 font-black text-lg shadow-xl shadow-red-600/20">
-                      Submit Request
+                    <Button onClick={handleCancelRevision} className="w-full h-16 rounded-2xl bg-red-600 hover:bg-red-700 font-black text-lg shadow-xl shadow-red-600/20">
+                      Cancel Revision Request
                     </Button>
                   </div>
                 )}
