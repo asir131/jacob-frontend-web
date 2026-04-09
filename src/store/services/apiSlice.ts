@@ -31,6 +31,24 @@ type VerifySignupOtpPayload = {
   otp: string;
 };
 
+type CreateOrderPayload = {
+  gigId: string;
+  packageName: string;
+  packageTitle: string;
+  packagePrice: number;
+  scheduledDate: string;
+  scheduledTime: string;
+  serviceAddress: string;
+  specialInstructions?: string;
+};
+
+type ProviderOrdersQuery = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiSlice = createApi({
@@ -47,7 +65,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Profile', 'Gigs', 'Categories'],
+  tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats'],
   endpoints: (builder) => ({
     getCategories: builder.query<ApiEnvelope<unknown[]>, void>({
       query: () => '/api/categories',
@@ -93,6 +111,115 @@ export const apiSlice = createApi({
     }),
     getPublicServiceById: builder.query<ApiEnvelope<unknown>, string>({
       query: (id) => `/api/gigs/public/${id}`,
+    }),
+    createOrder: builder.mutation<ApiEnvelope<{ order?: Record<string, unknown> }>, CreateOrderPayload>({
+      query: (payload) => ({
+        url: '/api/orders',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    getProviderOrders: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        pagination?: {
+          page: number;
+          limit: number;
+          totalItems: number;
+          totalPages: number;
+          hasNextPage: boolean;
+          hasPrevPage: boolean;
+        };
+      }>,
+      ProviderOrdersQuery
+    >({
+      query: ({ page = 1, limit = 8, search = '', status = 'all' }) => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+        params.set('status', status || 'all');
+        if (search.trim()) params.set('search', search.trim());
+        return `/api/orders/provider?${params.toString()}`;
+      },
+      providesTags: ['Orders'],
+    }),
+    getProviderOrderDetail: builder.query<ApiEnvelope<{ order?: Record<string, unknown> }>, string>({
+      query: (id) => `/api/orders/provider/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Orders', id }],
+    }),
+    acceptProviderOrder: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/orders/provider/${id}/accept`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    declineProviderOrder: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/orders/provider/${id}/decline`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    submitProviderDelivery: builder.mutation<ApiEnvelope<unknown>, { id: string; formData: FormData }>({
+      query: ({ id, formData }) => ({
+        url: `/api/orders/provider/${id}/deliver`,
+        method: 'PATCH',
+        body: formData,
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    finalizeClientOrder: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/orders/client/${id}/finalize`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    getConversations: builder.query<ApiEnvelope<Record<string, unknown>[]>, void>({
+      query: () => '/api/chats/conversations',
+      providesTags: ['Chats'],
+    }),
+    ensureConversationByOrder: builder.mutation<ApiEnvelope<Record<string, unknown>>, string>({
+      query: (orderId) => ({
+        url: `/api/chats/conversations/order/${orderId}`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Chats'],
+    }),
+    getConversationMessages: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        pagination?: {
+          page: number;
+          limit: number;
+          totalItems: number;
+          totalPages: number;
+          hasNextPage: boolean;
+          hasPrevPage: boolean;
+        };
+      }>,
+      { conversationId: string; page?: number; limit?: number }
+    >({
+      query: ({ conversationId, page = 1, limit = 100 }) => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+        return `/api/chats/conversations/${conversationId}/messages?${params.toString()}`;
+      },
+      providesTags: (_result, _error, arg) => [{ type: 'Chats', id: arg.conversationId }],
+    }),
+    sendConversationMessage: builder.mutation<
+      ApiEnvelope<Record<string, unknown>>,
+      { conversationId: string; text: string }
+    >({
+      query: ({ conversationId, text }) => ({
+        url: `/api/chats/conversations/${conversationId}/messages`,
+        method: 'POST',
+        body: { text },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Chats', id: arg.conversationId }, 'Chats'],
     }),
     createGig: builder.mutation<ApiEnvelope<unknown>, FormData>({
       query: (formData) => ({
@@ -184,6 +311,17 @@ export const {
   useLazyGetMyGigsQuery,
   useGetPublicServicesQuery,
   useGetPublicServiceByIdQuery,
+  useCreateOrderMutation,
+  useGetProviderOrdersQuery,
+  useGetProviderOrderDetailQuery,
+  useAcceptProviderOrderMutation,
+  useDeclineProviderOrderMutation,
+  useSubmitProviderDeliveryMutation,
+  useFinalizeClientOrderMutation,
+  useGetConversationsQuery,
+  useEnsureConversationByOrderMutation,
+  useGetConversationMessagesQuery,
+  useSendConversationMessageMutation,
   useCreateGigMutation,
   useUpdateGigMutation,
   useDeleteGigMutation,

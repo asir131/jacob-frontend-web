@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Package, MessageSquare, CreditCard, ChevronRight, Filter, CheckCircle2, Trash2, Clock, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,6 +69,7 @@ const itemVariants = {
 };
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const {
     notifications: liveNotifications,
     markAllNotificationsAsRead,
@@ -91,6 +93,7 @@ export default function NotificationsPage() {
     unread: item.unread,
     icon: <Bell className="text-[#2286BE]" />,
     color: 'bg-primary-soft',
+    targetPath: typeof item?.data?.targetPath === 'string' ? item.data.targetPath : '',
   }));
 
   const allNotifications = [...socketMappedNotifications, ...notifications];
@@ -106,6 +109,11 @@ export default function NotificationsPage() {
 
   const deleteNotification = (id: number) => {
     setNotifications(notifications.filter(n => n.id !== id));
+  };
+
+  const handleNotificationClick = (targetPath?: string) => {
+    if (!targetPath) return;
+    router.push(targetPath);
   };
 
   return (
@@ -181,8 +189,12 @@ export default function NotificationsPage() {
                    <Card className={`
                      border-none shadow-sm hover:shadow-xl transition-all duration-300 group rounded-[2rem] overflow-hidden
                      ${notif.unread ? 'bg-white ring-2 ring-primary/5 shadow-primary/5' : 'bg-white/60 shadow-slate-200/50'}
+                     ${'targetPath' in notif && notif.targetPath ? 'cursor-pointer' : ''}
                    `}>
-                      <CardContent className="p-0">
+                      <CardContent
+                        className="p-0"
+                        onClick={() => handleNotificationClick(('targetPath' in notif ? notif.targetPath : '') as string)}
+                      >
                          <div className="flex items-start gap-5 p-6 md:p-8">
                             <div className={`
                               h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform duration-500
@@ -210,7 +222,10 @@ export default function NotificationsPage() {
                                   <Button 
                                     size="sm" 
                                     variant="ghost" 
-                                    onClick={() => deleteNotification(notif.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteNotification(notif.id);
+                                    }}
                                     className="text-slate-400 hover:text-red-500 hover:bg-red-50 text-[10px] font-black uppercase tracking-widest h-8 px-4 rounded-lg"
                                   >
                                      <Trash2 size={14} className="mr-2" /> Dismiss

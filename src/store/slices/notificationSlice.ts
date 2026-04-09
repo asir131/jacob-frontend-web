@@ -7,7 +7,7 @@ export interface LiveNotification {
   description: string;
   unread: boolean;
   createdAt: string;
-  data?: unknown;
+  data?: Record<string, unknown> | null;
 }
 
 interface NotificationState {

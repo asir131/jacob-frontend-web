@@ -72,6 +72,8 @@ const normalizeAvatar = (avatar?: string) => {
 
 const readStoredUser = (): AuthUser | null => {
   if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('auth_token');
+  if (!token) return null;
   const raw = localStorage.getItem(AUTH_USER_KEY);
   if (!raw) return null;
 

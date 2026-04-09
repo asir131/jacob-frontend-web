@@ -11,6 +11,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { Toaster } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BRAND, SEO, CONTACT, SOCIAL_LINKS } from "@/lib/constants";
+import WebsiteAuthGate from "@/components/auth/WebsiteAuthGate";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SEO.siteUrl),
@@ -103,12 +104,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <SocketProvider>
                 <LocationProvider>
-                  <Header />
-                  <div className="pt-[72px] lg:pt-[88px]">
-                    <main className="flex-1">{children}</main>
-                  </div>
-                  <Footer />
-                  <Toaster position="top-center" richColors />
+                  <WebsiteAuthGate>
+                    <Header />
+                    <div className="pt-[72px] lg:pt-[88px]">
+                      <main className="flex-1">{children}</main>
+                    </div>
+                    <Footer />
+                    <Toaster position="top-center" richColors />
+                  </WebsiteAuthGate>
                 </LocationProvider>
               </SocketProvider>
             </AuthProvider>

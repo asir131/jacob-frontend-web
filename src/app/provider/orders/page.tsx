@@ -1,214 +1,313 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, MessageSquare, Check, X, MapPin, Calendar as CalendarIcon, Clock, AlertCircle, User, CheckCircle2 } from 'lucide-react';
+import { Search, MessageSquare, CheckCircle2, MapPin, Calendar as CalendarIcon, User, AlertCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import {
+  useAcceptProviderOrderMutation,
+  useDeclineProviderOrderMutation,
+  useGetProviderOrdersQuery,
+} from '@/store/services/apiSlice';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 
-const INCOMING_ORDERS = [
-  { id: 'ORD-101', client: 'Farhan Ahmed', service: 'Deep House Cleaning', date: 'Oct 23, 2025', time: '10:00 AM', status: 'Pending', price: 154, location: 'Gulshan 2, Dhaka' },
-  { id: 'ORD-102', client: 'Sadia Rahman', service: 'AC Master Servicing', date: 'Oct 24, 2025', time: '02:00 PM', status: 'Pending', price: 80, location: 'Banani, Dhaka' },
-  { id: 'ORD-103', client: 'Tahsan Khan', service: 'Premium Furniture Polish', date: 'Oct 25, 2025', time: '09:00 AM', status: 'In Progress', price: 120, location: 'Dhanmondi, Dhaka' },
-  { id: 'ORD-104', client: 'Rafa Islam', service: 'Full Kitchen Deep Cleaning', date: 'Oct 20, 2025', time: '11:00 AM', status: 'Completed', price: 200, location: 'Mirpur 10, Dhaka' },
-];
+type ProviderOrder = {
+  id: string;
+  orderNumber: string;
+  conversationId?: string | null;
+  orderName: string;
+  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'completed';
+  packagePrice: number;
+  serviceAddress: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  client: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    avatar: string;
+    locationLat: number | null;
+    locationLng: number | null;
+  };
+};
+
+const STATUS_LABEL: Record<ProviderOrder['status'], string> = {
+  pending: 'Pending',
+  accepted: 'In Progress',
+  declined: 'Declined',
+  accepting_delivery: 'Accepting Delivery',
+  completed: 'Completed',
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1
-    }
-  }
+      staggerChildren: 0.08,
+    },
+  },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, scale: 0.95, y: 10 },
-  visible: { opacity: 1, scale: 1, y: 0 }
+  hidden: { opacity: 0, scale: 0.97, y: 10 },
+  visible: { opacity: 1, scale: 1, y: 0 },
 };
 
 export default function ProviderOrdersPage() {
-  const [orders, setOrders] = useState(INCOMING_ORDERS);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectNote, setRejectNote] = useState('');
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [profileOrder, setProfileOrder] = useState<ProviderOrder | null>(null);
+  const { notifications } = useSocketNotifications();
+  const lastHandledNotificationIdRef = useRef<string | null>(null);
 
-  const filteredOrders = orders.filter(o => {
-    const matchesSearch = o.client.toLowerCase().includes(search.toLowerCase()) || 
-                         o.id.toLowerCase().includes(search.toLowerCase()) ||
-                         o.service.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || o.status.toLowerCase().replace(' ', '') === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleAccept = (id: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'In Progress' } : o));
-    toast.success('Order accepted! Client has been notified.');
-  };
-
-  const handleReject = (id: string) => {
-    if (!rejectReason) {
-      toast.error('Please select a reason for rejection.');
-      return;
+  const { data, isLoading, isFetching, refetch } = useGetProviderOrdersQuery(
+    {
+      page,
+      limit: 6,
+      search,
+      status: statusFilter,
+    },
+    {
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+      pollingInterval: 15000,
     }
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'Cancelled' } : o));
-    toast.success('Order declined.');
-    setRejectReason('');
-    setRejectNote('');
+  );
+  const [acceptOrder, { isLoading: isAccepting }] = useAcceptProviderOrderMutation();
+  const [declineOrder, { isLoading: isDeclining }] = useDeclineProviderOrderMutation();
+
+  const orders = useMemo(() => ((data?.data?.items || []) as ProviderOrder[]).filter(Boolean), [data]);
+  const pagination = data?.data?.pagination;
+
+  const handleAccept = async (id: string) => {
+    try {
+      await acceptOrder(id).unwrap();
+      toast.success('Order accepted! Client has been notified.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to accept order.');
+    }
   };
+
+  const handleReject = async (id: string) => {
+    try {
+      await declineOrder(id).unwrap();
+      toast.success('Order declined.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to decline order.');
+    }
+  };
+
+  useEffect(() => {
+    if (!notifications.length) return;
+    const latest = notifications[0] as {
+      id?: string;
+      data?: { notificationType?: string };
+    };
+    if (!latest?.id || latest.id === lastHandledNotificationIdRef.current) return;
+
+    const type = latest?.data?.notificationType;
+    if (type === 'order_created' || type === 'order_accepted' || type === 'order_finalized') {
+      lastHandledNotificationIdRef.current = latest.id;
+      refetch();
+    }
+  }, [notifications, refetch]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] py-12">
+    <div className="min-h-screen bg-[#F8FAFC] py-12 pb-28">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6"
-        >
-           <div>
-             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight text-center md:text-left">Order Management</h1>
-             <p className="text-slate-500 mt-2 text-lg text-center md:text-left">Manage incoming job requests and track your active tasks.</p>
-           </div>
-           
-           <div className="flex flex-wrap items-center gap-3">
-             <div className="relative w-full sm:w-80">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <Input 
-                  placeholder="Search orders..." 
-                  className="pl-12 h-14 bg-white border-none shadow-sm rounded-2xl font-medium"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
-             </div>
-             <Select value={statusFilter} onValueChange={setStatusFilter}>
-               <SelectTrigger className="w-full sm:w-[180px] h-14 bg-white border-none shadow-sm rounded-2xl font-bold">
-                 <SelectValue placeholder="All Status" />
-               </SelectTrigger>
-               <SelectContent className="rounded-2xl border-none shadow-2xl">
-                 <SelectItem value="all">All Status</SelectItem>
-                 <SelectItem value="pending">Pending</SelectItem>
-                 <SelectItem value="inprogress">In Progress</SelectItem>
-                 <SelectItem value="completed">Completed</SelectItem>
-                 <SelectItem value="cancelled">Cancelled</SelectItem>
-               </SelectContent>
-             </Select>
-           </div>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+          <div>
+            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight text-center md:text-left">Order Management</h1>
+            <p className="text-slate-500 mt-2 text-lg text-center md:text-left">Manage incoming job requests and track your active tasks.</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search orders..."
+                className="pl-12 h-14 bg-white border-none shadow-sm rounded-2xl font-medium"
+                value={search}
+                onChange={(e) => {
+                  setPage(1);
+                  setSearch(e.target.value);
+                }}
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setPage(1);
+                setStatusFilter(e.target.value);
+              }}
+              className="w-full sm:w-[180px] h-14 bg-white border-none shadow-sm rounded-2xl font-bold px-4 text-slate-700"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="accepted">Accepted</option>
+              <option value="accepting_delivery">Accepting Delivery</option>
+              <option value="completed">Completed</option>
+              <option value="declined">Declined</option>
+            </select>
+          </div>
         </motion.div>
 
         <AnimatePresence mode="wait">
-          {filteredOrders.length > 0 ? (
-            <motion.div 
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              {filteredOrders.map((order) => (
-                <Link href={`/provider/orders/${order.id}`} key={order.id} className="group block">
-                  <motion.div variants={itemVariants} className="h-full">
-                    <Card className="border-none shadow-sm hover:shadow-xl hover:shadow-[#2286BE]/10 transition-all duration-500 rounded-[2.5rem] bg-white h-full flex flex-col overflow-hidden border border-slate-50">
-                      <div className="p-8 border-b border-slate-50 flex justify-between items-start">
-                        <div className="flex gap-4">
-                          <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-1 ring-slate-100">
-                            <AvatarImage src={`https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=64&h=64&auto=format&fit=crop`} alt={order.client} />
-                            <AvatarFallback>{order.client[0]}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-black text-slate-900 text-sm tracking-tight">{order.client}</p>
-                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{order.id}</p>
+          {isLoading ? (
+            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-[2rem] bg-white p-16 text-center text-slate-500 font-bold shadow-sm">
+              Loading orders...
+            </motion.div>
+          ) : orders.length > 0 ? (
+            <motion.div key={`${statusFilter}-${search}-${page}`} variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {orders.map((order) => (
+                <motion.div key={order.id} variants={itemVariants} className="h-full">
+                  <Card className="border-none shadow-sm hover:shadow-xl hover:shadow-[#2286BE]/10 transition-all duration-500 rounded-[2.5rem] bg-white h-full flex flex-col overflow-hidden border border-slate-50">
+                    <div className="p-8 border-b border-slate-50 flex justify-between items-start gap-3">
+                      <div className="flex gap-4 min-w-0 flex-1">
+                        <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                          {order.client.avatar ? <AvatarImage src={order.client.avatar} alt={order.client.name} /> : null}
+                          <AvatarFallback className="bg-slate-100 text-slate-500">
+                            <User size={16} />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-black text-slate-900 text-sm tracking-tight truncate">{order.client.name || 'Client'}</p>
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest truncate">{order.orderNumber || order.id}</p>
+                        </div>
+                      </div>
+                      <Badge
+                        className={`
+                          px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border-none whitespace-nowrap shrink-0
+                          ${order.status === 'completed' ? 'bg-green-50 text-green-600' :
+                            order.status === 'accepted' ? 'bg-[#2286BE]/10 text-[#2286BE]' :
+                            order.status === 'pending' ? 'bg-blue-50 text-blue-600' :
+                            order.status === 'accepting_delivery' ? 'bg-amber-50 text-amber-600' :
+                            'bg-red-50 text-red-600'}
+                        `}
+                      >
+                        {STATUS_LABEL[order.status] || order.status}
+                      </Badge>
+                    </div>
+
+                    <CardContent className="p-8 flex-1 flex flex-col">
+                      <div className="mb-8 flex-1">
+                        <h3 className="font-black text-xl text-slate-900 leading-tight mb-4 group-hover:text-[#2286BE] transition-colors">
+                          {order.orderName}
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-3 text-slate-500">
+                            <MapPin size={16} className="mt-0.5 text-slate-300 flex-shrink-0" />
+                            <p className="text-sm font-bold text-slate-500">{order.serviceAddress || 'Location unavailable'}</p>
+                          </div>
+                          <div className="flex items-center gap-3 text-slate-500">
+                            <CalendarIcon size={16} className="text-slate-300 flex-shrink-0" />
+                            <p className="text-sm font-bold text-slate-500">
+                              {new Date(order.scheduledDate).toLocaleDateString()} • {order.scheduledTime}
+                            </p>
                           </div>
                         </div>
-                        <Badge 
-                          className={`
-                            px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border-none
-                            ${order.status === 'Completed' ? 'bg-green-50 text-green-600' : 
-                              order.status === 'In Progress' ? 'bg-[#2286BE]/10 text-[#2286BE]' : 
-                              order.status === 'Pending' ? 'bg-blue-50 text-blue-600' : 
-                              'bg-red-50 text-red-600'}
-                          `}
-                        >
-                          {order.status}
-                        </Badge>
                       </div>
 
-                      <CardContent className="p-8 flex-1 flex flex-col">
-                        <div className="mb-8 flex-1">
-                          <h3 className="font-black text-xl text-slate-900 leading-tight mb-4 group-hover:text-[#2286BE] transition-colors">{order.service}</h3>
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-3 text-slate-500">
-                              <MapPin size={16} className="mt-0.5 text-slate-300 flex-shrink-0" />
-                              <p className="text-sm font-bold text-slate-500">{order.location}</p>
-                            </div>
-                            <div className="flex items-center gap-3 text-slate-500">
-                              <CalendarIcon size={16} className="text-slate-300 flex-shrink-0" />
-                              <p className="text-sm font-bold text-slate-500">{order.date} • {order.time}</p>
-                            </div>
-                          </div>
+                      <div className="mt-auto pt-6 border-t border-slate-50 flex justify-between items-center">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Earning</p>
+                          <p className="text-3xl font-black text-slate-900 tracking-tighter">${Number(order.packagePrice || 0).toFixed(2)}</p>
                         </div>
-
-                        <div className="mt-auto pt-6 border-t border-slate-50 flex justify-between items-center">
-                          <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Earning</p>
-                            <p className="text-3xl font-black text-slate-900 tracking-tighter">${order.price.toLocaleString()}</p>
-                          </div>
-                          <div className="flex gap-2">
-                             <Link href={`/messages?user=USR-123`} onClick={(e) => e.stopPropagation()}>
-                               <Button variant="ghost" size="icon" className="h-12 w-12 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1.2rem] transition-all">
-                                 <MessageSquare size={20} />
-                               </Button>
-                             </Link>
-                             <Link href={`/client/USR-123`} onClick={(e) => e.stopPropagation()}>
-                               <Button variant="ghost" size="icon" className="h-12 w-12 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1.2rem] transition-all">
-                                 <User size={20} />
-                               </Button>
-                             </Link>
-                          </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              router.push(
+                                order.conversationId
+                                  ? `/messages?conversationId=${String(order.conversationId)}&orderId=${order.id}`
+                                  : `/messages?orderId=${order.id}&user=${order.client.id}`
+                              )
+                            }
+                            className="h-12 w-12 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1.2rem] transition-all"
+                          >
+                            <MessageSquare size={20} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setProfileOrder(order)}
+                            className="h-12 w-12 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1.2rem] transition-all"
+                          >
+                            <User size={20} />
+                          </Button>
                         </div>
+                      </div>
 
-                        <div className="mt-8">
-                          {order.status === 'Pending' && (
-                             <div className="grid grid-cols-2 gap-4">
-                               <Button variant="outline" className="h-14 font-black uppercase tracking-widest text-[11px] border-slate-100 text-slate-500 hover:bg-slate-50 rounded-2xl transition-all" onClick={(e) => { e.preventDefault(); handleReject(order.id); }}>Decline</Button>
-                               <Button className="h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white shadow-xl shadow-[#2286BE]/20 rounded-2xl transition-all" onClick={(e) => { e.preventDefault(); handleAccept(order.id); }}>Accept Job</Button>
-                             </div>
-                          )}
-
-                          {order.status === 'In Progress' && (
-                             <Button className="w-full h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] shadow-xl shadow-[#2286BE]/30 text-white rounded-2xl transition-all">
-                               <CheckCircle2 size={18} className="mr-2" /> Deliver Work
-                             </Button>
-                          )}
-
-                          {order.status === 'Completed' && (
-                            <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-slate-50 text-slate-300 cursor-default hover:bg-white rounded-2xl">
-                               Order Finalized
+                      <div className="mt-8">
+                        {order.status === 'pending' && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <Button
+                              variant="outline"
+                              className="h-14 font-black uppercase tracking-widest text-[11px] border-slate-100 text-slate-500 hover:bg-slate-50 rounded-2xl transition-all"
+                              onClick={() => handleReject(order.id)}
+                              disabled={isDeclining}
+                            >
+                              Decline
                             </Button>
-                          )}
-                          
-                          {order.status === 'Cancelled' && (
-                            <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-red-50 text-red-200 cursor-default hover:bg-white rounded-2xl">
-                               Booking Cancelled
+                            <Button
+                              className="h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white shadow-xl shadow-[#2286BE]/20 rounded-2xl transition-all"
+                              onClick={() => handleAccept(order.id)}
+                              disabled={isAccepting}
+                            >
+                              Accept Job
                             </Button>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </Link>
+                          </div>
+                        )}
+
+                        {order.status === 'accepted' && (
+                          <Link href={`/provider/orders/${order.id}`} className="block">
+                            <Button className="w-full h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] shadow-xl shadow-[#2286BE]/30 text-white rounded-2xl transition-all">
+                              <CheckCircle2 size={18} className="mr-2" /> Deliver Order
+                            </Button>
+                          </Link>
+                        )}
+
+                        {order.status === 'accepting_delivery' && (
+                          <Link href={`/provider/orders/${order.id}`} className="block">
+                            <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-amber-100 text-amber-700 rounded-2xl">
+                              Delivery Submitted
+                            </Button>
+                          </Link>
+                        )}
+
+                        {order.status === 'completed' && (
+                          <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-slate-50 text-slate-300 cursor-default hover:bg-white rounded-2xl">
+                            Order Finalized
+                          </Button>
+                        )}
+
+                        {order.status === 'declined' && (
+                          <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-red-50 text-red-200 cursor-default hover:bg-white rounded-2xl">
+                            Booking Declined
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               ))}
             </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="empty"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -225,6 +324,62 @@ export default function ProviderOrdersPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <div className="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!pagination?.hasPrevPage || isFetching}
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            className="h-9 rounded-xl border-slate-200 text-xs font-black uppercase tracking-widest"
+          >
+            Prev
+          </Button>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-600">
+            {pagination?.page || page} / {pagination?.totalPages || 1}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!pagination?.hasNextPage || isFetching}
+            onClick={() => setPage((prev) => prev + 1)}
+            className="h-9 rounded-xl border-slate-200 text-xs font-black uppercase tracking-widest"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
+      {profileOrder && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-center gap-3">
+              <Avatar className="h-12 w-12 border border-slate-100">
+                {profileOrder.client.avatar ? <AvatarImage src={profileOrder.client.avatar} /> : null}
+                <AvatarFallback className="bg-slate-100 text-slate-500">
+                  <User size={16} />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">{profileOrder.client.name || 'Client'}</h3>
+                <p className="text-xs font-semibold text-slate-500">Client Profile</p>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-700">
+              <p>Name: {profileOrder.client.name || 'N/A'}</p>
+              <p>Phone: {profileOrder.client.phone || 'N/A'}</p>
+              <p>Email: {profileOrder.client.email || 'N/A'}</p>
+              <p>Location: {profileOrder.client.address || profileOrder.serviceAddress || 'N/A'}</p>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => setProfileOrder(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

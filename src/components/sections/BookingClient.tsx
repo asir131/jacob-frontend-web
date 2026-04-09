@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronRight, CreditCard, ShieldCheck, Lock, Navigation, Wallet, Banknote } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronRight, ShieldCheck, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
+import { useCreateOrderMutation } from '@/store/services/apiSlice';
 
 const variants = {
   enter: (direction: number) => ({
@@ -91,10 +92,11 @@ export default function BookingClient({ service }: BookingClientProps) {
   const [pkg, setPkg] = useState('standard');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [time, setTime] = useState('10:00 AM');
-  const [address, setAddress] = useState('123 Manhattan Ave, New York, NY');
+  const [address, setAddress] = useState(service?.location?.city || '');
+  const [specialInstructions, setSpecialInstructions] = useState('');
   const [isAddrModalOpen, setIsAddrModalOpen] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [createOrder, { isLoading: isCreatingOrder }] = useCreateOrderMutation();
 
   const detectLocation = () => {
     setIsDetectingLocation(true);
@@ -123,12 +125,40 @@ export default function BookingClient({ service }: BookingClientProps) {
   const platformFee = 5;
   const total = price + platformFee;
 
-  const handleNext = () => setStep([Math.min(4, step + 1), 1]);
+  const handleNext = () => setStep([Math.min(3, step + 1), 1]);
   const handleBack = () => setStep([Math.max(1, step - 1), -1]);
 
-  const handleConfirmPay = () => {
-    toast.success('Payment Successful! Order is now Pending.');
-    router.push('/client/orders');
+  const handleFinalizeOrder = async () => {
+    if (!date) {
+      toast.error('Please select a date.');
+      return;
+    }
+    if (!time) {
+      toast.error('Please select a time.');
+      return;
+    }
+    if (!String(address || '').trim()) {
+      toast.error('Please enter your service location.');
+      return;
+    }
+
+    try {
+      await createOrder({
+        gigId: service.id,
+        packageName: selectedPackage?.key || pkg,
+        packageTitle: selectedPackage?.title || `${pkg} package`,
+        packagePrice: Number(price) || 0,
+        scheduledDate: date.toISOString(),
+        scheduledTime: time,
+        serviceAddress: String(address).trim(),
+        specialInstructions: String(specialInstructions || '').trim(),
+      }).unwrap();
+
+      toast.success('Order placed successfully.');
+      router.push('/client/orders');
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to create order.');
+    }
   };
 
   return (
@@ -147,7 +177,7 @@ export default function BookingClient({ service }: BookingClientProps) {
              <div className="font-black text-slate-900 uppercase tracking-widest text-xs">Secure Checkout</div>
            </div>
            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">
-             Step <span className="text-slate-900">0{step}</span> / 04
+             Step <span className="text-slate-900">0{step}</span> / 03
            </div>
         </div>
       </header>
@@ -158,7 +188,7 @@ export default function BookingClient({ service }: BookingClientProps) {
         <div className="flex-1">
            {/* Progress Line */}
            <div className="flex items-center mb-12 gap-3 px-2">
-              {[1, 2, 3, 4].map(i => (
+              {[1, 2, 3].map(i => (
                  <div key={i} className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden relative">
                     {step >= i && (
                        <motion.div 
@@ -316,56 +346,18 @@ export default function BookingClient({ service }: BookingClientProps) {
                          </div>
                          <div className="space-y-2">
                             <label htmlFor="instructions" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Special Instructions for Provider</label>
-                            <Input id="instructions" placeholder="E.g. Call before arrival, Gate code is 1234..." className="h-14 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-[#2286BE] font-bold" />
+                            <Input
+                              id="instructions"
+                              value={specialInstructions}
+                              onChange={(e) => setSpecialInstructions(e.target.value)}
+                              placeholder="E.g. Call before arrival, Gate code is 1234..."
+                              className="h-14 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-[#2286BE] font-bold"
+                            />
                          </div>
                       </div>
                     </div>
                   )}
 
-                  {/* STEP 4: Checkout */}
-                  {step === 4 && (
-                    <div>
-                      <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Secure checkout</h2>
-                      <p className="text-slate-400 font-medium mb-10">Choose your preferred payment method to proceed.</p>
-                      
-                      <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid grid-cols-1 gap-4 mb-10 max-w-lg">
-                         <motion.div whileHover={{ scale: 1.01 }} onClick={() => setPaymentMethod('stripe')} className={`border-2 rounded-3xl p-6 flex items-center gap-5 cursor-pointer transition-all ${paymentMethod === 'stripe' ? 'border-[#2286BE] bg-[#2286BE]/5 shadow-lg shadow-[#2286BE]/5' : 'border-slate-100 hover:border-slate-200 bg-white'}`}>
-                           <RadioGroupItem value="stripe" id="stripe" className={`border-2 ${paymentMethod === 'stripe' ? 'text-[#2286BE] focus:ring-[#2286BE]' : ''}`} />
-                           <div className={`p-4 rounded-2xl shadow-sm ${paymentMethod === 'stripe' ? 'bg-white text-[#2286BE]' : 'bg-slate-50 text-slate-400'}`} aria-hidden="true"><CreditCard size={20} /></div>
-                           <label htmlFor="stripe" className="font-black text-slate-900 text-lg cursor-pointer">Stripe / Credit Card</label>
-                           {paymentMethod === 'stripe' && <Badge className="ml-auto bg-slate-900 text-white border-none font-black text-[9px] uppercase tracking-widest px-2.5 py-1.5 rounded-lg">Selected</Badge>}
-                         </motion.div>
-                      </RadioGroup>
-
-                      <AnimatePresence mode="wait">
-                         {paymentMethod === 'stripe' && (
-                           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-6 max-w-lg overflow-hidden">
-                             <div className="space-y-2">
-                               <label htmlFor="card-number" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Card Number</label>
-                               <div className="relative">
-                                 <Input id="card-number" placeholder="4242 4242 4242 4242" className="h-14 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-[#2286BE] font-bold" />
-                                 <div className="absolute right-4 top-4 text-[#2286BE]" aria-hidden="true"><Lock size={18} /></div>
-                               </div>
-                             </div>
-                             <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                   <label htmlFor="exp" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Expiration</label>
-                                   <Input id="exp" placeholder="MM/YY" className="h-14 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-[#2286BE] font-bold" />
-                                </div>
-                                <div className="space-y-2">
-                                   <label htmlFor="cvc" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CVC / CVV</label>
-                                   <Input id="cvc" placeholder="***" type="password" className="h-14 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-[#2286BE] font-bold" />
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-3 p-5 bg-slate-50 rounded-2xl border border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] leading-loose">
-                                <ShieldCheck size={24} className="text-[#2286BE] shrink-0" aria-hidden="true" />
-                                Encrypted with 256-bit SSL security. We never store your full card details.
-                             </div>
-                           </motion.div>
-                         )}
-                      </AnimatePresence>
-                    </div>
-                  )}
                 </motion.div>
               </AnimatePresence>
            </div>
@@ -380,13 +372,13 @@ export default function BookingClient({ service }: BookingClientProps) {
               >
                 Previous Step
               </Button>
-              {step < 4 ? (
+              {step < 3 ? (
                 <Button onClick={handleNext} className="w-full sm:w-56 h-16 rounded-[1.25rem] bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-base shadow-2xl shadow-[#2286BE]/20 active:scale-95 transition-all">
                   Continue Process <ChevronRight size={20} className="ml-2" />
                 </Button>
               ) : (
-                <Button onClick={handleConfirmPay} className="w-full sm:w-64 h-16 rounded-[1.25rem] bg-slate-900 hover:bg-black text-white font-black text-lg shadow-2xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-3">
-                  <ShieldCheck size={20} className="text-[#2286BE]" /> Finalize & Pay
+                <Button disabled={isCreatingOrder} onClick={handleFinalizeOrder} className="w-full sm:w-64 h-16 rounded-[1.25rem] bg-slate-900 hover:bg-black text-white font-black text-lg shadow-2xl shadow-slate-900/20 active:scale-95 transition-all flex items-center justify-center gap-3">
+                  <ShieldCheck size={20} className="text-[#2286BE]" /> {isCreatingOrder ? 'Finalizing...' : 'Finalize Order'}
                 </Button>
               )}
            </div>
@@ -477,7 +469,7 @@ export default function BookingClient({ service }: BookingClientProps) {
                            <Input 
                              value={address} 
                              onChange={(e) => setAddress(e.target.value)}
-                             placeholder="123 Manhattan Ave, Apt 4B" 
+                             placeholder="Enter your exact location" 
                              className="h-16 pl-14 rounded-2xl border-slate-100 bg-slate-50 focus-visible:ring-[#2286BE] font-bold text-lg" 
                            />
                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors">

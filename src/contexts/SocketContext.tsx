@@ -64,6 +64,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       dispatch(addNotification(normalized));
       const notificationData = (normalized.data || {}) as {
         notificationType?: string;
+        targetPath?: string;
       };
       if (notificationData.notificationType === 'provider_verification_approved') {
         updateProfile({
@@ -83,7 +84,20 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           },
         });
       }
-      toast.info(normalized.title, { description: normalized.description });
+      toast.info(normalized.title, {
+        description: normalized.description,
+        action:
+          typeof notificationData.targetPath === 'string' && notificationData.targetPath
+            ? {
+                label: 'Open',
+                onClick: () => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = notificationData.targetPath as string;
+                  }
+                },
+              }
+            : undefined,
+      });
     });
 
     return () => {
