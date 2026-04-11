@@ -34,7 +34,17 @@ type ClientOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'declined'
+    | 'accepting_delivery'
+    | 'revision_requested'
+    | 'under_revision'
+    | 'after_sell_revision_requested'
+    | 'under_after_sell_revision'
+    | 'done_after_sell_revision'
+    | 'completed';
   packagePrice: number;
   scheduledDate: string;
   scheduledTime: string;
@@ -53,6 +63,9 @@ const STATUS_LABEL: Record<ClientOrder['status'], string> = {
   accepting_delivery: 'Payment Pending',
   revision_requested: 'Request Revision',
   under_revision: 'Under Revision',
+  after_sell_revision_requested: 'After-Sale Revision Requested',
+  under_after_sell_revision: 'Under After-Sale Revision',
+  done_after_sell_revision: 'Done After-Sale Revision',
   completed: 'Completed',
   declined: 'Cancelled',
 };
@@ -118,6 +131,11 @@ export default function ClientOrdersPage() {
       type === 'order_revision_accepted' ||
       type === 'order_revision_declined' ||
       type === 'order_revision_cancelled_self' ||
+      type === 'order_after_sell_revision_requested' ||
+      type === 'order_after_sell_revision_accepted' ||
+      type === 'order_after_sell_revision_declined' ||
+      type === 'order_after_sell_revision_cancelled' ||
+      type === 'order_after_sell_revision_completed' ||
       type === 'order_finalized'
     ) {
       lastHandledNotificationIdRef.current = latest.id;

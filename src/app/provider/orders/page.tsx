@@ -25,7 +25,17 @@ type ProviderOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'declined'
+    | 'accepting_delivery'
+    | 'revision_requested'
+    | 'under_revision'
+    | 'after_sell_revision_requested'
+    | 'under_after_sell_revision'
+    | 'done_after_sell_revision'
+    | 'completed';
   packagePrice: number;
   serviceAddress: string;
   scheduledDate: string;
@@ -49,6 +59,9 @@ const STATUS_LABEL: Record<ProviderOrder['status'], string> = {
   accepting_delivery: 'Accepting Delivery',
   revision_requested: 'Request Revision',
   under_revision: 'Under Revision',
+  after_sell_revision_requested: 'After-Sale Revision',
+  under_after_sell_revision: 'Under After-Sale Revision',
+  done_after_sell_revision: 'Done After-Sale Revision',
   completed: 'Completed',
 };
 
@@ -127,7 +140,12 @@ export default function ProviderOrdersPage() {
       type === 'order_accepted' ||
       type === 'order_finalized' ||
       type === 'order_revision_requested' ||
-      type === 'order_revision_cancelled'
+      type === 'order_revision_cancelled' ||
+      type === 'order_after_sell_revision_requested' ||
+      type === 'order_after_sell_revision_accepted' ||
+      type === 'order_after_sell_revision_declined' ||
+      type === 'order_after_sell_revision_cancelled' ||
+      type === 'order_after_sell_revision_completed'
     ) {
       lastHandledNotificationIdRef.current = latest.id;
       refetch();
@@ -305,10 +323,17 @@ export default function ProviderOrdersPage() {
                           </Link>
                         )}
 
-                        {(order.status === 'revision_requested' || order.status === 'under_revision') && (
+                        {(
+                          order.status === 'revision_requested' ||
+                          order.status === 'under_revision' ||
+                          order.status === 'after_sell_revision_requested' ||
+                          order.status === 'under_after_sell_revision'
+                        ) && (
                           <Link href={`/provider/orders/${order.id}`} className="block">
                             <Button variant="outline" className="w-full h-14 font-black uppercase tracking-widest text-[11px] border-violet-100 text-violet-700 rounded-2xl">
-                              Open Revision
+                              {order.status === 'after_sell_revision_requested' || order.status === 'under_after_sell_revision'
+                                ? 'Open After-Sale Revision'
+                                : 'Open Revision'}
                             </Button>
                           </Link>
                         )}

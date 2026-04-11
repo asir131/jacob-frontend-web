@@ -31,7 +31,17 @@ type ProviderOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'declined'
+    | 'accepting_delivery'
+    | 'revision_requested'
+    | 'under_revision'
+    | 'after_sell_revision_requested'
+    | 'under_after_sell_revision'
+    | 'done_after_sell_revision'
+    | 'completed';
   packagePrice: number;
   packageTitle: string;
   scheduledDate: string;
@@ -64,6 +74,9 @@ const statusText = (status: ProviderOrder['status']) => {
   if (status === 'accepting_delivery') return 'Accepting Delivery';
   if (status === 'revision_requested') return 'Request Revision';
   if (status === 'under_revision') return 'Under Revision';
+  if (status === 'after_sell_revision_requested') return 'After-Sale Revision';
+  if (status === 'under_after_sell_revision') return 'Under After-Sale Revision';
+  if (status === 'done_after_sell_revision') return 'Done After-Sale Revision';
   if (status === 'completed') return 'Order Finalized';
   if (status === 'declined') return 'Declined';
   return 'Pending';
@@ -110,6 +123,11 @@ export default function ProviderOrderDetailPage() {
     const isSameOrder = notificationOrderId === id;
     const shouldRefreshByType =
       type === 'order_revision_requested' ||
+      type === 'order_after_sell_revision_requested' ||
+      type === 'order_after_sell_revision_accepted' ||
+      type === 'order_after_sell_revision_declined' ||
+      type === 'order_after_sell_revision_completed' ||
+      type === 'order_after_sell_revision_cancelled' ||
       type === 'order_revision_cancelled' ||
       type === 'order_finalized' ||
       type === 'order_accepted' ||
@@ -130,8 +148,11 @@ export default function ProviderOrderDetailPage() {
   };
 
   const handleDeliver = async () => {
-    if (!order || !['accepted', 'under_revision', 'accepting_delivery'].includes(order.status)) return;
-    const noteToSubmit = order.status === 'under_revision' ? (order.deliveryNote || '').trim() : deliveryNote.trim();
+    if (!order || !['accepted', 'under_revision', 'accepting_delivery', 'under_after_sell_revision'].includes(order.status)) return;
+    const noteToSubmit =
+      order.status === 'under_revision' || order.status === 'under_after_sell_revision'
+        ? (order.deliveryNote || '').trim()
+        : deliveryNote.trim();
     if (!noteToSubmit) {
       toast.error('Please provide a delivery note.');
       return;
@@ -142,7 +163,13 @@ export default function ProviderOrderDetailPage() {
       formData.append('deliveryNote', noteToSubmit);
       files.forEach((file) => formData.append('deliveryImages', file));
       await submitDelivery({ id: order.id, formData }).unwrap();
-      toast.success(order.status === 'under_revision' ? 'Revision submitted. Waiting for client review.' : 'Work delivered! Waiting for client review.');
+      toast.success(
+        order.status === 'under_revision'
+          ? 'Revision submitted. Waiting for client review.'
+          : order.status === 'under_after_sell_revision'
+            ? 'After-sale revision completed.'
+            : 'Work delivered! Waiting for client review.'
+      );
       setFiles([]);
       setDeliveryNote('');
       await refetch();
@@ -152,10 +179,16 @@ export default function ProviderOrderDetailPage() {
   };
 
   const handleRevisionResponse = async (action: 'accept' | 'decline') => {
-    if (!order || order.status !== 'revision_requested') return;
+    if (!order || !['revision_requested', 'after_sell_revision_requested'].includes(order.status)) return;
     try {
       await respondRevision({ id: order.id, action }).unwrap();
-      toast.success(action === 'accept' ? 'Revision request accepted.' : 'Revision request declined.');
+      toast.success(
+        action === 'accept'
+          ? 'Revision request accepted.'
+          : order.status === 'after_sell_revision_requested'
+            ? 'After-sale revision declined.'
+            : 'Revision request declined.'
+      );
       await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to respond to revision.');
@@ -316,7 +349,7 @@ export default function ProviderOrderDetailPage() {
                           />
                         </div>
 
-                        {order.status === 'revision_requested' && (
+                        {['revision_requested', 'after_sell_revision_requested'].includes(order.status) && (
                           <div className="rounded-3xl border border-orange-100 bg-orange-50 p-6">
                             <p className="text-[10px] font-black uppercase tracking-widest text-orange-500 mb-2">Revision Note From Client</p>
                             <p className="text-sm font-semibold text-orange-900">
@@ -345,7 +378,7 @@ export default function ProviderOrderDetailPage() {
                         </div>
 
                         <div className="pt-6 border-t border-slate-50">
-                          {order.status === 'revision_requested' ? (
+                          {['revision_requested', 'after_sell_revision_requested'].includes(order.status) ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
                               <Button
                                 onClick={() => handleRevisionResponse('decline')}
@@ -366,16 +399,18 @@ export default function ProviderOrderDetailPage() {
                           ) : null}
                           <Button
                             onClick={handleDeliver}
-                            disabled={isDelivering || !['accepted', 'under_revision', 'accepting_delivery'].includes(order.status)}
+                            disabled={isDelivering || !['accepted', 'under_revision', 'accepting_delivery', 'under_after_sell_revision'].includes(order.status)}
                             className="w-full h-16 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-lg shadow-xl shadow-[#2286BE]/20 transition-all flex items-center justify-center gap-3"
                           >
                             {order.status === 'completed'
                               ? 'Order Finalized'
-                              : order.status === 'under_revision'
+                              : order.status === 'under_revision' || order.status === 'under_after_sell_revision'
                                 ? isDelivering
                                   ? 'Submitting...'
-                                  : 'Submit Revision'
-                              : order.status === 'revision_requested'
+                                  : order.status === 'under_after_sell_revision'
+                                    ? 'Done After Sell Revision'
+                                    : 'Submit Revision'
+                              : ['revision_requested', 'after_sell_revision_requested'].includes(order.status)
                                 ? 'Respond to revision request first'
                               : isDelivering
                                   ? 'Submitting...'

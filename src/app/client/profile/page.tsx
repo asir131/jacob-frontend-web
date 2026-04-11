@@ -209,6 +209,10 @@ export default function ClientProfilePage() {
 
     const [firstName, ...rest] = cleanFullName.split(' ').filter(Boolean);
     const lastName = rest.join(' ');
+    const resolvedAddress =
+      address.trim() ||
+      (await resolveAddressFromCoordinates(selectedMapCoords.lat, selectedMapCoords.lng, mapboxToken)) ||
+      defaultAddress.trim();
 
     setIsSavingProfile(true);
     try {
@@ -216,7 +220,7 @@ export default function ClientProfilePage() {
         firstName,
         lastName,
         phone: phone.trim(),
-        address: address.trim(),
+        address: resolvedAddress,
         preferredLanguage: preferredLanguage.trim(),
         locationLat: selectedMapCoords.lat,
         locationLng: selectedMapCoords.lng,
@@ -232,7 +236,7 @@ export default function ClientProfilePage() {
         lastName: nextUser?.lastName ?? lastName,
         name: `${nextUser?.firstName ?? firstName} ${nextUser?.lastName ?? lastName}`.trim(),
         phone: nextUser?.phone ?? phone.trim(),
-        address: nextUser?.address ?? address.trim(),
+        address: nextUser?.address ?? resolvedAddress,
         preferredLanguage: nextUser?.preferredLanguage ?? preferredLanguage.trim(),
         avatar: nextUser?.avatar ?? avatar,
         locationLat:

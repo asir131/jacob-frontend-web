@@ -49,11 +49,40 @@ type ProviderOrdersQuery = {
   status?: string;
 };
 
+type WithdrawalRequestPayload = {
+  amount: number;
+  note?: string;
+};
+
 type ClientOrdersQuery = {
   page?: number;
   limit?: number;
   search?: string;
   status?: string;
+};
+
+type ProviderDashboardResponse = {
+  revenue?: {
+    totalEarnings?: number;
+    walletBalance?: number;
+    totalWithdrawn?: number;
+  };
+  orders?: {
+    totalOrders?: number;
+    pendingOrders?: number;
+    activeOrders?: number;
+    completedOrders?: number;
+    completionRate?: number;
+  };
+  ratings?: {
+    averageRating?: number;
+    reviewCount?: number;
+  };
+  earningsAnalytics?: Array<{
+    name?: string;
+    earnings?: number;
+  }>;
+  pendingRequests?: Array<Record<string, unknown>>;
 };
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
@@ -151,6 +180,10 @@ export const apiSlice = createApi({
       },
       providesTags: ['Orders'],
     }),
+    getProviderDashboard: builder.query<ApiEnvelope<ProviderDashboardResponse>, void>({
+      query: () => '/api/orders/provider/dashboard',
+      providesTags: ['Orders', 'Profile'],
+    }),
     getClientOrders: builder.query<
       ApiEnvelope<{
         items?: Record<string, unknown>[];
@@ -237,6 +270,61 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { text },
       }),
+    }),
+    createClientCheckoutSession: builder.mutation<
+      ApiEnvelope<{ checkoutUrl?: string; sessionId?: string }>,
+      { id: string }
+    >({
+      query: ({ id }) => ({
+        url: `/api/orders/client/${id}/stripe-checkout`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Orders'],
+    }),
+    confirmClientCheckoutPayment: builder.mutation<
+      ApiEnvelope<{ order?: Record<string, unknown>; providerEarningsAmount?: number; platformFeeAmount?: number }>,
+      { id: string; sessionId: string; clientRating?: number; clientReview?: string }
+    >({
+      query: ({ id, sessionId, clientRating, clientReview }) => ({
+        url: `/api/orders/client/${id}/stripe-confirm`,
+        method: 'POST',
+        body: { sessionId, clientRating, clientReview },
+      }),
+      invalidatesTags: ['Orders', 'Profile'],
+    }),
+    submitClientOrderReview: builder.mutation<
+      ApiEnvelope<{ order?: Record<string, unknown> }>,
+      { id: string; rating: number; review?: string }
+    >({
+      query: ({ id, rating, review }) => ({
+        url: `/api/orders/client/${id}/review`,
+        method: 'POST',
+        body: { rating, review },
+      }),
+      invalidatesTags: ['Orders', 'Profile'],
+    }),
+    getMyWithdrawals: builder.query<
+      ApiEnvelope<{
+        balance?: {
+          availableBalance?: number;
+          pendingWithdrawalAmount?: number;
+          totalEarnings?: number;
+          totalWithdrawn?: number;
+        };
+        withdrawals?: Record<string, unknown>[];
+      }>,
+      void
+    >({
+      query: () => '/api/withdrawals/me',
+      providesTags: ['Profile'],
+    }),
+    requestWithdrawal: builder.mutation<ApiEnvelope<unknown>, WithdrawalRequestPayload>({
+      query: (payload) => ({
+        url: '/api/withdrawals/me/request',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Profile'],
     }),
     finalizeClientOrder: builder.mutation<ApiEnvelope<unknown>, string>({
       query: (id) => ({
@@ -381,6 +469,7 @@ export const {
   useGetPublicServiceByIdQuery,
   useCreateOrderMutation,
   useGetProviderOrdersQuery,
+  useGetProviderDashboardQuery,
   useGetClientOrdersQuery,
   useGetClientOrderDetailQuery,
   useGetProviderOrderDetailQuery,
@@ -391,6 +480,11 @@ export const {
   useRequestClientRevisionMutation,
   useCancelClientRevisionMutation,
   useSendClientResolutionMessageMutation,
+  useCreateClientCheckoutSessionMutation,
+  useConfirmClientCheckoutPaymentMutation,
+  useSubmitClientOrderReviewMutation,
+  useGetMyWithdrawalsQuery,
+  useRequestWithdrawalMutation,
   useFinalizeClientOrderMutation,
   useGetConversationsQuery,
   useEnsureConversationByOrderMutation,

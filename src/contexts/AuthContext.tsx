@@ -32,6 +32,9 @@ interface LoginPayload {
   serviceLocationLat?: number | null;
   serviceLocationLng?: number | null;
   payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  walletBalance?: number;
+  totalEarnings?: number;
+  totalWithdrawn?: number;
   payoutInfo?: {
     accountHolderName?: string;
     bankAccountNumber?: string;
@@ -143,6 +146,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       serviceLocationLng:
         typeof payload?.serviceLocationLng === 'number' ? payload.serviceLocationLng : undefined,
       payoutVerificationStatus: payload?.payoutVerificationStatus || 'unverified',
+      walletBalance: typeof payload?.walletBalance === 'number' ? payload.walletBalance : 0,
+      totalEarnings: typeof payload?.totalEarnings === 'number' ? payload.totalEarnings : 0,
+      totalWithdrawn: typeof payload?.totalWithdrawn === 'number' ? payload.totalWithdrawn : 0,
       payoutInfo: payload?.payoutInfo || {
         accountHolderName: '',
         bankAccountNumber: '',

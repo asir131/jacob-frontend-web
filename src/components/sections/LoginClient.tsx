@@ -54,6 +54,13 @@ type LoginResponse = {
   };
 };
 
+type ProfileResponse = {
+  success: boolean;
+  data?: {
+    user?: LoginResponse['data'] extends { user: infer U } ? U : never;
+  };
+};
+
 export default function LoginClient() {
   const { login } = useAuth();
   const router = useRouter();
@@ -68,6 +75,24 @@ export default function LoginClient() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const fetchProfileSnapshot = async (token: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) return null;
+
+    try {
+      const response = await fetch(`${baseUrl}/api/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as ProfileResponse;
+      return payload?.data?.user || null;
+    } catch {
+      return null;
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -97,26 +122,28 @@ export default function LoginClient() {
       localStorage.setItem('auth_token', data.data.accessToken);
       localStorage.setItem('refresh_token', data.data.refreshToken);
 
-      const normalizedRole = data.data.user.role === 'provider' ? 'provider' : 'client';
+      const profileSnapshot = await fetchProfileSnapshot(data.data.accessToken);
+      const userSnapshot = profileSnapshot || data.data.user;
+      const normalizedRole = userSnapshot.role === 'provider' ? 'provider' : 'client';
       login({
-        id: data.data.user.id,
-        firstName: data.data.user.firstName,
-        lastName: data.data.user.lastName,
-        email: data.data.user.email,
+        id: userSnapshot.id,
+        firstName: userSnapshot.firstName,
+        lastName: userSnapshot.lastName,
+        email: userSnapshot.email,
         role: normalizedRole,
-        avatar: data.data.user.avatar,
-        phone: data.data.user.phone,
-        address: data.data.user.address,
-        preferredLanguage: data.data.user.preferredLanguage,
-        locationLat: data.data.user.locationLat ?? undefined,
-        locationLng: data.data.user.locationLng ?? undefined,
-        businessBio: data.data.user.businessBio,
-        experienceLevel: data.data.user.experienceLevel,
-        serviceCity: data.data.user.serviceCity,
-        serviceLocationLat: data.data.user.serviceLocationLat ?? undefined,
-        serviceLocationLng: data.data.user.serviceLocationLng ?? undefined,
-        payoutVerificationStatus: data.data.user.payoutVerificationStatus || 'unverified',
-        payoutInfo: data.data.user.payoutInfo,
+        avatar: userSnapshot.avatar,
+        phone: userSnapshot.phone,
+        address: userSnapshot.address,
+        preferredLanguage: userSnapshot.preferredLanguage,
+        locationLat: userSnapshot.locationLat ?? undefined,
+        locationLng: userSnapshot.locationLng ?? undefined,
+        businessBio: userSnapshot.businessBio,
+        experienceLevel: userSnapshot.experienceLevel,
+        serviceCity: userSnapshot.serviceCity,
+        serviceLocationLat: userSnapshot.serviceLocationLat ?? undefined,
+        serviceLocationLng: userSnapshot.serviceLocationLng ?? undefined,
+        payoutVerificationStatus: userSnapshot.payoutVerificationStatus || 'unverified',
+        payoutInfo: userSnapshot.payoutInfo,
       });
       toast.success(`Welcome back to ${BRAND.name}!`);
       router.push('/');

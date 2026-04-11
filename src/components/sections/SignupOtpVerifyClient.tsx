@@ -43,6 +43,13 @@ type LoginResponse = {
   };
 };
 
+type ProfileResponse = {
+  success: boolean;
+  data?: {
+    user?: LoginResponse['data'] extends { user: infer U } ? U : never;
+  };
+};
+
 type PendingSignupAuth = {
   email: string;
   password: string;
@@ -59,6 +66,24 @@ export default function SignupOtpVerifyClient() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchProfileSnapshot = async (token: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) return null;
+
+    try {
+      const response = await fetch(`${baseUrl}/api/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as ProfileResponse;
+      return payload?.data?.user || null;
+    } catch {
+      return null;
+    }
+  };
 
   const email = useMemo(() => searchParams.get('email')?.trim() || '', [searchParams]);
 
@@ -139,24 +164,26 @@ export default function SignupOtpVerifyClient() {
 
       localStorage.setItem('auth_token', loginRes.data.accessToken);
       localStorage.setItem('refresh_token', loginRes.data.refreshToken);
-      const normalizedRole = loginRes.data.user.role === 'provider' ? 'provider' : 'client';
+      const profileSnapshot = await fetchProfileSnapshot(loginRes.data.accessToken);
+      const userSnapshot = profileSnapshot || loginRes.data.user;
+      const normalizedRole = userSnapshot.role === 'provider' ? 'provider' : 'client';
       login({
-        id: loginRes.data.user.id,
-        firstName: loginRes.data.user.firstName,
-        lastName: loginRes.data.user.lastName,
-        email: loginRes.data.user.email,
+        id: userSnapshot.id,
+        firstName: userSnapshot.firstName,
+        lastName: userSnapshot.lastName,
+        email: userSnapshot.email,
         role: normalizedRole,
-        avatar: loginRes.data.user.avatar,
-        phone: loginRes.data.user.phone,
-        address: loginRes.data.user.address,
-        preferredLanguage: loginRes.data.user.preferredLanguage,
-        locationLat: loginRes.data.user.locationLat ?? undefined,
-        locationLng: loginRes.data.user.locationLng ?? undefined,
-        businessBio: loginRes.data.user.businessBio,
-        experienceLevel: loginRes.data.user.experienceLevel,
-        serviceCity: loginRes.data.user.serviceCity,
-        serviceLocationLat: loginRes.data.user.serviceLocationLat ?? undefined,
-        serviceLocationLng: loginRes.data.user.serviceLocationLng ?? undefined,
+        avatar: userSnapshot.avatar,
+        phone: userSnapshot.phone,
+        address: userSnapshot.address,
+        preferredLanguage: userSnapshot.preferredLanguage,
+        locationLat: userSnapshot.locationLat ?? undefined,
+        locationLng: userSnapshot.locationLng ?? undefined,
+        businessBio: userSnapshot.businessBio,
+        experienceLevel: userSnapshot.experienceLevel,
+        serviceCity: userSnapshot.serviceCity,
+        serviceLocationLat: userSnapshot.serviceLocationLat ?? undefined,
+        serviceLocationLng: userSnapshot.serviceLocationLng ?? undefined,
       });
 
       sessionStorage.removeItem('pending_signup_auth');

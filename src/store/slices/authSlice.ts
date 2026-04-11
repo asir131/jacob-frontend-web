@@ -21,6 +21,9 @@ export interface AuthUser {
   serviceLocationLat?: number;
   serviceLocationLng?: number;
   payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  walletBalance?: number;
+  totalEarnings?: number;
+  totalWithdrawn?: number;
   payoutInfo?: {
     accountHolderName?: string;
     bankAccountNumber?: string;

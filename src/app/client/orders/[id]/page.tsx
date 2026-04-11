@@ -12,12 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import {
   useCancelClientRevisionMutation,
-  useFinalizeClientOrderMutation,
+  useConfirmClientCheckoutPaymentMutation,
+  useCreateClientCheckoutSessionMutation,
   useGetClientOrderDetailQuery,
   useRequestClientRevisionMutation,
+  useSubmitClientOrderReviewMutation,
   useSendClientResolutionMessageMutation,
 } from '@/store/services/apiSlice';
 import { useSocketNotifications } from '@/contexts/SocketContext';
@@ -28,7 +30,17 @@ type ClientOrder = {
   conversationId?: string | null;
   orderName: string;
   categoryName?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'accepting_delivery' | 'revision_requested' | 'under_revision' | 'completed';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'declined'
+    | 'accepting_delivery'
+    | 'revision_requested'
+    | 'under_revision'
+    | 'after_sell_revision_requested'
+    | 'under_after_sell_revision'
+    | 'done_after_sell_revision'
+    | 'completed';
   packagePrice: number;
   scheduledDate: string;
   scheduledTime: string;
@@ -44,6 +56,7 @@ type ClientOrder = {
     avatar: string;
     completedOrders?: number;
   };
+  paymentStatus?: 'unpaid' | 'pending' | 'paid' | 'failed';
 };
 
 const statusLabel = (status: ClientOrder['status']) => {
@@ -51,6 +64,9 @@ const statusLabel = (status: ClientOrder['status']) => {
   if (status === 'accepting_delivery') return 'Payment Pending';
   if (status === 'revision_requested') return 'Request Revision';
   if (status === 'under_revision') return 'Under Revision';
+  if (status === 'after_sell_revision_requested') return 'After-Sale Revision Requested';
+  if (status === 'under_after_sell_revision') return 'Under After-Sale Revision';
+  if (status === 'done_after_sell_revision') return 'Done After-Sale Revision';
   if (status === 'accepted') return 'In Progress';
   if (status === 'declined') return 'Cancelled';
   return 'Pending';
@@ -58,20 +74,25 @@ const statusLabel = (status: ClientOrder['status']) => {
 
 export default function OrderTrackingPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const orderIdOrNumber = typeof params?.id === 'string' ? params.id : '';
 
-  const [activeModal, setActiveModal] = useState<null | 'complete' | 'revision' | 'cancel'>(null);
+  const [activeModal, setActiveModal] = useState<null | 'complete' | 'review' | 'revision' | 'cancel'>(null);
+  const [revisionMode, setRevisionMode] = useState<'delivery' | 'after_sell'>('delivery');
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [revisionText, setRevisionText] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelText, setCancelText] = useState('');
+  const paymentHandledRef = useRef<string | null>(null);
   const { notifications } = useSocketNotifications();
   const lastHandledNotificationIdRef = useRef<string | null>(null);
 
   const { data, isLoading, refetch } = useGetClientOrderDetailQuery(orderIdOrNumber, { skip: !orderIdOrNumber });
-  const [finalizeOrder, { isLoading: isFinalizing }] = useFinalizeClientOrderMutation();
+  const [createCheckoutSession, { isLoading: isCreatingCheckout }] = useCreateClientCheckoutSessionMutation();
+  const [confirmCheckoutPayment, { isLoading: isConfirmingPayment }] = useConfirmClientCheckoutPaymentMutation();
+  const [submitOrderReview, { isLoading: isSubmittingReview }] = useSubmitClientOrderReviewMutation();
   const [requestRevision, { isLoading: isRequestingRevision }] = useRequestClientRevisionMutation();
   const [cancelRevision, { isLoading: isCancelingRevision }] = useCancelClientRevisionMutation();
   const [sendResolutionMessage, { isLoading: isSendingResolution }] = useSendClientResolutionMessageMutation();
@@ -84,6 +105,34 @@ export default function OrderTrackingPage() {
       ? `/messages?conversationId=${String(order.conversationId)}&orderId=${order.id}`
       : `/messages?orderId=${order.id}&user=${order.provider?.id || ''}`
     : '/messages';
+
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id') || searchParams.get('sessionId');
+    if (!sessionId || !order || paymentHandledRef.current === sessionId) return;
+
+    paymentHandledRef.current = sessionId;
+    confirmCheckoutPayment({
+      id: order.id,
+      sessionId,
+    })
+      .unwrap()
+      .then(async (response) => {
+        setRating(0);
+        setHoveredRating(0);
+        setReviewText('');
+        if (!response?.data?.order?.clientRating) {
+          setActiveModal('review');
+          toast.success('Payment completed. Please rate your provider.');
+        } else {
+          setActiveModal(null);
+          toast.success('Payment completed and order marked complete.');
+        }
+        await refetch();
+      })
+      .catch((error: any) => {
+        toast.error(error?.data?.message || 'Payment confirmation failed.');
+      });
+  }, [confirmCheckoutPayment, order, refetch, searchParams]);
 
   useEffect(() => {
     if (!notifications.length) return;
@@ -101,6 +150,13 @@ export default function OrderTrackingPage() {
       type === 'order_revision_accepted' ||
       type === 'order_revision_declined' ||
       type === 'order_revision_cancelled_self' ||
+      type === 'order_revision_requested' ||
+      type === 'order_revision_cancelled' ||
+      type === 'order_after_sell_revision_requested' ||
+      type === 'order_after_sell_revision_accepted' ||
+      type === 'order_after_sell_revision_declined' ||
+      type === 'order_after_sell_revision_cancelled' ||
+      type === 'order_after_sell_revision_completed' ||
       type === 'order_finalized';
 
     if (isSameOrder || isRelevantType) {
@@ -111,26 +167,58 @@ export default function OrderTrackingPage() {
 
   const handleCompleteOrder = async () => {
     if (!order) return;
-    if (rating === 0) return toast.error('Please select a rating.');
     if (order.status !== 'accepting_delivery') {
       toast.error('Delivery is not ready for finalization.');
       return;
     }
 
     try {
-      await finalizeOrder(order.id).unwrap();
+      const session = await createCheckoutSession({ id: order.id }).unwrap();
+      if (!session?.data?.checkoutUrl && !session?.data?.sessionId) {
+        throw new Error('Stripe checkout session not created.');
+      }
+
       setActiveModal(null);
-      toast.success('Order marked as complete. Thank you for your review!');
-      await refetch();
+      toast.info('Redirecting to secure payment checkout...');
+      if (typeof window !== 'undefined') {
+        window.location.href = String(session.data.checkoutUrl || window.location.href);
+      }
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to complete order.');
     }
   };
 
+  const handleSubmitReview = async () => {
+    if (!order) return;
+    if (rating === 0) return toast.error('Please select a rating.');
+
+    try {
+      await submitOrderReview({
+        id: order.id,
+        rating,
+        review: reviewText.trim(),
+      }).unwrap();
+      setActiveModal(null);
+      setRating(0);
+      setHoveredRating(0);
+      setReviewText('');
+      toast.success('Thanks for your review.');
+      await refetch();
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to submit review.');
+    }
+  };
+
   const handleRequestRevision = () => {
     if (!revisionText) return toast.error('Please provide details for the revision.');
-    if (!order || order.status !== 'accepting_delivery') {
+    if (!order) return;
+    const mode = revisionMode;
+    if (revisionMode === 'delivery' && order.status !== 'accepting_delivery') {
       toast.error('Revision can be requested only when delivery is pending your approval.');
+      return;
+    }
+    if (revisionMode === 'after_sell' && !(order.status === 'completed' && order.paymentStatus === 'paid')) {
+      toast.error('After-sale revision can only be requested after payment is completed.');
       return;
     }
     requestRevision({ id: order.id, note: revisionText.trim() })
@@ -138,7 +226,8 @@ export default function OrderTrackingPage() {
       .then(async () => {
         setActiveModal(null);
         setRevisionText('');
-        toast.success('Revision request sent to the provider.');
+        setRevisionMode('delivery');
+        toast.success(mode === 'after_sell' ? 'After-sale revision request sent to the provider.' : 'Revision request sent to the provider.');
         await refetch();
       })
       .catch((error: any) => {
@@ -148,7 +237,7 @@ export default function OrderTrackingPage() {
 
   const handleCancelRevision = () => {
     if (!order) return;
-    if (!['revision_requested', 'under_revision'].includes(order.status)) {
+    if (!['revision_requested', 'under_revision', 'after_sell_revision_requested', 'under_after_sell_revision'].includes(order.status)) {
       toast.error('No active revision request to cancel.');
       return;
     }
@@ -157,7 +246,12 @@ export default function OrderTrackingPage() {
       .unwrap()
       .then(async () => {
         setActiveModal(null);
-      toast.success('Revision request cancelled. Order is back to delivery approval.');
+        setRevisionMode('delivery');
+        toast.success(
+          ['after_sell_revision_requested', 'under_after_sell_revision'].includes(order.status)
+            ? 'After-sale revision request cancelled.'
+            : 'Revision request cancelled. Order is back to delivery approval.'
+        );
         await refetch();
       })
       .catch((error: any) => {
@@ -183,6 +277,7 @@ export default function OrderTrackingPage() {
 
   const closeModal = () => {
     setActiveModal(null);
+    setRevisionMode('delivery');
   };
 
   if (isLoading || !order) {
@@ -307,7 +402,7 @@ export default function OrderTrackingPage() {
                         onClick={() => setActiveModal('complete')}
                         className="flex-1 h-16 bg-slate-900 hover:bg-black text-white font-black shadow-xl shadow-slate-900/20 transition-all"
                       >
-                        Approve & Mark Complete
+                        Approve and Make Payment
                       </Button>
                     </div>
                   </div>
@@ -345,19 +440,32 @@ export default function OrderTrackingPage() {
                       View Portfolio
                     </Button>
                   </Link>
+                  {(['completed', 'done_after_sell_revision'].includes(order.status) || order.paymentStatus === 'paid') &&
+                  !['after_sell_revision_requested', 'under_after_sell_revision'].includes(order.status) ? (
+                    <Button
+                      variant="outline"
+                      className="w-full h-12 rounded-2xl border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300 font-black transition-all"
+                      onClick={() => {
+                        setRevisionMode('after_sell');
+                        setActiveModal('revision');
+                      }}
+                    >
+                      Request After-Sale Revision
+                    </Button>
+                  ) : null}
                 </div>
               </div>
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#2286BE]/5 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl group-hover:bg-[#2286BE]/10 transition-colors" />
             </div>
 
-            {['revision_requested', 'under_revision'].includes(order.status) && (
+            {['revision_requested', 'under_revision', 'after_sell_revision_requested', 'under_after_sell_revision'].includes(order.status) && (
               <div className="bg-red-50/50 rounded-[2.5rem] p-8 border border-red-100 relative overflow-hidden">
                 <div className="relative z-10">
                   <h4 className="text-sm font-black text-red-900 mb-2 uppercase tracking-widest flex items-center">
                     <AlertTriangle size={14} className="mr-2 text-red-500" /> Resolution Center
                   </h4>
                   <p className="text-xs font-medium text-red-700/80 leading-relaxed mb-2">
-                    {order.status === 'under_revision'
+                    {order.status === 'under_revision' || order.status === 'under_after_sell_revision'
                       ? 'Your order is under revision. You can talk with provider or cancel revision request.'
                       : 'Revision request sent. You can talk with provider or cancel revision request.'}
                   </p>
@@ -408,7 +516,13 @@ export default function OrderTrackingPage() {
               <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
                   {activeModal === 'complete' && <><CheckCircle2 size={24} className="text-[#2286BE]" /> Complete Order</>}
-                  {activeModal === 'revision' && <><HelpCircle size={24} className="text-amber-500" /> Request Revision</>}
+                  {activeModal === 'review' && <><Star size={24} className="text-amber-500" /> Rate Your Provider</>}
+                  {activeModal === 'revision' && (
+                    <>
+                      <HelpCircle size={24} className="text-amber-500" />
+                      {revisionMode === 'after_sell' ? 'Request After-Sale Revision' : 'Request Revision'}
+                    </>
+                  )}
                   {activeModal === 'cancel' && <><AlertTriangle size={24} className="text-red-500" /> Cancel Revision Request</>}
                 </h2>
                 <button onClick={closeModal} className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 shadow-sm border border-slate-100 transition-colors">
@@ -418,6 +532,18 @@ export default function OrderTrackingPage() {
 
               <div className="p-8 overflow-y-auto">
                 {activeModal === 'complete' && (
+                  <div className="space-y-6">
+                    <p className="text-sm font-medium text-slate-500 leading-relaxed bg-[#2286BE]/5 p-4 rounded-2xl border border-[#2286BE]/10">
+                      You&apos;ll be sent to Stripe Checkout to complete payment securely. Once payment is successful,
+                      you&apos;ll return here and can rate your provider.
+                    </p>
+                    <Button onClick={handleCompleteOrder} disabled={isCreatingCheckout || isConfirmingPayment} className="w-full h-16 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0] font-black text-lg shadow-xl shadow-[#2286BE]/20">
+                      {isCreatingCheckout || isConfirmingPayment ? 'Processing Payment...' : 'Proceed to Payment'}
+                    </Button>
+                  </div>
+                )}
+
+                {activeModal === 'review' && (
                   <div className="space-y-6">
                     <div className="text-center mb-8">
                       <div className="flex justify-center gap-2 mb-4">
@@ -444,8 +570,8 @@ export default function OrderTrackingPage() {
                       value={reviewText}
                       onChange={(e) => setReviewText(e.target.value)}
                     />
-                    <Button onClick={handleCompleteOrder} disabled={isFinalizing} className="w-full h-16 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0] font-black text-lg shadow-xl shadow-[#2286BE]/20">
-                      {isFinalizing ? 'Submitting...' : 'Submit & Release Funds'}
+                    <Button onClick={handleSubmitReview} disabled={isSubmittingReview} className="w-full h-16 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0] font-black text-lg shadow-xl shadow-[#2286BE]/20">
+                      {isSubmittingReview ? 'Submitting Review...' : 'Submit Review'}
                     </Button>
                   </div>
                 )}
@@ -453,10 +579,16 @@ export default function OrderTrackingPage() {
                 {activeModal === 'revision' && (
                   <div className="space-y-6">
                     <p className="text-sm font-medium text-slate-500 leading-relaxed bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                      Describe what you&apos;d like to change. Be as specific as possible to help the provider meet your expectations.
+                      {revisionMode === 'after_sell'
+                        ? 'Describe the change you want after the order has already been completed. Be specific so the provider can respond quickly.'
+                        : 'Describe what you&apos;d like to change. Be as specific as possible to help the provider meet your expectations.'}
                     </p>
                     <textarea
-                      placeholder="e.g., I need the kitchen tiles to be cleaned again, there are still some stains..."
+                      placeholder={
+                        revisionMode === 'after_sell'
+                          ? 'e.g., Please adjust the final work area and revisit the wall paint finish...'
+                          : 'e.g., I need the kitchen tiles to be cleaned again, there are still some stains...'
+                      }
                       className="w-full h-40 p-6 rounded-3xl bg-slate-50 border-none focus:ring-2 focus:ring-amber-500 font-medium resize-none shadow-inner"
                       value={revisionText}
                       onChange={(e) => setRevisionText(e.target.value)}
@@ -466,7 +598,11 @@ export default function OrderTrackingPage() {
                       disabled={isRequestingRevision}
                       className="w-full h-16 rounded-2xl bg-amber-500 hover:bg-amber-600 font-black text-lg shadow-xl shadow-amber-500/20"
                     >
-                      {isRequestingRevision ? 'Sending...' : 'Send Revision Request'}
+                      {isRequestingRevision
+                        ? 'Sending...'
+                        : revisionMode === 'after_sell'
+                          ? 'Send After-Sale Revision'
+                          : 'Send Revision Request'}
                     </Button>
                   </div>
                 )}

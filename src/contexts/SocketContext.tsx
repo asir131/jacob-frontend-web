@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
@@ -24,10 +24,17 @@ type SocketContextValue = {
 const SocketContext = createContext<SocketContextValue | undefined>(undefined);
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, updateProfile } = useAuth();
+  const { isAuthenticated, updateProfile, user } = useAuth();
   const dispatch = useAppDispatch();
   const notifications = useAppSelector((state) => state.notifications.items);
   const socketConnected = useAppSelector((state) => state.notifications.socketConnected);
+  const walletBalanceRef = useRef(0);
+  const totalEarningsRef = useRef(0);
+
+  useEffect(() => {
+    walletBalanceRef.current = Number(user?.walletBalance || 0);
+    totalEarningsRef.current = Number(user?.totalEarnings || 0);
+  }, [user?.totalEarnings, user?.walletBalance]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -83,6 +90,15 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
             reviewedAt: normalized.createdAt,
           },
         });
+      }
+      if (notificationData.notificationType === 'order_paid') {
+        const earnings = Number((notificationData as { providerEarningsAmount?: number }).providerEarningsAmount || 0);
+        if (earnings > 0) {
+          updateProfile({
+            walletBalance: walletBalanceRef.current + earnings,
+            totalEarnings: totalEarningsRef.current + earnings,
+          });
+        }
       }
       toast.info(normalized.title, {
         description: normalized.description,
