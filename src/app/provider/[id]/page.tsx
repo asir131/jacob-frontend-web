@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ReviewFilter from '@/components/ui/ReviewFilter';
+import { formatRating } from '@/lib/formatters';
 
 export default function ProviderPublicProfile() {
   const { id } = useParams();
@@ -121,7 +122,7 @@ export default function ProviderPublicProfile() {
                   <p className="text-slate-500 font-medium text-lg mb-4 italic">&quot;Professional {providerServices[0]?.category} Expert delivering top-tier results.&quot;</p>
                   
                   <div className="flex flex-wrap gap-6 items-center text-sm font-bold text-slate-600">
-                    <div className="flex items-center gap-1.5"><Star size={18} className="text-amber-400 fill-amber-400" /> {provider.rating} <span className="text-slate-400 font-medium">({provider.completedOrders} orders)</span></div>
+                    <div className="flex items-center gap-1.5"><Star size={18} className="text-amber-400 fill-amber-400" /> {formatRating(provider.rating)} <span className="text-slate-400 font-medium">({provider.completedOrders} orders)</span></div>
                     <div className="flex items-center gap-1.5"><MapPin size={18} className="text-slate-400" /> New York, NY</div>
                     <div className="flex items-center gap-1.5"><Clock size={18} className="text-slate-400" /> Avg. response 1hr</div>
                   </div>
@@ -145,7 +146,7 @@ export default function ProviderPublicProfile() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8">
                 {[
                   { label: 'Completed', value: provider.completedOrders, icon: <CheckCircle2 size={16} className="text-green-500" /> },
-                  { label: 'Rating', value: `${provider.rating}/5.0`, icon: <Star size={16} className="text-amber-400" /> },
+                  { label: 'Rating', value: formatRating(provider.rating), icon: <Star size={16} className="text-amber-400" /> },
                   { label: 'Level', value: `#${provider.level.split(' ')[1] || '1'}`, icon: <Award size={16} className="text-purple-500" /> },
                   { label: 'Recommends', value: '98%', icon: <ThumbsUp size={16} className="text-blue-500" /> },
                 ].map((stat, i) => (
@@ -198,7 +199,7 @@ export default function ProviderPublicProfile() {
                     <div className="p-6">
                       <h3 className="font-black text-slate-900 group-hover:text-[#2286BE] transition-colors line-clamp-2 leading-snug mb-4">{service.title}</h3>
                       <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-1.5"><Star size={14} className="text-amber-400 fill-amber-400" /> <span className="font-black text-slate-900 text-xs">{service.provider.rating}</span></div>
+                         <div className="flex items-center gap-1.5"><Star size={14} className="text-amber-400 fill-amber-400" /> <span className="font-black text-slate-900 text-xs">{formatRating(service.provider.rating)}</span></div>
                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{service.category}</div>
                       </div>
                     </div>

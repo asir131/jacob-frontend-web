@@ -16,6 +16,7 @@ import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthModal from '@/components/ui/AuthModal';
 import { useGetCategoriesQuery } from '@/store/services/apiSlice';
+import { formatRating } from '@/lib/formatters';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
 const item = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
@@ -302,7 +303,7 @@ export default function CategoryClient({ slug }: { slug: string }) {
                             </div>
                             <h3 className="font-black text-slate-900 group-hover:text-[#2286BE] transition-colors line-clamp-2 leading-snug mb-4">{service.title}</h3>
                             <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
-                              <div className="flex items-center gap-1.5"><Star size={14} className="text-amber-400 fill-amber-400" /><span className="font-black text-slate-900 text-xs">{service.provider.rating}</span><span className="text-slate-400 font-bold text-[9px]">({service.provider.completedOrders})</span></div>
+                              <div className="flex items-center gap-1.5"><Star size={14} className="text-amber-400 fill-amber-400" /><span className="font-black text-slate-900 text-xs">{formatRating(service.provider.rating)}</span><span className="text-slate-400 font-bold text-[9px]">({service.provider.completedOrders})</span></div>
                               <div className="flex items-center text-[9px] font-black text-[#2286BE] uppercase tracking-widest bg-[#2286BE]/5 px-2 py-1 rounded-full"><MapPin size={10} className="mr-1" /> {service.distance}km</div>
                             </div>
                           </div>

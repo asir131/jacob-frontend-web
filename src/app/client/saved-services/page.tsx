@@ -9,6 +9,7 @@ import { MOCK_SERVICES } from '@/data/mock-services';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { formatRating } from '@/lib/formatters';
 
 export default function SavedServicesPage() {
   // Mocking saved services (usually from a backend/state)
@@ -102,7 +103,7 @@ export default function SavedServicesPage() {
                     <div className="flex items-center justify-between mb-8">
                        <div className="flex items-center gap-1.5">
                           <Star size={18} className="text-amber-400 fill-amber-400" />
-                          <span className="font-black text-slate-900">{service.provider.rating}</span>
+                          <span className="font-black text-slate-900">{formatRating(service.provider.rating)}</span>
                        </div>
                        <div className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">
                           <MapPin size={12} className="text-[#2286BE]" /> {service.location.city}

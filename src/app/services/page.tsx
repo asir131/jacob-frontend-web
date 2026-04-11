@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useGetCategoriesQuery, useGetPublicServicesQuery } from '@/store/services/apiSlice';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
+import { formatRating } from '@/lib/formatters';
 
 type ServiceCard = {
   id: string;
@@ -26,6 +27,8 @@ type ServiceCard = {
     id: string;
     name: string;
     avatar: string;
+    rating?: number;
+    level?: 'Top Rated' | 'Level 3' | 'Level 2' | 'Level 1' | 'New';
   };
 };
 
@@ -112,8 +115,10 @@ export default function BrowseServicesPage() {
     return rawItems.filter((service) => {
       const staticMeta = getStaticMetaById(service.id);
       if (providerTypes.length > 0 && !providerTypes.includes(staticMeta.expertType)) return false;
-      if (selectedLevels.length > 0 && !selectedLevels.includes(staticMeta.sellerLevel)) return false;
-      if (minRating > 0 && staticMeta.rating < minRating) return false;
+      const providerLevel = service.provider?.level || 'New';
+      if (selectedLevels.length > 0 && !selectedLevels.includes(providerLevel)) return false;
+      const providerRating = Number(service.provider?.rating) || staticMeta.rating;
+      if (minRating > 0 && providerRating < minRating) return false;
       return true;
     });
   }, [minRating, providerTypes, rawItems, selectedLevels]);
@@ -324,6 +329,8 @@ export default function BrowseServicesPage() {
               <div className="grid gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                 {availableServices.map((service) => {
                   const staticMeta = getStaticMetaById(service.id);
+                  const providerRating = Number(service.provider?.rating) || staticMeta.rating;
+                  const providerLevel = service.provider?.level || 'New';
                   return (
                     <Link key={service.id} href={`/services/${service.id}`} className="group block h-full">
                       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all duration-500 h-full flex flex-col">
@@ -357,7 +364,7 @@ export default function BrowseServicesPage() {
                               {service.provider.name}
                             </span>
                             <span className="ml-auto text-[9px] font-black uppercase rounded-md bg-slate-100 px-2 py-1 text-slate-500">
-                              {staticMeta.sellerLevel}
+                              {providerLevel}
                             </span>
                           </div>
 
@@ -376,7 +383,7 @@ export default function BrowseServicesPage() {
                             <div className="flex items-center gap-1.5">
                               <Star size={16} className="text-amber-400 fill-amber-400" />
                               <span className="font-black text-slate-900 text-sm">
-                                {staticMeta.rating.toFixed(1)}
+                                {formatRating(providerRating)}
                               </span>
                             </div>
                           </div>

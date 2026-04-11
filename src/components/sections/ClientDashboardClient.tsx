@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle2, MapPin, Bell, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BRAND } from '@/lib/constants';
+import { formatRating } from '@/lib/formatters';
 import {
   useGetClientDashboardQuery,
   useGetPublicServicesQuery,
@@ -394,7 +395,7 @@ export default function ClientDashboardClient() {
                           <h4 className="font-bold text-slate-800 text-sm line-clamp-1 group-hover:text-[#2286BE] transition-colors">{svc.title}</h4>
                           <div className="flex items-center mt-1.5">
                              <Star size={12} className="text-amber-400 fill-amber-400 mr-1" />
-                             <span className="text-[12px] font-bold text-slate-700">{staticMeta.rating.toFixed(1)}</span>
+                             <span className="text-[12px] font-bold text-slate-700">{formatRating(staticMeta.rating)}</span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight flex items-center">

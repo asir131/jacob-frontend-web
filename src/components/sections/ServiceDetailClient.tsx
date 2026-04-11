@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { BRAND } from '@/lib/constants';
+import { formatRating } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { Copy, Facebook, Twitter, Linkedin, X } from 'lucide-react';
 import ReviewFilter from '@/components/ui/ReviewFilter';
@@ -129,7 +130,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                  <Badge className="bg-[#2286BE]/10 text-[#2286BE] border-none font-black text-[10px] px-3 py-1 uppercase tracking-widest">{service.category}</Badge>
                  <div className="flex items-center">
                     <Star size={14} className="text-amber-400 fill-amber-400 mr-1.5" />
-                    <span className="font-black text-slate-900 text-sm">{service.provider.rating}</span>
+                    <span className="font-black text-slate-900 text-sm">{formatRating(service.provider.rating)}</span>
                  </div>
               </div>
               <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.05] mb-8">
@@ -372,7 +373,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                         }`}>
                           {service.provider.type || 'Solo'}
                         </Badge>
-                        <div className="flex items-center text-amber-400"><Star fill="currentColor" size={14}/> <span className="text-slate-900 font-black ml-1 text-xs">{service.provider.rating}</span></div>
+                        <div className="flex items-center text-amber-400"><Star fill="currentColor" size={14}/> <span className="text-slate-900 font-black ml-1 text-xs">{formatRating(service.provider.rating)}</span></div>
                      </div>
                    </div>
                 </div>
