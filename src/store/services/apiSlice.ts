@@ -85,6 +85,22 @@ type ProviderDashboardResponse = {
   pendingRequests?: Array<Record<string, unknown>>;
 };
 
+type ClientDashboardResponse = {
+  orders?: {
+    totalOrders?: number;
+    activeOrders?: number;
+    pendingOrders?: number;
+    inProgressOrders?: number;
+    underReviewOrders?: number;
+    completedOrders?: number;
+    completionRate?: number;
+  };
+  inbox?: {
+    unreadMessages?: number;
+  };
+  recentOrders?: Array<Record<string, unknown>>;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiSlice = createApi({
@@ -183,6 +199,10 @@ export const apiSlice = createApi({
     getProviderDashboard: builder.query<ApiEnvelope<ProviderDashboardResponse>, void>({
       query: () => '/api/orders/provider/dashboard',
       providesTags: ['Orders', 'Profile'],
+    }),
+    getClientDashboard: builder.query<ApiEnvelope<ClientDashboardResponse>, void>({
+      query: () => '/api/orders/client/dashboard',
+      providesTags: ['Orders', 'Chats', 'Profile'],
     }),
     getClientOrders: builder.query<
       ApiEnvelope<{
@@ -470,6 +490,7 @@ export const {
   useCreateOrderMutation,
   useGetProviderOrdersQuery,
   useGetProviderDashboardQuery,
+  useGetClientDashboardQuery,
   useGetClientOrdersQuery,
   useGetClientOrderDetailQuery,
   useGetProviderOrderDetailQuery,
