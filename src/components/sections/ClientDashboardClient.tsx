@@ -49,13 +49,13 @@ type NearbyServiceCard = {
     id: string;
     name: string;
     avatar: string;
+    rating: number;
   };
 };
 
 type StaticServiceMeta = {
   expertType: 'Solo' | 'Team' | 'Agency';
   sellerLevel: 'Top Rated' | 'Level 3' | 'Level 2' | 'Level 1' | 'New';
-  rating: number;
 };
 
 const container = {
@@ -81,7 +81,6 @@ const getStaticMetaById = (id: string): StaticServiceMeta => {
   return {
     expertType: EXPERT_TYPES[value % EXPERT_TYPES.length],
     sellerLevel: SELLER_LEVELS[value % SELLER_LEVELS.length],
-    rating: 4 + ((value % 10) / 10),
   };
 };
 
@@ -119,6 +118,7 @@ const buildNearbyServiceCards = (items: unknown[]): NearbyServiceCard[] => {
           id: String((service.provider as Record<string, unknown>)?.id || ''),
           name: String((service.provider as Record<string, unknown>)?.name || 'Provider'),
           avatar: String((service.provider as Record<string, unknown>)?.avatar || ''),
+          rating: Number((service.provider as Record<string, unknown>)?.rating || 0),
         },
       };
     })
@@ -264,17 +264,29 @@ export default function ClientDashboardClient() {
            </motion.div>
 
            <motion.div variants={item}>
-             <Card className="border-none shadow-lg shadow-[#2286BE]/10 bg-gradient-to-br from-[#2286BE] to-[#1b6da0] text-white group hover:scale-[1.02] transition-transform duration-300">
-               <CardHeader className="py-5 pb-2">
-                 <CardTitle className="text-[12px] font-bold text-blue-100 uppercase tracking-widest flex items-center">
-                    <Bell size={14} className="mr-2 animate-bounce"/> Inbox
+             <Link href="/messages" className="block">
+               <Card
+                 className={`border-none group hover:scale-[1.02] transition-transform duration-300 ${
+                   inboxCount > 0
+                     ? 'shadow-lg shadow-[#2286BE]/10 bg-gradient-to-br from-[#2286BE] to-[#1b6da0] text-white'
+                     : 'bg-white text-slate-900 shadow-md shadow-slate-200/50'
+                 }`}
+               >
+                 <CardHeader className="py-5 pb-2">
+                   <CardTitle
+                     className={`text-[12px] font-bold uppercase tracking-widest flex items-center ${
+                       inboxCount > 0 ? 'text-blue-100' : 'text-slate-400'
+                     }`}
+                   >
+                      <Bell size={14} className={`mr-2 ${inboxCount > 0 ? 'animate-bounce' : 'text-[#2286BE]'}`} /> Inbox
                  </CardTitle>
                </CardHeader>
                <CardContent className="pb-6">
                  <div className="text-4xl font-black">{isDashboardLoading || isServicesLoading ? '0' : inboxCount}</div>
-                 <p className="text-xs text-blue-100 font-medium mt-2">New messages from providers</p>
+                 <p className={`text-xs font-medium mt-2 ${inboxCount > 0 ? 'text-blue-100' : 'text-slate-500'}`}>New messages from providers</p>
                </CardContent>
              </Card>
+             </Link>
            </motion.div>
         </motion.div>
 
@@ -379,7 +391,6 @@ export default function ClientDashboardClient() {
               </h2>
               <div className="space-y-4">
                  {nearbyServices.length > 0 ? nearbyServices.map((svc) => {
-                   const staticMeta = getStaticMetaById(svc.id);
                    return (
                      <Link href={`/services/${svc.id}`} key={svc.id}>
                      <motion.div
@@ -395,7 +406,7 @@ export default function ClientDashboardClient() {
                           <h4 className="font-bold text-slate-800 text-sm line-clamp-1 group-hover:text-[#2286BE] transition-colors">{svc.title}</h4>
                           <div className="flex items-center mt-1.5">
                              <Star size={12} className="text-amber-400 fill-amber-400 mr-1" />
-                             <span className="text-[12px] font-bold text-slate-700">{formatRating(staticMeta.rating)}</span>
+                             <span className="text-[12px] font-bold text-slate-700">{formatRating(Number(svc.provider.rating || 0))}</span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight flex items-center">

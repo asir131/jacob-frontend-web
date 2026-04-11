@@ -29,6 +29,7 @@ type ServiceCard = {
     avatar: string;
     rating?: number;
     level?: 'Top Rated' | 'Level 3' | 'Level 2' | 'Level 1' | 'New';
+    sellerLevel?: 'Top Rated' | 'Level 3' | 'Level 2' | 'Level 1' | 'New';
   };
 };
 
@@ -115,7 +116,7 @@ export default function BrowseServicesPage() {
     return rawItems.filter((service) => {
       const staticMeta = getStaticMetaById(service.id);
       if (providerTypes.length > 0 && !providerTypes.includes(staticMeta.expertType)) return false;
-      const providerLevel = service.provider?.level || 'New';
+      const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
       if (selectedLevels.length > 0 && !selectedLevels.includes(providerLevel)) return false;
       const providerRating = Number(service.provider?.rating) || staticMeta.rating;
       if (minRating > 0 && providerRating < minRating) return false;
@@ -330,7 +331,7 @@ export default function BrowseServicesPage() {
                 {availableServices.map((service) => {
                   const staticMeta = getStaticMetaById(service.id);
                   const providerRating = Number(service.provider?.rating) || staticMeta.rating;
-                  const providerLevel = service.provider?.level || 'New';
+                  const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
                   return (
                     <Link key={service.id} href={`/services/${service.id}`} className="group block h-full">
                       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all duration-500 h-full flex flex-col">

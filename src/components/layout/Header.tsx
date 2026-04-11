@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -48,12 +48,19 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
-    { name: 'Services', href: '/services' },
-    { name: 'Categories', href: '/categories' },
-    { name: 'Join as Pro', href: '/join-provider' },
-    { name: 'Success Stories', href: '/success-stories' },
-  ];
+  const navLinks = useMemo(() => {
+    const baseLinks =
+      role === 'provider'
+        ? [{ name: 'Requested Orders', href: '/provider/requests' }]
+        : [{ name: 'Services', href: '/services' }];
+
+    return [
+      ...baseLinks,
+      { name: 'Categories', href: '/categories' },
+      { name: 'Join as Pro', href: '/join-provider' },
+      { name: 'Success Stories', href: '/success-stories' },
+    ];
+  }, [role]);
 
   const isActive = (href: string) => pathname === href;
 

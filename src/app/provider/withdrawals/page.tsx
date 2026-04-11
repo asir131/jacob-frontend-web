@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { ArrowLeft, DollarSign, Clock, CheckCircle2, AlertCircle, History, Walle
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useGetMyWithdrawalsQuery, useRequestWithdrawalMutation } from '@/store/services/apiSlice';
+import { useSocketNotifications } from '@/contexts/SocketContext';
 
 type WithdrawalItem = {
   id: string;
@@ -22,17 +23,45 @@ type WithdrawalItem = {
 export default function ProviderWithdrawalsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 8;
+  const { notifications } = useSocketNotifications();
 
-  const { data, isLoading, refetch } = useGetMyWithdrawalsQuery();
+  const { data, isLoading, refetch } = useGetMyWithdrawalsQuery({ page, limit, status: 'all' });
   const [requestWithdrawal, { isLoading: isRequesting }] = useRequestWithdrawalMutation();
 
   const balance = data?.data?.balance;
   const withdrawals = useMemo(() => ((data?.data?.withdrawals || []) as WithdrawalItem[]).filter(Boolean), [data]);
+  const pagination = data?.data?.pagination || {
+    page: 1,
+    limit,
+    totalItems: 0,
+    totalPages: 1,
+    hasPrevPage: false,
+    hasNextPage: false,
+  };
 
   const availableBalance = Number(balance?.availableBalance || 0);
   const pendingWithdrawalAmount = Number(balance?.pendingWithdrawalAmount || 0);
   const totalEarnings = Number(balance?.totalEarnings || 0);
   const totalWithdrawn = Number(balance?.totalWithdrawn || 0);
+
+  const latestWithdrawalNotification = useMemo(() => {
+    return notifications.find((notification) => {
+      const notificationType = String(notification.data?.notificationType || '');
+      return (
+        notificationType === 'withdrawal_request_created' ||
+        notificationType === 'withdrawal_request_approved' ||
+        notificationType === 'withdrawal_request_rejected' ||
+        notificationType === 'withdrawal_paid'
+      );
+    });
+  }, [notifications]);
+
+  useEffect(() => {
+    if (!latestWithdrawalNotification) return;
+    void refetch();
+  }, [latestWithdrawalNotification, refetch]);
 
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +82,7 @@ export default function ProviderWithdrawalsPage() {
       setIsModalOpen(false);
       setWithdrawAmount('');
       toast.success('Withdrawal request submitted! Admin will review it shortly.');
+      setPage(1);
       await refetch();
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to submit withdrawal request.');
@@ -170,7 +200,7 @@ export default function ProviderWithdrawalsPage() {
                                     : 'bg-amber-50 text-amber-600'
                             }`}
                           >
-                            {tx.status}
+                            {tx.status === 'approved' ? 'approved' : tx.status}
                           </Badge>
                         </td>
                       </tr>
@@ -187,6 +217,32 @@ export default function ProviderWithdrawalsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <div className="h-28" />
+
+        <div className="fixed bottom-8 left-1/2 z-40 -translate-x-1/2">
+          <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
+            <Button
+              variant="outline"
+              disabled={!pagination.hasPrevPage}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              className="rounded-xl"
+            >
+              Previous
+            </Button>
+            <div className="rounded-xl bg-white px-4 py-2 text-sm font-black text-slate-700 border border-slate-200">
+              {pagination.page}/{pagination.totalPages}
+            </div>
+            <Button
+              variant="outline"
+              disabled={!pagination.hasNextPage}
+              onClick={() => setPage((prev) => prev + 1)}
+              className="rounded-xl"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
 
         <AnimatePresence>
           {isModalOpen && (

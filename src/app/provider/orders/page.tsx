@@ -40,6 +40,7 @@ type ProviderOrder = {
   serviceAddress: string;
   scheduledDate: string;
   scheduledTime: string;
+  isRequestedOrder?: boolean;
   client: {
     id: string;
     name: string;
@@ -204,19 +205,24 @@ export default function ProviderOrdersPage() {
               {orders.map((order) => (
                 <motion.div key={order.id} variants={itemVariants} className="h-full">
                   <Card className="border-none shadow-sm hover:shadow-xl hover:shadow-[#2286BE]/10 transition-all duration-500 rounded-[2.5rem] bg-white h-full flex flex-col overflow-hidden border border-slate-50">
-                    <div className="p-8 border-b border-slate-50 flex justify-between items-start gap-3">
-                      <div className="flex gap-4 min-w-0 flex-1">
-                        <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                      <div className="p-8 border-b border-slate-50 flex justify-between items-start gap-3">
+                        <div className="flex gap-4 min-w-0 flex-1">
+                          <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-1 ring-slate-100">
                           {order.client.avatar ? <AvatarImage src={order.client.avatar} alt={order.client.name} /> : null}
                           <AvatarFallback className="bg-slate-100 text-slate-500">
                             <User size={16} />
                           </AvatarFallback>
                         </Avatar>
-                        <div className="min-w-0">
-                          <p className="font-black text-slate-900 text-sm tracking-tight truncate">{order.client.name || 'Client'}</p>
-                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest truncate">{order.orderNumber || order.id}</p>
+                          <div className="min-w-0">
+                            <p className="font-black text-slate-900 text-sm tracking-tight truncate">{order.client.name || 'Client'}</p>
+                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest truncate">{order.orderNumber || order.id}</p>
+                            {order.isRequestedOrder && (
+                              <p className="mt-2 inline-flex w-fit rounded-full bg-[#2286BE]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#2286BE]">
+                                Requested Order
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
                       <Badge
                         className={`
                           px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border-none whitespace-nowrap shrink-0

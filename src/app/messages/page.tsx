@@ -22,6 +22,8 @@ import {
   useEnsureConversationByOrderMutation,
   useGetConversationMessagesQuery,
   useGetConversationsQuery,
+  useMarkAllMessagesAsReadMutation,
+  useMarkConversationMessagesAsReadMutation,
   useSendConversationMessageMutation,
 } from '@/store/services/apiSlice';
 
@@ -68,6 +70,8 @@ export default function MessagesPage() {
   const { data: conversationResponse, refetch: refetchConversations } = useGetConversationsQuery();
   const [ensureConversationByOrder] = useEnsureConversationByOrderMutation();
   const [sendConversationMessage, { isLoading: isSending }] = useSendConversationMessageMutation();
+  const [markAllMessagesAsRead] = useMarkAllMessagesAsReadMutation();
+  const [markConversationMessagesAsRead] = useMarkConversationMessagesAsReadMutation();
 
   const conversations = useMemo(
     () => ((conversationResponse?.data || []) as Conversation[]).filter((item) => item?.id),
@@ -148,6 +152,19 @@ export default function MessagesPage() {
       active = false;
     };
   }, [orderIdParam, ensureConversationByOrder, refetchConversations, refetchMessages]);
+
+  useEffect(() => {
+    void markAllMessagesAsRead().unwrap().then(() => {
+      refetchConversations();
+    });
+  }, [markAllMessagesAsRead, refetchConversations]);
+
+  useEffect(() => {
+    if (!selectedConversationId) return;
+    void markConversationMessagesAsRead(selectedConversationId).unwrap().then(() => {
+      refetchConversations();
+    });
+  }, [markConversationMessagesAsRead, refetchConversations, selectedConversationId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

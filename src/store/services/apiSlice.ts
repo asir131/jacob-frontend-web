@@ -42,6 +42,24 @@ type CreateOrderPayload = {
   specialInstructions?: string;
 };
 
+type ServiceRequestPayload = {
+  categorySlug: string;
+  categoryName: string;
+  serviceAddress: string;
+  description: string;
+  preferredDate?: string;
+  preferredTime: string;
+  budget: number;
+};
+
+type ServiceRequestQuery = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  radiusKm?: number;
+};
+
 type ProviderOrdersQuery = {
   page?: number;
   limit?: number;
@@ -101,6 +119,15 @@ type ClientDashboardResponse = {
   recentOrders?: Array<Record<string, unknown>>;
 };
 
+type ServiceRequestPagination = {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiSlice = createApi({
@@ -117,7 +144,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats'],
+  tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats', 'ServiceRequests'],
   endpoints: (builder) => ({
     getCategories: builder.query<ApiEnvelope<unknown[]>, void>({
       query: () => '/api/categories',
@@ -171,6 +198,62 @@ export const apiSlice = createApi({
         body: payload,
       }),
       invalidatesTags: ['Orders'],
+    }),
+    createServiceRequest: builder.mutation<ApiEnvelope<{ request?: Record<string, unknown> }>, FormData>({
+      query: (formData) => ({
+        url: '/api/service-requests',
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: ['ServiceRequests', 'Orders'],
+    }),
+    getClientServiceRequests: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        pagination?: ServiceRequestPagination;
+      }>,
+      ServiceRequestQuery
+    >({
+      query: ({ page = 1, limit = 6, search = '', status = 'all' }) => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+        params.set('status', status || 'all');
+        if (search.trim()) params.set('search', search.trim());
+        return `/api/service-requests/client?${params.toString()}`;
+      },
+      providesTags: ['ServiceRequests'],
+    }),
+    getProviderServiceRequests: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        pagination?: ServiceRequestPagination;
+      }>,
+      ServiceRequestQuery
+    >({
+      query: ({ page = 1, limit = 6, search = '', radiusKm = 30 }) => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+        params.set('radiusKm', String(radiusKm));
+        if (search.trim()) params.set('search', search.trim());
+        return `/api/service-requests/provider?${params.toString()}`;
+      },
+      providesTags: ['ServiceRequests'],
+    }),
+    acceptServiceRequest: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/service-requests/provider/${id}/accept`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['ServiceRequests', 'Orders'],
+    }),
+    ignoreServiceRequest: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/service-requests/provider/${id}/ignore`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['ServiceRequests'],
     }),
     getProviderOrders: builder.query<
       ApiEnvelope<{
@@ -332,10 +415,29 @@ export const apiSlice = createApi({
           totalWithdrawn?: number;
         };
         withdrawals?: Record<string, unknown>[];
+        pagination?: {
+          page: number;
+          limit: number;
+          totalItems: number;
+          totalPages: number;
+          hasNextPage: boolean;
+          hasPrevPage: boolean;
+        };
       }>,
-      void
+      { page?: number; limit?: number; status?: string } | void
     >({
-      query: () => '/api/withdrawals/me',
+      query: (args) => {
+        const params = new URLSearchParams();
+        if (args && typeof args === 'object') {
+          params.set('page', String(args.page ?? 1));
+          params.set('limit', String(args.limit ?? 8));
+          if (args.status) params.set('status', args.status);
+        } else {
+          params.set('page', '1');
+          params.set('limit', '8');
+        }
+        return `/api/withdrawals/me?${params.toString()}`;
+      },
       providesTags: ['Profile'],
     }),
     requestWithdrawal: builder.mutation<ApiEnvelope<unknown>, WithdrawalRequestPayload>({
@@ -396,6 +498,20 @@ export const apiSlice = createApi({
         body: { text },
       }),
       invalidatesTags: (_result, _error, arg) => [{ type: 'Chats', id: arg.conversationId }, 'Chats'],
+    }),
+    markConversationMessagesAsRead: builder.mutation<ApiEnvelope<{ modifiedCount?: number }>, string>({
+      query: (conversationId) => ({
+        url: `/api/chats/conversations/${conversationId}/read`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_result, _error, conversationId) => [{ type: 'Chats', id: conversationId }, 'Chats'],
+    }),
+    markAllMessagesAsRead: builder.mutation<ApiEnvelope<{ modifiedCount?: number }>, void>({
+      query: () => ({
+        url: '/api/chats/conversations/read-all',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Chats'],
     }),
     createGig: builder.mutation<ApiEnvelope<unknown>, FormData>({
       query: (formData) => ({
@@ -488,6 +604,11 @@ export const {
   useGetPublicServicesQuery,
   useGetPublicServiceByIdQuery,
   useCreateOrderMutation,
+  useCreateServiceRequestMutation,
+  useGetClientServiceRequestsQuery,
+  useGetProviderServiceRequestsQuery,
+  useAcceptServiceRequestMutation,
+  useIgnoreServiceRequestMutation,
   useGetProviderOrdersQuery,
   useGetProviderDashboardQuery,
   useGetClientDashboardQuery,
@@ -511,6 +632,8 @@ export const {
   useEnsureConversationByOrderMutation,
   useGetConversationMessagesQuery,
   useSendConversationMessageMutation,
+  useMarkConversationMessagesAsReadMutation,
+  useMarkAllMessagesAsReadMutation,
   useCreateGigMutation,
   useUpdateGigMutation,
   useDeleteGigMutation,
