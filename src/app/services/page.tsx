@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MapPin, Search, Star, Filter } from 'lucide-react';
@@ -65,6 +66,7 @@ const getLocationParts = (rawAddress: string, fallbackCity: string) => {
 };
 
 export default function BrowseServicesPage() {
+  const router = useRouter();
   const { city, coordinates, radius, setRadius } = useLocation();
   const { user } = useAuth();
 
@@ -355,15 +357,25 @@ export default function BrowseServicesPage() {
 
                         <div className="p-6 flex flex-col flex-1">
                           <div className="flex items-center gap-2 mb-4">
-                            <Avatar className="h-6 w-6 border border-slate-100 shadow-sm">
-                              <AvatarImage src={service.provider.avatar} />
-                              <AvatarFallback className="bg-[#2286BE]/10 text-[#2286BE] text-[8px] font-black">
-                                PRO
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs font-black text-slate-900 tracking-tight">
-                              {service.provider.name}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                router.push(`/provider/${service.provider.id}`);
+                              }}
+                              className="flex items-center gap-2 hover:underline accent-[#2286BE]"
+                            >
+                              <Avatar className="h-6 w-6 border border-slate-100 shadow-sm">
+                                <AvatarImage src={service.provider.avatar} />
+                                <AvatarFallback className="bg-[#2286BE]/10 text-[#2286BE] text-[8px] font-black">
+                                  PRO
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs font-black text-slate-900 tracking-tight">
+                                {service.provider.name}
+                              </span>
+                            </button>
                             <span className="ml-auto text-[9px] font-black uppercase rounded-md bg-slate-100 px-2 py-1 text-slate-500">
                               {providerLevel}
                             </span>

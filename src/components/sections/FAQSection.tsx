@@ -1,42 +1,67 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, Minus, MessageCircle, ArrowRight } from 'lucide-react';
 import { BRAND } from '@/lib/constants';
+import { useGetFaqsQuery } from '@/store/services/apiSlice';
 
 interface FAQItem {
-  id: number;
+  id: string;
   question: string;
   answer: string;
 }
 
 export default function FAQSection() {
-  const [openId, setOpenId] = useState<number | null>(1);
+  const { data } = useGetFaqsQuery(undefined, {
+    pollingInterval: 5000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+  const faqs = useMemo(
+    () =>
+      (((data?.data || []) as FAQItem[]).filter((item) => item?.question && item?.answer).map((item, index) => ({
+        id: String(item.id || index + 1),
+        question: item.question,
+        answer: item.answer,
+      })) as FAQItem[]),
+    [data]
+  );
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  const faqs: FAQItem[] = [
+  const fallbackFaqs: FAQItem[] = [
     {
-      id: 1,
+      id: '1',
       question: `What makes ${BRAND.name} different from other apps?`,
-      answer: "We focus on high-quality local results. Our platform allows you to save by booking optimized time slots and choosing high-rated local professionals in your area."
+      answer: "We focus on high-quality local results. Our platform allows you to save by booking optimized time slots and choosing high-rated local professionals in your area.",
     },
     {
-      id: 2,
+      id: '2',
       question: "Are the service professionals verified?",
-      answer: "Yes, every professional on our platform undergoes a rigorous 5-step verification process, including background checks, skill assessments, and reference verification from previous clients."
+      answer: "Yes, every professional on our platform undergoes a rigorous 5-step verification process, including background checks, skill assessments, and reference verification from previous clients.",
     },
     {
-      id: 3,
+      id: '3',
       question: "How do I save on costs?",
-      answer: "When you book a service, you can choose optimized time slots. Neighbors within your zip code who book at similar times help professionals save on travel, and those savings are passed to you."
+      answer: "When you book a service, you can choose optimized time slots. Neighbors within your zip code who book at similar times help professionals save on travel, and those savings are passed to you.",
     },
     {
-      id: 4,
+      id: '4',
       question: "What if I'm not satisfied with the service?",
-      answer: "We offer a 100% Satisfaction Guarantee. Payment is held in secure escrow and only released to the professional once you confirm the job is done right. If there's an issue, our support team steps in immediately."
-    }
+      answer: "We offer a 100% Satisfaction Guarantee. Payment is held in secure escrow and only released to the professional once you confirm the job is done right. If there's an issue, our support team steps in immediately.",
+    },
   ];
 
-  const toggleAccordion = (id: number) => {
+  const faqItems = faqs.length > 0 ? faqs : fallbackFaqs;
+
+  React.useEffect(() => {
+    if (!faqItems.length) {
+      setOpenId(null);
+      return;
+    }
+    setOpenId((prev) => (prev && faqItems.some((faq) => faq.id === prev) ? prev : faqItems[0].id));
+  }, [faqItems]);
+
+  const toggleAccordion = (id: string) => {
     setOpenId(openId === id ? null : id);
   };
 
@@ -63,7 +88,7 @@ export default function FAQSection() {
 
         {/* FAQ Accordion List */}
         <div className="space-y-4">
-          {faqs.map((faq) => (
+          {faqItems.map((faq) => (
             <div
               key={faq.id}
               className={`rounded-[24px] border-2 transition-all duration-300 ${

@@ -83,14 +83,14 @@ export default function SavedServicesPage() {
                        <Trash2 size={18} />
                     </button>
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/60 to-transparent p-6 pt-10">
-                       <div className="flex items-center gap-2">
+                       <Link href={`/provider/${service.provider.id}`} className="flex items-center gap-2 w-fit hover:opacity-90 transition-opacity">
                           <Avatar className="h-8 w-8 border-2 border-white/20">
                              <AvatarImage src={service.provider.avatar} />
                              <AvatarFallback className="bg-[#2286BE] text-white text-[10px] font-black">PRO</AvatarFallback>
                           </Avatar>
                           <span className="text-xs font-black text-white">{service.provider.name}</span>
                           {service.provider.badge === 'Verified' && <ShieldCheck size={14} className="text-[#2286BE]" />}
-                       </div>
+                       </Link>
                     </div>
                   </div>
 

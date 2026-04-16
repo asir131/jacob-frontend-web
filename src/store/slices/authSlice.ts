@@ -20,6 +20,9 @@ export interface AuthUser {
   serviceCity?: string;
   serviceLocationLat?: number;
   serviceLocationLng?: number;
+  averageRating?: number;
+  reviewCount?: number;
+  sellerLevel?: string;
   payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
   walletBalance?: number;
   totalEarnings?: number;

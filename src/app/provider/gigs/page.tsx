@@ -21,6 +21,7 @@ import {
   useDeleteGigMutation,
   useDeleteGigRequestMutation,
   useLazyGetMyGigsQuery,
+  useGetPublicProviderProfileQuery,
 } from '@/store/services/apiSlice';
 
 type GigPackage = {
@@ -78,7 +79,7 @@ const itemVariants = {
 };
 
 export default function ProviderGigsPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [activeTab, setActiveTab] = useState('published');
   const [publishedGigs, setPublishedGigs] = useState<MyGig[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
@@ -88,6 +89,9 @@ export default function ProviderGigsPage() {
   const [getMyGigs] = useLazyGetMyGigsQuery();
   const [deleteGig] = useDeleteGigMutation();
   const [deleteGigRequest] = useDeleteGigRequestMutation();
+  const { data: providerProfileData } = useGetPublicProviderProfileQuery(user?.id || '', {
+    skip: role !== 'provider' || !user?.id,
+  });
 
   const loadMyGigs = useCallback(async () => {
     try {
@@ -134,6 +138,11 @@ export default function ProviderGigsPage() {
     if (activeTab === 'pending') return pendingRequests.filter((gig) => gig.status === 'pending_approval');
     return publishedGigs.filter((gig) => gig.status === 'rejected' || gig.status === 'draft');
   }, [activeTab, pendingRequests, publishedGigs, visiblePublishedGigs]);
+
+  const providerRating = useMemo(() => {
+    const rating = Number(providerProfileData?.data?.provider?.rating ?? user?.averageRating ?? 0);
+    return Number.isFinite(rating) ? rating : 0;
+  }, [providerProfileData?.data?.provider?.rating, user?.averageRating]);
 
   const tabCounts = {
     published: visiblePublishedGigs.length,
@@ -301,9 +310,9 @@ export default function ProviderGigsPage() {
                           <div className="flex items-center gap-1.5">
                             <div className="flex items-center bg-amber-50 px-2 py-1 rounded-lg">
                               <Star size={14} className="text-amber-500 mr-1 fill-amber-500" />
-                              <span className="text-sm font-black text-amber-700">4.9</span>
+                              <span className="text-sm font-black text-amber-700">{providerRating.toFixed(2)}</span>
                             </div>
-                            <span className="text-xs font-bold text-slate-400">(demo)</span>
+                            <span className="text-xs font-bold text-slate-400">from your profile</span>
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Packages</p>

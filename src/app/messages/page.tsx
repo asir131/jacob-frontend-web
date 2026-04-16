@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io, Socket } from 'socket.io-client';
 import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, CheckCheck, Smile, User } from 'lucide-react';
@@ -20,6 +20,9 @@ import {
 import { toast } from 'sonner';
 import {
   useEnsureConversationByOrderMutation,
+  useClearConversationHistoryMutation,
+  useBlockConversationUserMutation,
+  useUnblockConversationUserMutation,
   useGetConversationMessagesQuery,
   useGetConversationsQuery,
   useMarkAllMessagesAsReadMutation,
@@ -33,6 +36,8 @@ type Conversation = {
   orderNumber?: string;
   orderName?: string;
   packageTitle?: string;
+  categoryName?: string;
+  blockedBy?: string | null;
   lastMessage?: string;
   lastMessageAt?: string;
   otherUser?: {
@@ -47,7 +52,56 @@ type ApiMessage = {
   conversationId: string;
   senderId: string;
   text: string;
+  attachments?: Array<{
+    url?: string;
+    fileName?: string;
+    mimeType?: string;
+    resourceType?: string;
+  }>;
   createdAt: string;
+};
+
+const EMOJI_OPTIONS = ['😀', '😂', '😍', '👍', '🙏', '🔥', '🎉', '❤️', '😢', '😎', '🤝', '💯'];
+
+type CallInvite = {
+  conversationId: string;
+  callType: 'voice' | 'video';
+  offer?: RTCSessionDescriptionInit;
+  senderId?: string;
+  senderName?: string;
+  senderAvatar?: string;
+};
+
+type CallSignal = {
+  conversationId: string;
+  targetUserId?: string;
+  signalType?: 'offer' | 'answer' | 'candidate';
+  signal?: RTCSessionDescriptionInit | RTCIceCandidateInit;
+  senderId?: string;
+};
+
+const createPeerConnection = () =>
+  new RTCPeerConnection({
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    ],
+  });
+
+const acquireCallMedia = async (callType: 'voice' | 'video') => {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: callType === 'video',
+    });
+  } catch (error) {
+    if (callType === 'video') {
+      return navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+    }
+    throw error;
+  }
 };
 
 export default function MessagesPage() {
@@ -60,16 +114,36 @@ export default function MessagesPage() {
   const [manualConversationId, setManualConversationId] = useState('');
   const [ensuredConversationId, setEnsuredConversationId] = useState('');
   const [newMessage, setNewMessage] = useState('');
+  const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
   const [activeCall, setActiveCall] = useState<'voice' | 'video' | null>(null);
   const [liveMessages, setLiveMessages] = useState<ApiMessage[]>([]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<CallInvite | null>(null);
+  const [callStatus, setCallStatus] = useState<'idle' | 'ringing' | 'connecting' | 'active'>('idle');
+  const [callError, setCallError] = useState('');
+  const [hasLocalStream, setHasLocalStream] = useState(false);
+  const [hasRemoteStream, setHasRemoteStream] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [callSeconds, setCallSeconds] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const messageInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const activeCallRef = useRef<{ conversationId: string; targetUserId: string; callType: 'voice' | 'video' } | null>(null);
 
   const { data: conversationResponse, refetch: refetchConversations } = useGetConversationsQuery();
   const [ensureConversationByOrder] = useEnsureConversationByOrderMutation();
   const [sendConversationMessage, { isLoading: isSending }] = useSendConversationMessageMutation();
+  const [clearConversationHistory] = useClearConversationHistoryMutation();
+  const [blockConversationUser] = useBlockConversationUserMutation();
+  const [unblockConversationUser] = useUnblockConversationUserMutation();
   const [markAllMessagesAsRead] = useMarkAllMessagesAsReadMutation();
   const [markConversationMessagesAsRead] = useMarkConversationMessagesAsReadMutation();
 
@@ -109,6 +183,7 @@ export default function MessagesPage() {
     const q = search.trim().toLowerCase();
     const list = conversations.map((conv) => ({
       id: conv.id,
+      otherUserId: conv.otherUser?.id || '',
       name: conv.otherUser?.name || 'User',
       avatar: conv.otherUser?.avatar || '',
       lastMessage: conv.lastMessage || 'No messages yet',
@@ -116,10 +191,12 @@ export default function MessagesPage() {
         ? new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : '',
       unread: 0,
-      online: true,
-      packageLabel: conv.packageTitle || conv.orderName || 'Package',
-      orderLabel: conv.orderNumber || '',
-    }));
+        online: true,
+        packageLabel: conv.packageTitle || conv.orderName || 'Package',
+        orderLabel: conv.orderNumber || '',
+        categoryLabel: conv.categoryName || conv.packageTitle || conv.orderName || 'Category',
+        blockedBy: conv.blockedBy || null,
+      }));
 
     if (!q) return list;
     return list.filter((c) => c.name.toLowerCase().includes(q) || c.lastMessage.toLowerCase().includes(q) || c.orderLabel.toLowerCase().includes(q));
@@ -129,6 +206,219 @@ export default function MessagesPage() {
     () => filteredContacts.find((c) => c.id === selectedConversationId) || filteredContacts[0] || null,
     [filteredContacts, selectedConversationId]
   );
+
+  const selectedConversation = useMemo(
+    () => conversations.find((conv) => conv.id === selectedConversationId) || null,
+    [conversations, selectedConversationId]
+  );
+
+  const blockedBy = selectedConversation?.blockedBy || null;
+  const isBlockedByMe = Boolean(blockedBy && String(blockedBy) === String(user?.id || ''));
+  const isBlockedByOther = Boolean(blockedBy && String(blockedBy) !== String(user?.id || ''));
+  const canSendMessage = !blockedBy;
+  const canSendCurrentMessage = canSendMessage && (Boolean(newMessage.trim()) || selectedAttachments.length > 0);
+  const attachmentPreviews = useMemo(
+    () => selectedAttachments.map((file) => (file.type.startsWith('image/') ? URL.createObjectURL(file) : '')),
+    [selectedAttachments]
+  );
+
+  const formatCallDuration = useCallback((totalSeconds: number) => {
+    const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const seconds = safeSeconds % 60;
+    if (hours > 0) {
+      return [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
+    }
+    return [minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
+  }, []);
+  const callDurationLabel = useMemo(() => formatCallDuration(callSeconds), [callSeconds, formatCallDuration]);
+
+  const cleanupCall = useCallback(
+    (shouldNotifyPeer = false) => {
+      const call = activeCallRef.current;
+      const socket = socketRef.current;
+      if (shouldNotifyPeer && call && socket) {
+        socket.emit('call:end', {
+          conversationId: call.conversationId,
+          targetUserId: call.targetUserId,
+          callType: call.callType,
+        });
+      }
+
+      peerRef.current?.getSenders().forEach((sender) => sender.track?.stop());
+      peerRef.current?.close();
+      peerRef.current = null;
+
+      localStreamRef.current?.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+      setHasLocalStream(false);
+      setHasRemoteStream(false);
+      setCallStartedAt(null);
+      setCallSeconds(0);
+
+      activeCallRef.current = null;
+      setActiveCall(null);
+      setIncomingCall(null);
+      setCallStatus('idle');
+      setCallError('');
+    },
+    []
+  );
+
+  const startCallSession = useCallback(
+    async (callType: 'voice' | 'video') => {
+      if (!selectedConversationId || !selectedContact?.id || !socketRef.current) {
+        toast.error('Select a conversation first.');
+        return;
+      }
+
+      try {
+        cleanupCall(false);
+        setCallStatus('connecting');
+        setCallError('');
+
+        const stream = await acquireCallMedia(callType);
+        localStreamRef.current = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        setHasLocalStream(true);
+
+        const peer = createPeerConnection();
+        peerRef.current = peer;
+        activeCallRef.current = {
+          conversationId: selectedConversationId,
+          targetUserId: selectedContact.otherUserId || '',
+          callType,
+        };
+        setActiveCall(callType);
+
+        stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+        peer.ontrack = (event) => {
+          const [remoteStream] = event.streams;
+          if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            setHasRemoteStream(true);
+          }
+        };
+
+        peer.onicecandidate = (event) => {
+          if (event.candidate && socketRef.current && activeCallRef.current) {
+            socketRef.current.emit('call:signal', {
+              conversationId: activeCallRef.current.conversationId,
+              targetUserId: activeCallRef.current.targetUserId,
+              signalType: 'candidate',
+              signal: event.candidate.toJSON(),
+              callType,
+            });
+          }
+        };
+
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+
+        socketRef.current.emit('call:invite', {
+          conversationId: selectedConversationId,
+          targetUserId: selectedContact.otherUserId || '',
+          callType,
+          offer,
+          senderName: user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User',
+          senderAvatar: user?.avatar || '',
+        } satisfies CallInvite);
+
+        setCallStatus('ringing');
+      } catch (error) {
+        console.error('Failed to start call:', error);
+        cleanupCall(false);
+        setCallError('Could not access your camera or microphone.');
+        toast.error('Could not start the call.');
+      }
+    },
+    [cleanupCall, selectedContact, selectedConversationId, user]
+  );
+
+  const acceptIncomingCall = useCallback(async () => {
+    if (!incomingCall || !socketRef.current) return;
+
+    try {
+      cleanupCall(false);
+      setCallStatus('connecting');
+      setCallError('');
+
+      const stream = await acquireCallMedia(incomingCall.callType);
+        localStreamRef.current = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        setHasLocalStream(true);
+
+      const peer = createPeerConnection();
+      peerRef.current = peer;
+      activeCallRef.current = {
+        conversationId: incomingCall.conversationId,
+        targetUserId: incomingCall.senderId || '',
+        callType: incomingCall.callType,
+      };
+      setActiveCall(incomingCall.callType);
+
+      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+        peer.ontrack = (event) => {
+          const [remoteStream] = event.streams;
+          if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            setHasRemoteStream(true);
+          }
+        };
+
+      peer.onicecandidate = (event) => {
+        if (event.candidate && socketRef.current && activeCallRef.current) {
+          socketRef.current.emit('call:signal', {
+            conversationId: activeCallRef.current.conversationId,
+            targetUserId: activeCallRef.current.targetUserId,
+            signalType: 'candidate',
+            signal: event.candidate.toJSON(),
+            callType: incomingCall.callType,
+          });
+        }
+      };
+
+      if (incomingCall.offer) {
+        await peer.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socketRef.current.emit('call:signal', {
+          conversationId: incomingCall.conversationId,
+          targetUserId: incomingCall.senderId || '',
+          signalType: 'answer',
+          signal: answer,
+          callType: incomingCall.callType,
+        });
+      }
+
+      setIncomingCall(null);
+      setCallStatus('active');
+      setCallStartedAt(Date.now());
+      setCallSeconds(0);
+    } catch (error) {
+      console.error('Failed to accept call:', error);
+      cleanupCall(false);
+      setCallError('Could not start the call.');
+    }
+  }, [cleanupCall, incomingCall]);
+
+  useEffect(() => {
+    if (callStatus !== 'active' || !callStartedAt) return;
+    const timer = window.setInterval(() => {
+      setCallSeconds(Math.floor((Date.now() - callStartedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [callStartedAt, callStatus]);
 
   useEffect(() => {
     if (!orderIdParam) return;
@@ -202,26 +492,69 @@ export default function MessagesPage() {
       refetchConversations();
     });
 
+    socket.on('call:invite', (payload: CallInvite) => {
+      if (payload?.conversationId && payload.conversationId !== selectedConversationId) {
+        setManualConversationId(payload.conversationId);
+      }
+      setIncomingCall(payload);
+      setActiveCall(payload.callType);
+      setCallStatus('ringing');
+      toast.info(`${payload.senderName || 'Someone'} is calling you`, {
+        description: payload.callType === 'video' ? 'Video call incoming.' : 'Voice call incoming.',
+      });
+    });
+
+    socket.on('call:signal', async (payload: CallSignal) => {
+      if (payload.conversationId !== activeCallRef.current?.conversationId) return;
+      const peer = peerRef.current;
+      if (!peer || !payload.signal) return;
+
+      if (payload.signalType === 'answer') {
+        await peer.setRemoteDescription(new RTCSessionDescription(payload.signal as RTCSessionDescriptionInit));
+        setCallStatus('active');
+        setCallStartedAt(Date.now());
+        setCallSeconds(0);
+      }
+
+      if (payload.signalType === 'candidate') {
+        try {
+          await peer.addIceCandidate(new RTCIceCandidate(payload.signal as RTCIceCandidateInit));
+        } catch (error) {
+          console.error('Failed to add ICE candidate:', error);
+        }
+      }
+    });
+
+    socket.on('call:end', (payload: CallSignal) => {
+      if (payload.conversationId !== activeCallRef.current?.conversationId) return;
+      cleanupCall(false);
+      toast.info('Call ended');
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [refetchConversations, refetchMessages, selectedConversationId, user?.id]);
+  }, [cleanupCall, refetchConversations, refetchMessages, selectedConversationId, user?.id]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!newMessage.trim() || !selectedConversationId) return;
+    if ((!newMessage.trim() && selectedAttachments.length === 0) || !selectedConversationId || !canSendMessage) return;
 
     try {
       const result = await sendConversationMessage({
         conversationId: selectedConversationId,
         text: newMessage.trim(),
+        attachments: selectedAttachments,
       }).unwrap();
       const message = (result?.data || null) as ApiMessage | null;
       if (message) {
         setLiveMessages((prev) => (prev.some((item) => item.id === message.id) ? prev : [...prev, message]));
       }
       setNewMessage('');
+      setSelectedAttachments([]);
+      setIsEmojiPickerOpen(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       refetchMessages();
       refetchConversations();
     } catch (error: any) {
@@ -229,13 +562,56 @@ export default function MessagesPage() {
     }
   };
 
-  const handleAction = (action: string) => {
-    toast.success(`Action: ${action} processed.`);
+  const handleAttachmentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setSelectedAttachments((prev) => [...prev, ...files].slice(0, 4));
   };
 
-  const startCall = (type: 'voice' | 'video') => {
-    setActiveCall(type);
+  const removeAttachment = (indexToRemove: number) => {
+    setSelectedAttachments((prev) => prev.filter((_, index) => index !== indexToRemove));
+    if (fileInputRef.current && selectedAttachments.length <= 1) {
+      fileInputRef.current.value = '';
+    }
   };
+
+  const appendEmoji = (emoji: string) => {
+    setNewMessage((prev) => `${prev}${emoji}`);
+    setIsEmojiPickerOpen(false);
+    window.setTimeout(() => {
+      messageInputRef.current?.focus();
+    }, 0);
+  };
+
+  useEffect(() => {
+    return () => {
+      attachmentPreviews.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [attachmentPreviews]);
+
+  const startCall = (type: 'voice' | 'video') => {
+    void startCallSession(type);
+  };
+
+  const declineIncomingCall = useCallback(() => {
+    if (incomingCall?.senderId && socketRef.current) {
+      socketRef.current.emit('call:end', {
+        conversationId: incomingCall.conversationId,
+        targetUserId: incomingCall.senderId,
+        callType: incomingCall.callType,
+        reason: 'declined',
+      });
+    }
+    cleanupCall(false);
+  }, [cleanupCall, incomingCall]);
+
+  useEffect(() => {
+    return () => {
+      cleanupCall(false);
+    };
+  }, [cleanupCall]);
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-white overflow-hidden">
@@ -278,7 +654,7 @@ export default function MessagesPage() {
                     <span className="text-[10px] font-bold text-slate-400 uppercase">{contact.time}</span>
                   </div>
                   <p className="text-[11px] truncate font-black uppercase tracking-wider text-[#2286BE]/80 mb-0.5">
-                    {contact.packageLabel || 'Package'}
+                    {contact.categoryLabel || contact.packageLabel || 'Category'}
                   </p>
                   <p className="text-sm truncate text-slate-400 font-medium">{contact.lastMessage}</p>
                 </div>
@@ -305,7 +681,7 @@ export default function MessagesPage() {
             <div>
               <h3 className="font-bold text-slate-900 leading-none">{selectedContact?.name || 'Conversation'}</h3>
               <p className="text-[10px] font-bold text-[#2286BE] uppercase tracking-widest mt-1">
-                {selectedContact?.orderLabel || (userRole === 'provider' ? 'Client chat' : 'Provider chat')}
+                {selectedContact?.categoryLabel || selectedContact?.packageLabel || (userRole === 'provider' ? 'Client chat' : 'Provider chat')}
               </p>
             </div>
           </div>
@@ -327,12 +703,32 @@ export default function MessagesPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl">
-                <DropdownMenuItem onClick={() => handleAction('History Cleared')} className="py-2.5 rounded-lg cursor-pointer">
+                <DropdownMenuItem onClick={() => setShowClearConfirm(true)} className="py-2.5 rounded-lg cursor-pointer">
                   Clear History
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAction('User Blocked')} className="py-2.5 rounded-lg cursor-pointer">
-                  Block User
-                </DropdownMenuItem>
+                {isBlockedByMe ? (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void unblockConversationUser(selectedConversationId).unwrap().then(() => refetchConversations());
+                    }}
+                    className="py-2.5 rounded-lg cursor-pointer"
+                  >
+                    Unblock User
+                  </DropdownMenuItem>
+                ) : isBlockedByOther ? (
+                  <DropdownMenuItem disabled className="py-2.5 rounded-lg cursor-pointer">
+                    Blocked by User
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void blockConversationUser(selectedConversationId).unwrap().then(() => refetchConversations());
+                    }}
+                    className="py-2.5 rounded-lg cursor-pointer"
+                  >
+                    Block User
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -362,7 +758,46 @@ export default function MessagesPage() {
                       </Avatar>
                       <div className={`px-5 py-3.5 rounded-[2rem] shadow-sm relative group ${mine ? 'bg-[#2286BE] text-white rounded-br-none' : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'}`}>
                         <p className={`text-[11px] font-black mb-1 ${mine ? 'text-white/80 text-right' : 'text-slate-500'}`}>{senderName}</p>
-                        <p className="text-sm md:text-base font-medium leading-relaxed">{message.text}</p>
+                        {message.text ? <p className="text-sm md:text-base font-medium leading-relaxed">{message.text}</p> : null}
+                        {Array.isArray(message.attachments) && message.attachments.length > 0 ? (
+                          <div className={`mt-3 grid gap-2 ${message.attachments.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {message.attachments.map((attachment, index) => {
+                              const isImage = (attachment?.mimeType || '').startsWith('image/');
+                              return isImage ? (
+                                <button
+                                  key={`${message.id}-attachment-${index}`}
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewImage({
+                                      url: attachment?.url || '',
+                                      alt: attachment?.fileName || 'Attachment',
+                                    })
+                                  }
+                                  className="block overflow-hidden rounded-2xl border border-white/10 bg-black/10"
+                                >
+                                  <img
+                                    src={attachment?.url || ''}
+                                    alt={attachment?.fileName || 'Attachment'}
+                                    className="h-36 w-full object-cover"
+                                  />
+                                </button>
+                              ) : (
+                                <a
+                                  key={`${message.id}-attachment-${index}`}
+                                  href={attachment?.url || '#'}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold ${
+                                    mine ? 'bg-white/10 text-white' : 'bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  <Paperclip size={16} />
+                                  <span className="truncate">{attachment?.fileName || 'Attachment'}</span>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                         <div className={`flex items-center gap-1.5 mt-1.5 ${mine ? 'justify-end text-white/70' : 'text-slate-400'}`}>
                           <span className="text-[10px] font-bold">
                             {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -375,12 +810,54 @@ export default function MessagesPage() {
                 );
               })}
             </AnimatePresence>
+
+            {isBlockedByOther ? (
+              <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-800 font-semibold">
+                You can&apos;t send message to this user anymore.
+              </div>
+            ) : null}
           </div>
         </ScrollArea>
 
         <footer className="p-6 bg-white border-t border-slate-100">
-          <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-slate-50 h-16 px-4 rounded-[2rem] border border-slate-100  transition-all">
-            <Button type="button" variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
+          <div className="max-w-4xl mx-auto">
+            {selectedAttachments.length > 0 ? (
+              <div className="mb-3 flex flex-wrap gap-3">
+                {selectedAttachments.map((file, index) => {
+                  const previewUrl = attachmentPreviews[index] || '';
+                  return (
+                    <div key={`${file.name}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                      {previewUrl ? (
+                        <img src={previewUrl} alt={file.name} className="h-16 w-16 rounded-xl object-cover" />
+                      ) : (
+                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-white text-slate-500">
+                          <Paperclip size={18} />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(index)}
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/75 text-[10px] font-bold text-white"
+                      >
+                        x
+                      </button>
+                      <p className="mt-2 max-w-20 truncate text-[11px] font-semibold text-slate-600">{file.name}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <form onSubmit={handleSendMessage} className="relative flex items-center gap-3 bg-slate-50 h-16 px-4 rounded-[2rem] border border-slate-100 transition-all">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+              className="hidden"
+              onChange={handleAttachmentSelect}
+            />
+            <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
               <Paperclip size={20} />
             </Button>
             <Input
@@ -389,18 +866,250 @@ export default function MessagesPage() {
               onChange={(e) => setNewMessage(e.target.value)}
               onFocus={() => setIsInfoPanelOpen(false)}
               onClick={() => messageInputRef.current?.focus()}
-              placeholder="Type your message here..."
-              className="flex-1 bg-transparent border-none outline-none focus:border-none focus:outline-none focus-visible:ring-0 focus-visible:outline-none shadow-none font-medium text-slate-700 h-full cursor-text rounded-none"
+              placeholder={isBlockedByOther ? "You can't send message to this user anymore." : 'Type your message here...'}
+              disabled={!canSendMessage}
+              className="flex-1 bg-transparent border-none outline-none focus:border-none focus:outline-none focus-visible:ring-0 focus-visible:outline-none shadow-none font-medium text-slate-700 h-full cursor-text rounded-none disabled:cursor-not-allowed"
             />
-            <Button type="button" variant="ghost" size="icon" className="hidden sm:inline-flex rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+              className="hidden sm:inline-flex rounded-full text-slate-400 hover:text-[#2286BE] hover:bg-white shrink-0"
+            >
               <Smile size={20} />
             </Button>
-            <Button type="submit" disabled={!newMessage.trim() || isSending} className={`rounded-full flex items-center justify-center p-0 h-10 w-10 shrink-0 transition-all ${newMessage.trim() ? 'bg-[#2286BE] text-white shadow-lg shadow-primary/30' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+            <Button type="submit" disabled={!canSendCurrentMessage || isSending} className={`rounded-full flex items-center justify-center p-0 h-10 w-10 shrink-0 transition-all ${canSendCurrentMessage ? 'bg-[#2286BE] text-white shadow-lg shadow-primary/30' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
               <Send size={18} />
             </Button>
-          </form>
+            {isEmojiPickerOpen ? (
+              <div className="absolute bottom-[calc(100%+12px)] right-12 z-20 w-64 rounded-3xl border border-slate-100 bg-white p-4 shadow-2xl">
+                <p className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Pick an emoji</p>
+                <div className="grid grid-cols-6 gap-2">
+                  {EMOJI_OPTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => appendEmoji(emoji)}
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-xl transition hover:bg-primary-soft"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            </form>
+          </div>
         </footer>
       </main>
+
+      {activeCall ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
+          <div className="relative w-full max-w-5xl overflow-hidden rounded-[2.75rem] border border-white/10 bg-white shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
+            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-[#2286BE] via-[#1f9bd7] to-[#7c3aed] opacity-95" />
+
+            <div className="relative p-5 md:p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-[1.5rem] border border-white/20 bg-white/15 p-3 shadow-lg backdrop-blur">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#2286BE]">
+                      {activeCall === 'video' ? <Video size={24} /> : <Phone size={24} />}
+                    </div>
+                  </div>
+                  <div className="pt-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-2xl font-black text-white drop-shadow-sm">
+                        {incomingCall && callStatus === 'ringing'
+                          ? `${incomingCall.senderName || 'Incoming'} is calling`
+                          : selectedContact?.name || 'Call in progress'}
+                      </h3>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${
+                          callStatus === 'active'
+                            ? 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30'
+                            : callStatus === 'ringing'
+                              ? 'bg-amber-500/15 text-amber-200 border border-amber-400/30'
+                              : 'bg-white/15 text-white/80 border border-white/20'
+                        }`}
+                      >
+                        {callStatus === 'active' ? `Live ${callDurationLabel}` : callStatus === 'ringing' ? 'Ringing' : 'Connecting'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-medium text-white/80">
+                      {activeCall === 'video' ? 'Video call' : 'Voice call'} with {selectedContact?.name || incomingCall?.senderName || 'User'}.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {incomingCall && callStatus === 'ringing' ? (
+                    <>
+                      <Button
+                        className="rounded-full bg-emerald-500 px-5 py-2.5 font-bold text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600"
+                        onClick={acceptIncomingCall}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-white/20 bg-white/10 px-5 py-2.5 font-bold text-white hover:bg-white/20 hover:text-white"
+                        onClick={declineIncomingCall}
+                      >
+                        Decline
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      className="rounded-full bg-rose-500 px-5 py-2.5 font-bold text-white shadow-lg shadow-rose-500/30 hover:bg-rose-600"
+                      onClick={() => cleanupCall(true)}
+                    >
+                      End Call
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[1.3fr_0.7fr]">
+                <div className="rounded-[2.25rem] bg-slate-950 p-3 shadow-inner shadow-slate-950/40 ring-1 ring-white/10">
+                  <div className="relative min-h-[360px] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,134,190,0.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.18),transparent_30%)]" />
+                    <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />
+                    {!hasRemoteStream ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white/80">
+                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15">
+                          <User size={32} />
+                        </div>
+                        <p className="text-lg font-bold text-white">Waiting for the other side</p>
+                        <p className="mt-1 text-sm text-white/60">
+                          {callStatus === 'ringing' ? 'The call is ringing now.' : 'Remote video will show here once the call connects.'}
+                        </p>
+                      </div>
+                    ) : null}
+                    <div className="absolute left-4 top-4 rounded-full bg-black/35 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.25em] text-white backdrop-blur">
+                      Remote
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Your preview</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-700">
+                          {hasLocalStream ? 'Camera and mic are connected.' : 'Preparing your media devices.'}
+                        </p>
+                      </div>
+                      <Badge className="rounded-full bg-[#2286BE]/10 px-3 py-1 text-[#2286BE] hover:bg-[#2286BE]/10">
+                        {activeCall === 'video' ? 'Video' : 'Voice'}
+                      </Badge>
+                    </div>
+                    <div className="mt-4 overflow-hidden rounded-[1.5rem] bg-slate-950 shadow-inner shadow-slate-950/30">
+                      <div className="relative min-h-[220px]">
+                        <video ref={localVideoRef} autoPlay muted playsInline className="absolute inset-0 h-full w-full object-cover" />
+                        {!hasLocalStream ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white/75">
+                            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15">
+                              <Phone size={24} />
+                            </div>
+                            <p className="font-semibold text-white">Your camera preview</p>
+                            <p className="mt-1 text-sm text-white/60">We&apos;ll show your local feed here.</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[2rem] border border-slate-100 bg-slate-50 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Call state</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-700">
+                          {callStatus === 'active'
+                            ? 'Connected and running'
+                            : callStatus === 'ringing'
+                              ? 'Waiting for response'
+                              : 'Setting up connection'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">Duration</p>
+                        <p className="mt-1 font-mono text-lg font-black text-slate-900">{callDurationLabel}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {callError ? (
+                <div className="mt-4 rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-red-700 font-semibold">
+                  {callError}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {previewImage ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 px-4 py-8 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 shadow-[0_30px_120px_rgba(15,23,42,0.5)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewImage(null)}
+              className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-lg font-bold text-white backdrop-blur transition hover:bg-black/65"
+            >
+              x
+            </button>
+            <div className="flex min-h-[60vh] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(34,134,190,0.15),transparent_35%),radial-gradient(circle_at_bottom,rgba(124,58,237,0.18),transparent_35%)] p-6">
+              <img
+                src={previewImage.url}
+                alt={previewImage.alt}
+                className="max-h-[78vh] w-auto max-w-full rounded-[1.5rem] object-contain"
+              />
+            </div>
+            <div className="border-t border-white/10 bg-slate-900/90 px-5 py-4">
+              <p className="truncate text-sm font-semibold text-white/85">{previewImage.alt}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showClearConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-black text-slate-900">Clear chat history?</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This will hide the messages from your view only. The other person will still see their copy.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button variant="outline" className="rounded-2xl" onClick={() => setShowClearConfirm(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="rounded-2xl bg-red-600 hover:bg-red-700"
+                onClick={async () => {
+                  if (!selectedConversationId) return;
+                  await clearConversationHistory(selectedConversationId).unwrap();
+                  setShowClearConfirm(false);
+                  setLiveMessages([]);
+                  refetchMessages();
+                  refetchConversations();
+                }}
+              >
+                Confirm Hide
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

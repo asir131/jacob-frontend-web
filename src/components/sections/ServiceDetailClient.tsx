@@ -353,7 +353,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
              {/* Profile Widget */}
              <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
                 <div className="flex items-center gap-5 mb-8">
-                   <div className="relative">
+                   <Link href={`/provider/${service.provider.id}`} className="relative block">
                      <Avatar className="h-20 w-20 border-4 border-slate-50 shadow-xl">
                        <AvatarImage src={service.provider.avatar} alt={service.provider.name} />
                        <AvatarFallback className="bg-[#2286BE]/10 text-[#2286BE] font-black text-2xl">{service.provider.name.charAt(0)}</AvatarFallback>
@@ -361,9 +361,13 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                      <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-[#2286BE] border-4 border-white rounded-full flex items-center justify-center text-white" aria-hidden="true">
                         <ShieldCheck size={12} />
                      </div>
-                   </div>
+                   </Link>
                    <div>
-                     <h4 className="font-black text-slate-900 text-xl leading-none mb-1.5">{service.provider.name}</h4>
+                     <h4 className="font-black text-slate-900 text-xl leading-none mb-1.5">
+                       <Link href={`/provider/${service.provider.id}`} className="hover:text-[#2286BE] transition-colors">
+                         {service.provider.name}
+                       </Link>
+                     </h4>
                      <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest py-0.5 border-slate-100 text-slate-400">{service.provider.level || 'Level 2'}</Badge>
                         <Badge className={`border-none font-black text-[10px] px-2 py-0.5 rounded-full ${

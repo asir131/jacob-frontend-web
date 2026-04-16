@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Star, MapPin, ShieldCheck, ChevronRight, ArrowLeft, Search, ChevronDown, Filter, Map, Grid, List as ListIcon, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 const item = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 
 export default function CategoryClient({ slug }: { slug: string }) {
+  const router = useRouter();
   const { city, coordinates, radius } = useLocation();
   const { isAuthenticated } = useAuth();
   const { data: categoriesPayload, isFetching: isCategoriesLoading } = useGetCategoriesQuery();
@@ -291,10 +293,18 @@ export default function CategoryClient({ slug }: { slug: string }) {
                           </div>
                           <div className="p-6 flex flex-col flex-1">
                             <div className="flex items-center gap-2 mb-3">
-                              <Link href={`/provider/${service.provider.id}`} className="hover:underline accent-[#2286BE] flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  router.push(`/provider/${service.provider.id}`);
+                                }}
+                                className="hover:underline accent-[#2286BE] flex items-center gap-2"
+                              >
                                 <Avatar className="h-6 w-6 border border-slate-100 shadow-sm"><AvatarImage src={service.provider.avatar} /><AvatarFallback>P</AvatarFallback></Avatar>
                                 <span className="text-xs font-black text-slate-900">{service.provider.name}</span>
-                              </Link>
+                              </button>
                               {service.provider.level && (
                                 <Badge className={`ml-1 border-none font-black text-[9px] uppercase px-2 py-0.5 rounded-md md:inline-flex hidden ${service.provider.level === 'Top Rated' ? 'bg-amber-400 text-white' : service.provider.level === 'Level 3' ? 'bg-purple-500 text-white' : service.provider.level === 'Level 2' ? 'bg-green-500 text-white' : service.provider.level === 'Level 1' ? 'bg-blue-500 text-white' : 'bg-slate-400 text-white'}`}>
                                   {service.provider.level}

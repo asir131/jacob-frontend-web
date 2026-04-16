@@ -119,6 +119,76 @@ type ClientDashboardResponse = {
   recentOrders?: Array<Record<string, unknown>>;
 };
 
+type PublicProviderProfileResponse = {
+  provider?: {
+    id?: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    bio?: string;
+    experienceLevel?: string;
+    sellerLevel?: string;
+    level?: string;
+    rating?: number;
+    reviewCount?: number;
+    completedOrders?: number;
+    totalOrders?: number;
+    completionRate?: number;
+    recommendRate?: number;
+    location?: string;
+    joinedAt?: string;
+  };
+  gigs?: Array<{
+    id?: string;
+    title?: string;
+    categoryName?: string;
+    categorySlug?: string;
+    images?: string[];
+    startingPrice?: number;
+    avgPackagePrice?: number;
+    provider?: {
+      id?: string;
+      name?: string;
+      avatar?: string;
+      rating?: number;
+      sellerLevel?: string;
+      level?: string;
+    };
+  }>;
+  reviews?: Array<{
+    id?: string;
+    orderId?: string;
+    gigId?: string | null;
+    gigName?: string;
+    rating?: number;
+    review?: string;
+    createdAt?: string | null;
+    client?: {
+      id?: string;
+      name?: string;
+      avatar?: string;
+    };
+  }>;
+  performance?: {
+    responseRate?: number;
+    deliveredOnTime?: number;
+    orderCompletion?: number;
+  };
+  skills?: string[];
+};
+
+type FaqItem = {
+  id: string;
+  question: string;
+  answer: string;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
 type ServiceRequestPagination = {
   page: number;
   limit: number;
@@ -146,6 +216,9 @@ export const apiSlice = createApi({
   }),
   tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats', 'ServiceRequests'],
   endpoints: (builder) => ({
+    getFaqs: builder.query<ApiEnvelope<FaqItem[]>, void>({
+      query: () => '/api/faqs',
+    }),
     getCategories: builder.query<ApiEnvelope<unknown[]>, void>({
       query: () => '/api/categories',
       providesTags: ['Categories'],
@@ -190,6 +263,9 @@ export const apiSlice = createApi({
     }),
     getPublicServiceById: builder.query<ApiEnvelope<unknown>, string>({
       query: (id) => `/api/gigs/public/${id}`,
+    }),
+    getPublicProviderProfile: builder.query<ApiEnvelope<PublicProviderProfileResponse>, string>({
+      query: (providerId) => `/api/profile/provider/${providerId}/public`,
     }),
     createOrder: builder.mutation<ApiEnvelope<{ order?: Record<string, unknown> }>, CreateOrderPayload>({
       query: (payload) => ({
@@ -490,14 +566,42 @@ export const apiSlice = createApi({
     }),
     sendConversationMessage: builder.mutation<
       ApiEnvelope<Record<string, unknown>>,
-      { conversationId: string; text: string }
+      { conversationId: string; text?: string; attachments?: File[] }
     >({
-      query: ({ conversationId, text }) => ({
-        url: `/api/chats/conversations/${conversationId}/messages`,
-        method: 'POST',
-        body: { text },
-      }),
+      query: ({ conversationId, text = '', attachments = [] }) => {
+        const formData = new FormData();
+        formData.append('text', text);
+        attachments.forEach((file) => {
+          formData.append('attachments', file);
+        });
+        return {
+          url: `/api/chats/conversations/${conversationId}/messages`,
+          method: 'POST',
+          body: formData,
+        };
+      },
       invalidatesTags: (_result, _error, arg) => [{ type: 'Chats', id: arg.conversationId }, 'Chats'],
+    }),
+    clearConversationHistory: builder.mutation<ApiEnvelope<{ deletedCount?: number }>, string>({
+      query: (conversationId) => ({
+        url: `/api/chats/conversations/${conversationId}/messages`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, conversationId) => [{ type: 'Chats', id: conversationId }, 'Chats'],
+    }),
+    blockConversationUser: builder.mutation<ApiEnvelope<{ blockedBy?: string }>, string>({
+      query: (conversationId) => ({
+        url: `/api/chats/conversations/${conversationId}/block`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_result, _error, conversationId) => [{ type: 'Chats', id: conversationId }, 'Chats'],
+    }),
+    unblockConversationUser: builder.mutation<ApiEnvelope<{ blockedBy?: string | null }>, string>({
+      query: (conversationId) => ({
+        url: `/api/chats/conversations/${conversationId}/block`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, conversationId) => [{ type: 'Chats', id: conversationId }, 'Chats'],
     }),
     markConversationMessagesAsRead: builder.mutation<ApiEnvelope<{ modifiedCount?: number }>, string>({
       query: (conversationId) => ({
@@ -599,10 +703,12 @@ export const apiSlice = createApi({
 });
 
 export const {
+  useGetFaqsQuery,
   useGetCategoriesQuery,
   useLazyGetMyGigsQuery,
   useGetPublicServicesQuery,
   useGetPublicServiceByIdQuery,
+  useGetPublicProviderProfileQuery,
   useCreateOrderMutation,
   useCreateServiceRequestMutation,
   useGetClientServiceRequestsQuery,
@@ -632,6 +738,9 @@ export const {
   useEnsureConversationByOrderMutation,
   useGetConversationMessagesQuery,
   useSendConversationMessageMutation,
+  useClearConversationHistoryMutation,
+  useBlockConversationUserMutation,
+  useUnblockConversationUserMutation,
   useMarkConversationMessagesAsReadMutation,
   useMarkAllMessagesAsReadMutation,
   useCreateGigMutation,

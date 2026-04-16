@@ -31,6 +31,9 @@ interface LoginPayload {
   serviceCity?: string;
   serviceLocationLat?: number | null;
   serviceLocationLng?: number | null;
+  averageRating?: number;
+  reviewCount?: number;
+  sellerLevel?: string;
   payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
   walletBalance?: number;
   totalEarnings?: number;
@@ -145,6 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         typeof payload?.serviceLocationLat === 'number' ? payload.serviceLocationLat : undefined,
       serviceLocationLng:
         typeof payload?.serviceLocationLng === 'number' ? payload.serviceLocationLng : undefined,
+      averageRating: typeof payload?.averageRating === 'number' ? payload.averageRating : 0,
+      reviewCount: typeof payload?.reviewCount === 'number' ? payload.reviewCount : 0,
+      sellerLevel: payload?.sellerLevel || 'New',
       payoutVerificationStatus: payload?.payoutVerificationStatus || 'unverified',
       walletBalance: typeof payload?.walletBalance === 'number' ? payload.walletBalance : 0,
       totalEarnings: typeof payload?.totalEarnings === 'number' ? payload.totalEarnings : 0,
