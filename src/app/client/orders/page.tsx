@@ -50,6 +50,7 @@ type ClientOrder = {
     | 'done_after_sell_revision'
     | 'completed';
   packagePrice: number;
+  paymentAmount?: number;
   scheduledDate: string;
   scheduledTime: string;
   serviceAddress: string;
@@ -526,7 +527,7 @@ export default function ClientOrdersPage() {
                             <div className="text-right w-full sm:w-auto pt-4 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex sm:block justify-between items-center">
                               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1 block sm:hidden">Total Amount</p>
                               <div className="text-right">
-                                <p className="text-2xl font-black text-slate-900 tracking-tight">${Number(order.packagePrice || 0).toFixed(2)}</p>
+                                <p className="text-2xl font-black text-slate-900 tracking-tight">${Number(order.paymentAmount || order.packagePrice || 0).toFixed(2)}</p>
                                 {order.status === 'completed' ? (
                                   <p className="text-[10px] font-bold text-[#2286BE] bg-[#2286BE]/10 px-2 py-0.5 rounded mt-1 inline-block uppercase tracking-widest">
                                     Paid via App

@@ -5,14 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, Search, Star, Filter } from 'lucide-react';
+import { MapPin, Search, Star, Filter, Heart } from 'lucide-react';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useGetCategoriesQuery, useGetPublicServicesQuery } from '@/store/services/apiSlice';
+import AuthModal from '@/components/ui/AuthModal';
+import { toast } from 'sonner';
+import { useGetCategoriesQuery, useGetPublicServicesQuery, useRemoveSavedServiceMutation, useSaveServiceMutation } from '@/store/services/apiSlice';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
 import { formatRating } from '@/lib/formatters';
 
@@ -21,6 +23,7 @@ type ServiceCard = {
   title: string;
   categorySlug: string;
   categoryName: string;
+  expertType?: 'solo' | 'team';
   image: string;
   avgPackagePrice: number;
   distanceKm: number | null;
@@ -35,12 +38,12 @@ type ServiceCard = {
 };
 
 type StaticServiceMeta = {
-  expertType: 'Solo' | 'Team' | 'Agency';
+  expertType: 'Solo' | 'Team';
   sellerLevel: 'Top Rated' | 'Level 3' | 'Level 2' | 'Level 1' | 'New';
   rating: number;
 };
 
-const EXPERT_TYPES: StaticServiceMeta['expertType'][] = ['Solo', 'Team', 'Agency'];
+const EXPERT_TYPES: StaticServiceMeta['expertType'][] = ['Solo', 'Team'];
 const SELLER_LEVELS: StaticServiceMeta['sellerLevel'][] = ['Top Rated', 'Level 3', 'Level 2', 'Level 1', 'New'];
 
 const getStaticMetaById = (id: string): StaticServiceMeta => {
@@ -68,7 +71,7 @@ const getLocationParts = (rawAddress: string, fallbackCity: string) => {
 export default function BrowseServicesPage() {
   const router = useRouter();
   const { city, coordinates, radius, setRadius } = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated, updateProfile } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -77,6 +80,9 @@ export default function BrowseServicesPage() {
   const [minRating, setMinRating] = useState(0);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
+  const [removeSavedService, { isLoading: isRemovingSavedService }] = useRemoveSavedServiceMutation();
 
   const limit = 9;
   const lat = typeof user?.locationLat === 'number' ? user.locationLat : coordinates?.lat ?? null;
@@ -118,7 +124,8 @@ export default function BrowseServicesPage() {
   const availableServices = useMemo(() => {
     return rawItems.filter((service) => {
       const staticMeta = getStaticMetaById(service.id);
-      if (providerTypes.length > 0 && !providerTypes.includes(staticMeta.expertType)) return false;
+      const serviceExpertType = service.expertType === 'team' ? 'Team' : 'Solo';
+      if (providerTypes.length > 0 && !providerTypes.includes(serviceExpertType)) return false;
       const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
       if (selectedLevels.length > 0 && !selectedLevels.includes(providerLevel)) return false;
       const providerRating = Number(service.provider?.rating) || staticMeta.rating;
@@ -146,6 +153,29 @@ export default function BrowseServicesPage() {
   };
 
   const locationParts = getLocationParts(user?.address || '', city);
+
+  const handleToggleFavorite = async (serviceId: string) => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    const isSaved = Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(serviceId));
+    try {
+      const response = isSaved
+        ? await removeSavedService(String(serviceId)).unwrap()
+        : await saveService(String(serviceId)).unwrap();
+      const nextUser = response?.data?.user as { savedServiceIds?: string[] } | undefined;
+      if (nextUser) {
+        updateProfile({
+          savedServiceIds: Array.isArray(nextUser.savedServiceIds) ? nextUser.savedServiceIds : [],
+        });
+      }
+      toast.success(isSaved ? 'Service removed from saved list.' : 'Service saved successfully.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to update saved services.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 py-10">
@@ -250,7 +280,7 @@ export default function BrowseServicesPage() {
               <div className="mb-10">
                 <h3 className="text-sm font-black text-slate-900 mb-6 uppercase tracking-widest">Expert Type</h3>
                 <div className="space-y-4">
-                  {['Solo', 'Team', 'Agency'].map((type) => (
+                  {['Solo', 'Team'].map((type) => (
                     <div key={type} className="flex items-center space-x-3">
                       <Checkbox
                         id={`type-${type}`}
@@ -335,10 +365,11 @@ export default function BrowseServicesPage() {
                   const staticMeta = getStaticMetaById(service.id);
                   const providerRating = Number(service.provider?.rating) || staticMeta.rating;
                   const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
+                  const serviceExpertType = service.expertType === 'team' ? 'Team' : 'Solo';
                   return (
-                    <Link key={service.id} href={`/services/${service.id}`} className="group block h-full">
-                      <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all duration-500 h-full flex flex-col">
-                        <div className="relative w-full aspect-[4/3] overflow-hidden bg-slate-100">
+                     <Link key={service.id} href={`/services/${service.id}`} className="group block h-full">
+                       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all duration-500 h-full flex flex-col">
+                         <div className="relative w-full aspect-[4/3] overflow-hidden bg-slate-100">
                           {service.image ? (
                             <Image
                               src={service.image}
@@ -351,10 +382,33 @@ export default function BrowseServicesPage() {
                               Service
                             </div>
                           )}
-                          <div className="absolute top-4 left-4 rounded-md bg-white/95 px-3 py-1 text-[10px] font-black uppercase text-slate-900">
-                            ${service.avgPackagePrice || 0}
-                          </div>
-                        </div>
+                           <div className="absolute top-4 left-4 rounded-md bg-white/95 px-3 py-1 text-[10px] font-black uppercase text-slate-900">
+                             ${service.avgPackagePrice || 0}
+                           </div>
+                           <button
+                             type="button"
+                             onClick={async (event) => {
+                               event.preventDefault();
+                               event.stopPropagation();
+                               await handleToggleFavorite(service.id);
+                             }}
+                             disabled={isSavingService || isRemovingSavedService}
+                             className={`absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-md transition ${
+                               Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id))
+                                 ? 'text-red-500'
+                                 : 'text-slate-400 hover:text-red-500'
+                             }`}
+                           >
+                             <Heart
+                               size={18}
+                               fill={
+                                 Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id))
+                                   ? 'currentColor'
+                                   : 'none'
+                               }
+                             />
+                           </button>
+                         </div>
 
                         <div className="p-6 flex flex-col flex-1">
                           <div className="flex items-center gap-2 mb-4">
@@ -386,7 +440,7 @@ export default function BrowseServicesPage() {
                             {service.title}
                           </h3>
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-                            {service.categoryName} | {staticMeta.expertType}
+                              {service.categoryName} | {serviceExpertType}
                           </p>
 
                           <div className="mt-auto pt-5 border-t border-slate-50 flex items-end justify-between">
@@ -412,6 +466,13 @@ export default function BrowseServicesPage() {
           </main>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        title="Love this Service?"
+        subtitle="Sign in to save your favorite services."
+      />
 
       <div className="fixed bottom-10 left-[58%] -translate-x-1/2 z-40">
         <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur">

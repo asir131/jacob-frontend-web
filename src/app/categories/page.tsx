@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
-import { DEFAULT_CATEGORIES, getIconByName } from '@/data/categories';
+import { getIconByName } from '@/data/categories';
 import { useGetCategoriesQuery } from '@/store/services/apiSlice';
 
 type ApiCategory = {
@@ -28,21 +28,17 @@ export default function CategoriesPage() {
     [data]
   );
 
-  const visibleCategories = useMemo(() => {
-    const defaultSlugs = new Set(DEFAULT_CATEGORIES.map((category) => category.slug));
-    const customCategories = approvedCategories.filter((category) => !defaultSlugs.has(category.slug));
-
-    return [
-      ...DEFAULT_CATEGORIES,
-      ...customCategories.map((category) => ({
+  const visibleCategories = useMemo(
+    () =>
+      approvedCategories.map((category) => ({
         name: category.name,
         slug: category.slug,
         iconName: category.iconName || 'ShieldCheck',
         color: category.color || 'bg-slate-100 text-slate-600',
         count: typeof category.count === 'number' ? category.count : 0,
       })),
-    ];
-  }, [approvedCategories]);
+    [approvedCategories]
+  );
 
   const filteredCategories = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -138,7 +134,7 @@ export default function CategoriesPage() {
             </div>
           </motion.div>
           {isLoading ? (
-            <p className="mt-4 text-sm font-semibold text-slate-400">Loading approved custom categories...</p>
+            <p className="mt-4 text-sm font-semibold text-slate-400">Loading categories...</p>
           ) : null}
         </header>
 

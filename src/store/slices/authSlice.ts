@@ -23,6 +23,7 @@ export interface AuthUser {
   averageRating?: number;
   reviewCount?: number;
   sellerLevel?: string;
+  savedServiceIds?: string[];
   payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
   walletBalance?: number;
   totalEarnings?: number;

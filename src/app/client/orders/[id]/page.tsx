@@ -42,6 +42,7 @@ type ClientOrder = {
     | 'done_after_sell_revision'
     | 'completed';
   packagePrice: number;
+  paymentAmount?: number;
   scheduledDate: string;
   scheduledTime: string;
   serviceAddress: string;
@@ -326,7 +327,7 @@ export default function OrderTrackingPage() {
                 </div>
                 <div className="text-left md:text-right shrink-0">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
-                  <p className="text-4xl font-black text-slate-900 tracking-tight">${Number(order.packagePrice || 0).toFixed(2)}</p>
+                  <p className="text-4xl font-black text-slate-900 tracking-tight">${Number(order.paymentAmount || order.packagePrice || 0).toFixed(2)}</p>
                 </div>
               </div>
 

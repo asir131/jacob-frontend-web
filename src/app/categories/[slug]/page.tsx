@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import CategoryClient from '@/components/sections/CategoryClient';
-import { CATEGORY_MAP } from '@/data/categories';
 import { BRAND } from '@/lib/constants';
 
 interface Props {
@@ -16,23 +15,17 @@ const humanizeSlug = (slug: string) =>
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const category = CATEGORY_MAP[slug];
-  
-  if (!category) {
-    return {
-      title: `${humanizeSlug(slug)} Services | ${BRAND.name}`,
-      description: `Browse ${humanizeSlug(slug)} services on ${BRAND.name}.`,
-    };
-  }
+  const title = `${humanizeSlug(slug)} Services | ${BRAND.name}`;
+  const description = `Browse ${humanizeSlug(slug)} services on ${BRAND.name}.`;
 
   return {
-    title: `${category.name} Services | ${BRAND.name}`,
-    description: category.description,
+    title,
+    description,
     openGraph: {
-      title: `${category.name} Services — Professional ${category.name} Experts`,
-      description: category.description,
+      title,
+      description,
       type: 'website',
-    }
+    },
   };
 }
 

@@ -34,6 +34,7 @@ interface LoginPayload {
   averageRating?: number;
   reviewCount?: number;
   sellerLevel?: string;
+  savedServiceIds?: string[];
   payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
   walletBalance?: number;
   totalEarnings?: number;
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       averageRating: typeof payload?.averageRating === 'number' ? payload.averageRating : 0,
       reviewCount: typeof payload?.reviewCount === 'number' ? payload.reviewCount : 0,
       sellerLevel: payload?.sellerLevel || 'New',
+      savedServiceIds: Array.isArray(payload?.savedServiceIds) ? payload.savedServiceIds : [],
       payoutVerificationStatus: payload?.payoutVerificationStatus || 'unverified',
       walletBalance: typeof payload?.walletBalance === 'number' ? payload.walletBalance : 0,
       totalEarnings: typeof payload?.totalEarnings === 'number' ? payload.totalEarnings : 0,

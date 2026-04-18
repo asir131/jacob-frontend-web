@@ -43,6 +43,7 @@ type ProviderOrder = {
     | 'done_after_sell_revision'
     | 'completed';
   packagePrice: number;
+  providerEarningsAmount?: number;
   packageTitle: string;
   scheduledDate: string;
   scheduledTime: string;
@@ -266,7 +267,7 @@ export default function ProviderOrderDetailPage() {
 
             <div className="bg-slate-50 rounded-3xl p-6 md:px-10 flex flex-col justify-center items-center md:items-end">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Your Earnings</p>
-              <div className="text-4xl font-black text-slate-900 tracking-tighter">${Number(order.packagePrice || 0).toFixed(2)}</div>
+              <div className="text-4xl font-black text-slate-900 tracking-tighter">${Number(order.providerEarningsAmount || order.packagePrice || 0).toFixed(2)}</div>
             </div>
           </div>
 
@@ -464,7 +465,7 @@ export default function ProviderOrderDetailPage() {
                 </div>
                 <div className="pt-5 border-t border-slate-50 flex justify-between items-center">
                   <span className="font-bold text-slate-900">Total Earnings</span>
-                  <span className="text-2xl font-black text-[#2286BE]">${Number(order.packagePrice || 0).toFixed(2)}</span>
+                  <span className="text-2xl font-black text-[#2286BE]">${Number(order.providerEarningsAmount || order.packagePrice || 0).toFixed(2)}</span>
                 </div>
               </div>
             </Card>

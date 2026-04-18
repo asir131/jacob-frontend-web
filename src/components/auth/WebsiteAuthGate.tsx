@@ -7,6 +7,7 @@ const AUTH_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const AUTH_USER_KEY = 'auth_user';
 const PUBLIC_PATHS = ['/login', '/signup', '/signup/verify-otp'];
+const PROTECTED_PATH_PREFIXES = ['/book', '/client', '/provider', '/messages', '/notifications'];
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function WebsiteAuthGate({ children }: { children: React.ReactNode }) {
@@ -20,6 +21,13 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
     return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   }, [pathname]);
 
+  const isProtectedPath = React.useMemo(() => {
+    if (!pathname) return false;
+    return PROTECTED_PATH_PREFIXES.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`)
+    );
+  }, [pathname]);
+
   React.useEffect(() => {
     let isMounted = true;
 
@@ -31,7 +39,7 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
         if (!isMounted) return;
         setHasToken(false);
         setChecked(true);
-        if (!isPublicPath) router.replace('/login');
+        if (isProtectedPath) router.replace('/login');
         return;
       }
 
@@ -65,7 +73,7 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
         if (!isMounted) return;
         setHasToken(false);
         setChecked(true);
-        if (!isPublicPath) {
+        if (isProtectedPath) {
           router.replace('/login');
         }
       }
@@ -75,7 +83,7 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
     return () => {
       isMounted = false;
     };
-  }, [isPublicPath, router, pathname]);
+  }, [isProtectedPath, router, pathname]);
 
   if (!checked) {
     return (
@@ -85,7 +93,7 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
     );
   }
 
-  if (!hasToken && !isPublicPath) {
+  if (!hasToken && isProtectedPath) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-xs font-black uppercase tracking-[0.25em] text-[#2286BE]">Redirecting to login...</div>

@@ -168,6 +168,7 @@ export default function ClientDashboardClient() {
   const completedOrders = Number(dashboard?.orders?.completedOrders || 0);
   const completionRate = Number(dashboard?.orders?.completionRate || 0);
   const inboxCount = Number(dashboard?.inbox?.unreadMessages || 0);
+  const savedServicesCount = Array.isArray(user?.savedServiceIds) ? user.savedServiceIds.length : 0;
 
   const recentOrders = (Array.isArray(dashboard?.recentOrders) ? dashboard.recentOrders : []) as RecentOrderCard[];
   const nearbyServices = useMemo(
@@ -257,7 +258,7 @@ export default function ClientDashboardClient() {
                  <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Saved Services</CardTitle>
                </CardHeader>
                <CardContent className="pb-6">
-                 <div className="text-4xl font-black text-slate-900">5</div>
+                  <div className="text-4xl font-black text-slate-900">{savedServicesCount}</div>
                  <p className="text-xs text-[#2286BE] font-bold mt-2 hover:underline cursor-pointer"><Link href="/client/saved-services">View Favorites →</Link></p>
                </CardContent>
              </Card>

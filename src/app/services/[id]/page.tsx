@@ -18,6 +18,7 @@ type ApiService = {
   title?: string;
   categorySlug?: string;
   categoryName?: string;
+  expertType?: 'solo' | 'team';
   description?: string;
   requirements?: string;
   images?: string[];
@@ -28,10 +29,22 @@ type ApiService = {
   travelRadiusKm?: number | null;
   avgPackagePrice?: number;
   packages?: ApiPackage[];
+  reviews?: Array<{
+    id?: string;
+    rating?: number;
+    review?: string;
+    createdAt?: string | null;
+    client?: {
+      id?: string;
+      name?: string;
+      avatar?: string;
+    };
+  }>;
   provider?: {
     id?: string;
     name?: string;
     avatar?: string;
+    bio?: string;
     rating?: number;
     type?: 'Solo' | 'Team' | 'Agency';
     level?: 'New' | 'Level 1' | 'Level 2' | 'Level 3' | 'Top Rated';
@@ -62,8 +75,9 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
     provider: {
       id: service.provider?.id || '',
       name: service.provider?.name || 'Provider',
-      type: service.provider?.type || 'Solo',
+      type: service.expertType === 'team' ? 'Team' : service.provider?.type || 'Solo',
       avatar: service.provider?.avatar || '',
+      bio: service.provider?.bio || '',
       level: service.provider?.level || 'Level 2',
       rating: Number(service.provider?.rating) || 4.8,
       completedOrders: Number(service.provider?.completedOrders) || 0,
@@ -83,6 +97,19 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
     requirements: service.requirements || '',
     travelRadius: Number(service.travelRadiusKm) || 25,
     packages: normalizedPackages,
+    reviews: Array.isArray(service.reviews)
+      ? service.reviews.map((review) => ({
+          id: review.id || '',
+          rating: Number(review.rating) || 0,
+          text: review.review || '',
+          createdAt: review.createdAt || null,
+          client: {
+            id: review.client?.id || '',
+            name: review.client?.name || 'Client',
+            avatar: review.client?.avatar || '',
+          },
+        }))
+      : [],
   };
 };
 

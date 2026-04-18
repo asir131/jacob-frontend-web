@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
+import { calculateAdminFeeAmount, calculateClientPaymentAmount } from '@/lib/pricing';
 import {
   useCreateGigMutation,
   useLazyGetMyGigsQuery,
@@ -45,6 +46,7 @@ type LoadedGig = {
   categoryName?: string;
   customCategoryName?: string;
   customCategoryDescription?: string;
+  expertType?: 'solo' | 'team';
   description?: string;
   requirements?: string;
   packages?: PackageState[];
@@ -67,6 +69,7 @@ export default function CreateGigPage() {
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState('');
   const [customCategoryDescription, setCustomCategoryDescription] = useState('');
+  const [expertType, setExpertType] = useState<'solo' | 'team'>('solo');
   const [packages, setPackages] = useState<PackageState[]>(INITIAL_PACKAGES);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -117,6 +120,7 @@ export default function CreateGigPage() {
         setIsCustomCategory(Boolean(gig.categorySlug === 'create-your-own-category' || gig.customCategoryName || gig.customCategoryDescription));
         setCustomCategoryName(gig.customCategoryName || '');
         setCustomCategoryDescription(gig.customCategoryDescription || '');
+        setExpertType(gig.expertType === 'team' ? 'team' : 'solo');
         setPackages(
           (gig.packages?.length
             ? gig.packages.map((pkg, index) => ({
@@ -242,6 +246,7 @@ export default function CreateGigPage() {
       formData.append('categoryName', selectedCategoryName);
       formData.append('customCategoryName', isCustomCategory ? customCategoryName.trim() : '');
       formData.append('customCategoryDescription', isCustomCategory ? customCategoryDescription.trim() : '');
+      formData.append('expertType', expertType);
       formData.append('description', gigDescription.trim());
       formData.append('requirements', gigRequirements.trim());
       formData.append('packages', JSON.stringify(packages.map((pkg) => ({
@@ -377,6 +382,35 @@ export default function CreateGigPage() {
                   You can create your own category as well.
                 </div>
               </div>
+              <div>
+                <label className="text-sm font-bold text-slate-800 mb-3 block">Expert Type</label>
+                <RadioGroup
+                  value={expertType}
+                  onValueChange={(value) => setExpertType(value === 'team' ? 'team' : 'solo')}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                >
+                  <div className="relative">
+                    <RadioGroupItem value="solo" id="expert-solo" className="peer sr-only" />
+                    <label
+                      htmlFor="expert-solo"
+                      className="flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-5 transition-colors peer-data-[state=checked]:border-[#2286BE] peer-data-[state=checked]:bg-primary-soft"
+                    >
+                      <span className="text-base font-bold text-slate-900">Solo</span>
+                      <span className="mt-1 text-sm text-slate-500">This service will be handled by you alone.</span>
+                    </label>
+                  </div>
+                  <div className="relative">
+                    <RadioGroupItem value="team" id="expert-team" className="peer sr-only" />
+                    <label
+                      htmlFor="expert-team"
+                      className="flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-5 transition-colors peer-data-[state=checked]:border-[#2286BE] peer-data-[state=checked]:bg-primary-soft"
+                    >
+                      <span className="text-base font-bold text-slate-900">Team</span>
+                      <span className="mt-1 text-sm text-slate-500">This service will be delivered with a team.</span>
+                    </label>
+                  </div>
+                </RadioGroup>
+              </div>
               {isCustomCategory && (
                 <div className="space-y-6">
                   <div>
@@ -439,19 +473,23 @@ export default function CreateGigPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-500 mb-1 block">Price (USD)</label>
-                        <div className="relative">
+                       <div>
+                         <label className="text-xs font-semibold text-slate-500 mb-1 block">Price (USD)</label>
+                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                           <Input
                             value={pkg.price}
                             onChange={(e) => updatePackage(idx, 'price', e.target.value)}
                             className="h-10 pl-8 text-sm font-bold text-slate-900 focus-visible:ring-[#2286BE]"
                             type="number"
-                            min="0"
-                          />
-                        </div>
-                      </div>
+                             min="0"
+                           />
+                         </div>
+                         <p className="mt-2 text-[11px] font-bold text-slate-500">
+                           Admin Fee ${calculateAdminFeeAmount(Number(pkg.price) || 0).toFixed(2)}.
+                           Client total ${calculateClientPaymentAmount(Number(pkg.price) || 0).toFixed(2)}.
+                         </p>
+                       </div>
                     </div>
                   </div>
                 ))}
@@ -595,6 +633,7 @@ export default function CreateGigPage() {
                 <div className="flex justify-between gap-4"><span>Title:</span> <span className="font-semibold text-slate-900 text-right">{gigTitle || 'Untitled Gig'}</span></div>
                 <div className="flex justify-between gap-4"><span>Category:</span> <span className="font-semibold text-slate-900 text-right">{selectedCategoryName}</span></div>
                 <div className="flex justify-between gap-4"><span>Packages:</span> <span className="font-semibold text-slate-900 text-right">{packages.length} tiers</span></div>
+                <div className="flex justify-between gap-4"><span>Expert Type:</span> <span className="font-semibold text-slate-900 text-right">{expertType === 'team' ? 'Team' : 'Solo'}</span></div>
                 <div className="flex justify-between gap-4"><span>Images:</span> <span className="font-semibold text-slate-900 text-right">{displayedImagePreviews.length} selected</span></div>
                 <div className="flex justify-between gap-4"><span>Location:</span> <span className="font-semibold text-slate-900 text-right">{baseCity}</span></div>
                 <div className="flex justify-between gap-4"><span>Radius:</span> <span className="font-semibold text-slate-900 text-right">{selectedRadius} km</span></div>

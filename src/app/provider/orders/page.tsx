@@ -37,6 +37,7 @@ type ProviderOrder = {
     | 'done_after_sell_revision'
     | 'completed';
   packagePrice: number;
+  providerEarningsAmount?: number;
   serviceAddress: string;
   scheduledDate: string;
   scheduledTime: string;
@@ -264,7 +265,7 @@ export default function ProviderOrdersPage() {
                       <div className="mt-auto pt-6 border-t border-slate-50 flex justify-between items-center">
                         <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Earning</p>
-                          <p className="text-3xl font-black text-slate-900 tracking-tighter">${Number(order.packagePrice || 0).toFixed(2)}</p>
+                          <p className="text-3xl font-black text-slate-900 tracking-tighter">${Number(order.providerEarningsAmount || order.packagePrice || 0).toFixed(2)}</p>
                         </div>
                         <div className="flex gap-2">
                           <Button

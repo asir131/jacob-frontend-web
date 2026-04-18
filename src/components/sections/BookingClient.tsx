@@ -122,8 +122,7 @@ export default function BookingClient({ service }: BookingClientProps) {
 
   const selectedPackage = getPackageData(pkg);
   const price = selectedPackage?.price || 0;
-  const platformFee = 5;
-  const total = price + platformFee;
+  const total = Number(price) || 0;
 
   const handleNext = () => setStep([Math.min(3, step + 1), 1]);
   const handleBack = () => setStep([Math.max(1, step - 1), -1]);
@@ -147,7 +146,6 @@ export default function BookingClient({ service }: BookingClientProps) {
         gigId: service.id,
         packageName: selectedPackage?.key || pkg,
         packageTitle: selectedPackage?.title || `${pkg} package`,
-        packagePrice: Number(price) || 0,
         scheduledDate: date.toISOString(),
         scheduledTime: time,
         serviceAddress: String(address).trim(),
@@ -407,18 +405,14 @@ export default function BookingClient({ service }: BookingClientProps) {
              </div>
 
              <div className="space-y-4 mb-10 text-[13px] font-bold uppercase tracking-widest font-medium">
-                <div className="flex justify-between text-slate-400">
-                   <span>Service Fee</span>
-                   <span className="text-slate-900">${price}</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                   <span>Platform Fee</span>
-                   <span className="text-slate-900">${platformFee}</span>
-                </div>
-                <div className="flex justify-between items-center py-4 px-4 bg-slate-50 rounded-2xl mt-4 border border-slate-100">
-                   <span className="text-slate-900">Grand Total</span>
-                   <span className="text-2xl font-black text-[#2286BE]">${total}</span>
-                </div>
+                 <div className="flex justify-between text-slate-400">
+                    <span>Selected Package</span>
+                    <span className="text-slate-900">${Number(price || 0).toFixed(2)}</span>
+                 </div>
+                 <div className="flex justify-between items-center py-4 px-4 bg-slate-50 rounded-2xl mt-4 border border-slate-100">
+                    <span className="text-slate-900">Grand Total</span>
+                    <span className="text-2xl font-black text-[#2286BE]">${Number(total || 0).toFixed(2)}</span>
+                 </div>
              </div>
 
              <div className="space-y-4">

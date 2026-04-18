@@ -35,7 +35,6 @@ type CreateOrderPayload = {
   gigId: string;
   packageName: string;
   packageTitle: string;
-  packagePrice: number;
   scheduledDate: string;
   scheduledTime: string;
   serviceAddress: string;
@@ -684,6 +683,24 @@ export const apiSlice = createApi({
         body: payload,
       }),
     }),
+    getSavedServices: builder.query<ApiEnvelope<{ items?: Record<string, unknown>[] }>, void>({
+      query: () => '/api/profile/me/saved-services',
+      providesTags: ['Profile'],
+    }),
+    saveService: builder.mutation<ApiEnvelope<{ user?: Record<string, unknown> }>, string>({
+      query: (gigId) => ({
+        url: `/api/profile/me/saved-services/${gigId}`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Profile'],
+    }),
+    removeSavedService: builder.mutation<ApiEnvelope<{ user?: Record<string, unknown> }>, string>({
+      query: (gigId) => ({
+        url: `/api/profile/me/saved-services/${gigId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Profile'],
+    }),
     submitProviderPayoutInfo: builder.mutation<ApiEnvelope<{ user?: Record<string, unknown> }>, FormData>({
       query: (formData) => ({
         url: '/api/profile/provider/payout-info',
@@ -765,6 +782,9 @@ export const {
   useUpdateProfileMutation,
   useUploadAvatarMutation,
   useChangePasswordMutation,
+  useGetSavedServicesQuery,
+  useSaveServiceMutation,
+  useRemoveSavedServiceMutation,
   useSubmitProviderPayoutInfoMutation,
   useLoginMutation,
   useSignupMutation,

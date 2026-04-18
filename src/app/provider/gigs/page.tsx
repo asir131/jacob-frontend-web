@@ -23,6 +23,7 @@ import {
   useLazyGetMyGigsQuery,
   useGetPublicProviderProfileQuery,
 } from '@/store/services/apiSlice';
+import { calculateAdminFeeAmount } from '@/lib/pricing';
 
 type GigPackage = {
   name: string;
@@ -37,6 +38,7 @@ type MyGig = {
   title: string;
   categoryName: string;
   categorySlug: string;
+  expertType?: 'solo' | 'team';
   images?: string[];
   packages?: GigPackage[];
   status: 'draft' | 'pending_approval' | 'published' | 'rejected';
@@ -79,8 +81,10 @@ const itemVariants = {
 };
 
 export default function ProviderGigsPage() {
+  const PAGE_SIZE = 9;
   const { role, user } = useAuth();
   const [activeTab, setActiveTab] = useState('published');
+  const [page, setPage] = useState(1);
   const [publishedGigs, setPublishedGigs] = useState<MyGig[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,6 +143,13 @@ export default function ProviderGigsPage() {
     return publishedGigs.filter((gig) => gig.status === 'rejected' || gig.status === 'draft');
   }, [activeTab, pendingRequests, publishedGigs, visiblePublishedGigs]);
 
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(activeItems.length / PAGE_SIZE)), [activeItems.length]);
+
+  const paginatedItems = useMemo(() => {
+    const startIndex = (page - 1) * PAGE_SIZE;
+    return activeItems.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [activeItems, page]);
+
   const providerRating = useMemo(() => {
     const rating = Number(providerProfileData?.data?.provider?.rating ?? user?.averageRating ?? 0);
     return Number.isFinite(rating) ? rating : 0;
@@ -149,6 +160,16 @@ export default function ProviderGigsPage() {
     pending: pendingRequests.filter((gig) => gig.status === 'pending_approval').length,
     rejected: publishedGigs.filter((gig) => gig.status === 'rejected' || gig.status === 'draft').length,
   };
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
@@ -215,7 +236,7 @@ export default function ProviderGigsPage() {
         <AnimatePresence mode="wait">
           {!loading ? (
             <motion.div key={activeTab} variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {activeItems.map((gig) => {
+              {paginatedItems.map((gig) => {
                 const cover = gig.images?.[0] || 'https://images.unsplash.com/photo-1581578731548-c64695cc6954?q=80&w=800&auto=format&fit=crop';
                 const isPending = gig.status === 'pending_approval';
                 return (
@@ -302,9 +323,26 @@ export default function ProviderGigsPage() {
 
                         <div className="space-y-2 text-sm text-slate-500 mb-5">
                           {gig.baseCity ? <p className="font-medium">{gig.baseCity}</p> : null}
+                          <p className="font-medium">Expert type: {gig.expertType === 'team' ? 'Team' : 'Solo'}</p>
                           {gig.travelRadiusKm ? <p className="font-medium">Service radius: {gig.travelRadiusKm} km</p> : null}
                           {gig.description ? <p className="line-clamp-2">{gig.description}</p> : null}
                         </div>
+
+                        {Array.isArray(gig.packages) && gig.packages.length > 0 ? (
+                          <div className="mb-5 flex flex-wrap gap-2">
+                            {gig.packages.map((pkg) => {
+                              const adminFee = calculateAdminFeeAmount(Number(pkg.price || 0));
+                              return (
+                                <span
+                                  key={`${gig._id}-${pkg.name}`}
+                                  className="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700"
+                                >
+                                  {pkg.name}: Admin Fee ${adminFee.toFixed(2)}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : null}
 
                         <div className="flex items-center justify-between mb-6">
                           <div className="flex items-center gap-1.5">
@@ -351,6 +389,34 @@ export default function ProviderGigsPage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {!loading && activeItems.length > PAGE_SIZE ? (
+          <div className="mt-8 flex flex-col items-center justify-between gap-4 rounded-[2rem] border border-slate-200 bg-white px-5 py-4 md:flex-row">
+            <p className="text-sm font-bold text-slate-500">
+              Page {page} of {totalPages}
+            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {deleteTarget ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
