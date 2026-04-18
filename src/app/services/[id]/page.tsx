@@ -22,6 +22,9 @@ type ApiService = {
   requirements?: string;
   images?: string[];
   baseCity?: string;
+  zipCode?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
   travelRadiusKm?: number | null;
   avgPackagePrice?: number;
   packages?: ApiPackage[];
@@ -67,7 +70,10 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
     },
     location: {
       city: service.baseCity || 'Location unavailable',
+      lat: typeof service.locationLat === 'number' ? service.locationLat : null,
+      lng: typeof service.locationLng === 'number' ? service.locationLng : null,
     },
+    zipCode: service.zipCode || '',
     startingPrice:
       Number(service.avgPackagePrice) ||
       (normalizedPackages.filter((item) => item.price > 0).reduce((sum, item) => sum + item.price, 0) /

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { Search } from 'lucide-react';
 import { DEFAULT_CATEGORIES, getIconByName } from '@/data/categories';
 import { useGetCategoriesQuery } from '@/store/services/apiSlice';
 
@@ -19,6 +20,9 @@ type ApiCategory = {
 
 export default function CategoriesPage() {
   const { data, isLoading } = useGetCategoriesQuery();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement | null>(null);
   const approvedCategories = useMemo(
     () => (Array.isArray(data?.data) ? (data.data as ApiCategory[]) : []),
     [data]
@@ -39,6 +43,23 @@ export default function CategoriesPage() {
       })),
     ];
   }, [approvedCategories]);
+
+  const filteredCategories = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return visibleCategories;
+    return visibleCategories.filter((category) => category.name.toLowerCase().includes(query));
+  }, [searchQuery, visibleCategories]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!searchRef.current?.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-20">
@@ -67,13 +88,62 @@ export default function CategoriesPage() {
           >
             Find the perfect professional for every house task from our wide range of service categories.
           </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mx-auto mt-8 w-full max-w-xl"
+            ref={searchRef}
+          >
+            <div className="relative">
+              <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onClick={() => setIsDropdownOpen(true)}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                placeholder="Search categories"
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold text-slate-800 outline-none transition focus:border-[#2286BE] focus:ring-2 focus:ring-[#2286BE]/10"
+              />
+              {isDropdownOpen ? (
+                <div className="absolute left-0 right-0 top-full z-30 mt-3 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white text-left shadow-2xl shadow-slate-200/50">
+                  <div className="max-h-72 overflow-y-auto py-2">
+                    {filteredCategories.length ? (
+                      filteredCategories.map((category) => (
+                        <button
+                          key={category.slug}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery(category.name);
+                            setIsDropdownOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between px-5 py-3 transition hover:bg-slate-50"
+                        >
+                          <span className="text-sm font-black text-slate-900">{category.name}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Category
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-5 py-4 text-sm font-semibold text-slate-500">No categories found.</div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </motion.div>
           {isLoading ? (
             <p className="mt-4 text-sm font-semibold text-slate-400">Loading approved custom categories...</p>
           ) : null}
         </header>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {visibleCategories.map((cat, idx) => (
+          {filteredCategories.map((cat, idx) => (
             <motion.div
               key={cat.slug}
               initial={{ opacity: 0, scale: 0.9 }}

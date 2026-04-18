@@ -243,19 +243,33 @@ export const apiSlice = createApi({
         page?: number;
         limit?: number;
         radiusKm?: number;
+        requireCoverage?: boolean;
         categorySlug?: string;
         search?: string;
+        zipCode?: string;
         lat?: number | null;
         lng?: number | null;
       }
     >({
-      query: ({ page = 1, limit = 9, radiusKm = 25, categorySlug = 'all', search = '', lat = null, lng = null }) => {
+      query: ({
+        page = 1,
+        limit = 9,
+        radiusKm = 25,
+        requireCoverage = false,
+        categorySlug = 'all',
+        search = '',
+        zipCode = '',
+        lat = null,
+        lng = null,
+      }) => {
         const params = new URLSearchParams();
         params.set('page', String(page));
         params.set('limit', String(limit));
         params.set('radiusKm', String(radiusKm));
+        params.set('requireCoverage', String(requireCoverage));
         params.set('categorySlug', categorySlug || 'all');
         if (search.trim()) params.set('search', search.trim());
+        if (zipCode.trim()) params.set('zipCode', zipCode.trim());
         if (typeof lat === 'number') params.set('lat', String(lat));
         if (typeof lng === 'number') params.set('lng', String(lng));
         return `/api/gigs/public?${params.toString()}`;
@@ -705,6 +719,7 @@ export const apiSlice = createApi({
 export const {
   useGetFaqsQuery,
   useGetCategoriesQuery,
+  useLazyGetPublicServicesQuery,
   useLazyGetMyGigsQuery,
   useGetPublicServicesQuery,
   useGetPublicServiceByIdQuery,

@@ -38,9 +38,22 @@ interface ServiceDetailClientProps {
   service: any; // Using any for brevity in this mock context, in prod would be ServiceItem
 }
 
+const calculateDistanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const deltaLat = toRadians(toLat - fromLat);
+  const deltaLng = toRadians(toLng - fromLng);
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(toRadians(fromLat)) * Math.cos(toRadians(toLat)) * Math.sin(deltaLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Number((earthRadiusKm * c).toFixed(1));
+};
+
 export default function ServiceDetailClient({ service }: ServiceDetailClientProps) {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const galleryImages = React.useMemo(
     () =>
       Array.isArray(service.images) && service.images.length > 0
@@ -96,6 +109,29 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   }, [service.packages, service.startingPrice]);
 
   const handleBooking = () => {
+    const clientLat = typeof user?.locationLat === 'number' ? user.locationLat : null;
+    const clientLng = typeof user?.locationLng === 'number' ? user.locationLng : null;
+    const serviceLat = typeof service?.location?.lat === 'number' ? service.location.lat : null;
+    const serviceLng = typeof service?.location?.lng === 'number' ? service.location.lng : null;
+    const travelRadius = Number(service?.travelRadius);
+
+    if (
+      isAuthenticated &&
+      user?.role === 'client' &&
+      clientLat !== null &&
+      clientLng !== null &&
+      serviceLat !== null &&
+      serviceLng !== null &&
+      Number.isFinite(travelRadius) &&
+      travelRadius > 0
+    ) {
+      const distanceKm = calculateDistanceKm(clientLat, clientLng, serviceLat, serviceLng);
+      if (distanceKm > travelRadius) {
+        toast.error('Client cannot place this order because the location is outside the gig radius');
+        return;
+      }
+    }
+
     router.push(`/book/${service.id}`);
   };
 

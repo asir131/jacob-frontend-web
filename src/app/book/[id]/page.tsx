@@ -21,6 +21,7 @@ type ApiService = {
   requirements?: string;
   images?: string[];
   baseCity?: string;
+  zipCode?: string;
   travelRadiusKm?: number | null;
   avgPackagePrice?: number;
   packages?: ApiPackage[];
@@ -67,6 +68,7 @@ const toBookingShape = (service: ApiService, id: string) => {
     location: {
       city: service.baseCity || 'Location unavailable',
     },
+    zipCode: service.zipCode || '',
     startingPrice:
       Number(service.avgPackagePrice) ||
       (normalizedPackages.filter((item) => item.price > 0).reduce((sum, item) => sum + item.price, 0) /

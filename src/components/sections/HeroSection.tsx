@@ -4,12 +4,105 @@ import React from 'react';
 import Image from 'next/image';
 import { Search, MapPin, Clock, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
+import { DEFAULT_CATEGORIES } from '@/data/categories';
+import { useGetCategoriesQuery, useLazyGetPublicServicesQuery } from '@/store/services/apiSlice';
+import { extractZipCode, isValidZipCode } from '@/lib/zip';
+
+type CategoryItem = {
+  slug?: string;
+  name?: string;
+};
+
+type PublicGigItem = {
+  id?: string;
+  title?: string;
+  categoryName?: string;
+  zipCode?: string;
+};
 
 export default function HeroSection() {
+  const router = useRouter();
+  const searchBoxRef = React.useRef<HTMLFormElement | null>(null);
+  const [searchText, setSearchText] = React.useState('');
+  const [zipCode, setZipCode] = React.useState('');
+  const [selectedCategorySlug, setSelectedCategorySlug] = React.useState('');
+  const [showCategorySuggestions, setShowCategorySuggestions] = React.useState(false);
+  const [searchedGigs, setSearchedGigs] = React.useState<PublicGigItem[]>([]);
+  const { data: categoriesPayload } = useGetCategoriesQuery();
+  const [triggerSearch, { isFetching }] = useLazyGetPublicServicesQuery();
+
+  const categories = React.useMemo(() => {
+    const approvedCategories = ((categoriesPayload?.data || []) as CategoryItem[]).filter(
+      (item) => item?.name && item?.slug
+    );
+    const defaultSlugs = new Set(DEFAULT_CATEGORIES.map((category) => category.slug));
+    const customCategories = approvedCategories.filter((category) => !defaultSlugs.has(String(category.slug || '')));
+
+    return [
+      ...DEFAULT_CATEGORIES.map((category) => ({
+        name: category.name,
+        slug: category.slug,
+      })),
+      ...customCategories.map((category) => ({
+        name: String(category.name || ''),
+        slug: String(category.slug || ''),
+      })),
+    ];
+  }, [categoriesPayload?.data]);
+
+  const categorySuggestions = React.useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((item) => String(item.name || '').toLowerCase().includes(query));
+  }, [categories, searchText]);
+
+  React.useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!searchBoxRef.current?.contains(event.target as Node)) {
+        setShowCategorySuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const normalizedZip = extractZipCode(zipCode);
+    if (!isValidZipCode(normalizedZip)) {
+      toast.error('Please enter a valid 5-digit zip code.');
+      return;
+    }
+
+    try {
+      const payload = await triggerSearch({
+        page: 1,
+        limit: 100,
+        radiusKm: 100,
+        categorySlug: selectedCategorySlug || 'all',
+        search: searchText.trim(),
+        zipCode: normalizedZip,
+      }).unwrap();
+
+      const items = Array.isArray(payload?.data?.items) ? (payload.data.items as PublicGigItem[]) : [];
+      setSearchedGigs(items);
+      setShowCategorySuggestions(false);
+
+      if (!items.length) {
+        toast.info('No gigs found in this zip area.');
+      }
+    } catch {
+      toast.error('Could not search gigs right now.');
+    }
+  };
+
   return (
     <section className="relative w-full overflow-hidden py-20 lg:py-24">
-      {/* Background Texture — Using CSS opacity for subtle texture */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.3]"
         style={{ backgroundImage: `url('/herobg.png')` }}
@@ -18,8 +111,6 @@ export default function HeroSection() {
 
       <div className="relative mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
-
-          {/* LEFT COLUMN: Main H1 and Search */}
           <div className="lg:col-span-7">
             <h1 className="text-[38px] font-[800] leading-[1.2] text-[#111827] sm:text-[48px]">
               You. Your Neighbors. Saving time{' '}
@@ -27,52 +118,118 @@ export default function HeroSection() {
               with <span className="text-[#2286BE]">{BRAND.name}.</span>
             </h1>
 
-            {/* Accessible Search Bar */}
             <form
               role="search"
               aria-label="Find a home service"
-              className="mt-8 flex h-[56px] w-full max-w-[580px] items-center rounded-[12px] border border-[#E0E0E0] bg-white p-1 shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-              onSubmit={(e) => e.preventDefault()}
+              className="mt-8 w-full max-w-[580px]"
+              onSubmit={handleSearchSubmit}
+              ref={searchBoxRef}
             >
-              <label htmlFor="hero-search" className="sr-only">
-                What do you need help with?
-              </label>
-              <div className="flex flex-1 items-center px-4">
-                <input
-                  id="hero-search"
-                  type="text"
-                  placeholder="What do you need help with?"
-                  className="w-full bg-transparent text-[15px] text-[#333] outline-none placeholder:text-gray-400 font-medium"
-                />
+              <div className="flex h-[56px] w-full items-center rounded-[12px] border border-[#E0E0E0] bg-white p-1 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                <label htmlFor="hero-search" className="sr-only">
+                  Search category
+                </label>
+                <div className="flex flex-1 items-center px-4">
+                  <input
+                    id="hero-search"
+                    type="text"
+                    value={searchText}
+                    onChange={(e) => {
+                      setSearchText(e.target.value);
+                      setSelectedCategorySlug('');
+                      setShowCategorySuggestions(true);
+                      setSearchedGigs([]);
+                    }}
+                    onFocus={() => setShowCategorySuggestions(true)}
+                    placeholder="Search category"
+                    className="w-full bg-transparent text-[15px] text-[#333] outline-none placeholder:text-gray-400 font-medium"
+                  />
+                </div>
+
+                <div className="h-6 w-[1px] bg-[#E0E0E0]" aria-hidden="true" />
+
+                <label htmlFor="hero-zip" className="sr-only">
+                  Zip code
+                </label>
+                <div className="flex items-center gap-2 px-4 whitespace-nowrap">
+                  <MapPin size={18} className="text-[#2286BE]" strokeWidth={2.5} aria-hidden="true" />
+                  <input
+                    id="hero-zip"
+                    type="text"
+                    value={zipCode}
+                    onChange={(e) => {
+                      setZipCode(e.target.value.replace(/\D/g, '').slice(0, 5));
+                      setSearchedGigs([]);
+                    }}
+                    placeholder="Zip"
+                    className="w-20 bg-transparent text-[15px] text-slate-700 outline-none placeholder:text-gray-400 font-medium"
+                    maxLength={5}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  aria-label="Search for home services"
+                  className="flex h-full aspect-square items-center justify-center rounded-[8px] bg-[#2286BE] text-white hover:bg-[#1b6da0] transition-transform active:scale-95 shadow-md shadow-primary/20 disabled:opacity-60"
+                  disabled={isFetching}
+                >
+                  <Search size={20} strokeWidth={3} aria-hidden="true" />
+                </button>
               </div>
 
-              {/* Native Divider */}
-              <div className="h-6 w-[1px] bg-[#E0E0E0]" aria-hidden="true" />
+              {showCategorySuggestions ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40">
+                  <div className="max-h-56 overflow-y-auto py-2">
+                    {categorySuggestions.length ? (
+                      categorySuggestions.map((category) => (
+                        <button
+                          key={category.slug}
+                          type="button"
+                          onClick={() => {
+                            setSearchText(String(category.name || ''));
+                            setSelectedCategorySlug(String(category.slug || ''));
+                            setShowCategorySuggestions(false);
+                          }}
+                          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50"
+                        >
+                          <span className="text-sm font-bold text-slate-800">{category.name}</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Category</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm font-medium text-slate-500">No matching category found.</div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
 
-              <label htmlFor="hero-zip" className="sr-only">
-                Zip code
-              </label>
-              <div className="flex items-center gap-2 px-4 whitespace-nowrap">
-                <MapPin size={18} className="text-[#2286BE]" strokeWidth={2.5} aria-hidden="true" />
-                <input
-                  id="hero-zip"
-                  type="text"
-                  placeholder="Zip"
-                  className="w-16 bg-transparent text-[15px] text-slate-700 outline-none placeholder:text-gray-400 font-medium"
-                  maxLength={5}
-                />
-              </div>
-
-              <button
-                type="submit"
-                aria-label="Search for home services"
-                className="flex h-full aspect-square items-center justify-center rounded-[8px] bg-[#2286BE] text-white hover:bg-[#1b6da0] transition-transform active:scale-95 shadow-md shadow-primary/20"
-              >
-                <Search size={20} strokeWidth={3} aria-hidden="true" />
-              </button>
+              {searchedGigs.length ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40">
+                  <div className="border-b border-slate-100 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500">
+                    Available gigs in ZIP {extractZipCode(zipCode)}
+                  </div>
+                  <div className="max-h-[228px] overflow-y-auto">
+                    {searchedGigs.map((gig) => (
+                      <button
+                        key={gig.id}
+                        type="button"
+                        onClick={() => router.push(`/services/${gig.id}`)}
+                        className="flex w-full items-center justify-between border-b border-slate-100 px-4 py-4 text-left last:border-b-0 hover:bg-slate-50"
+                      >
+                        <div>
+                          <div className="text-sm font-black text-slate-900">{gig.title || 'Untitled gig'}</div>
+                          <div className="mt-1 text-xs font-semibold text-slate-500">
+                            {gig.categoryName || 'General'} • ZIP {gig.zipCode || extractZipCode(zipCode)}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#2286BE]">Open</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </form>
 
-            {/* Quick Link Buttons for Connections */}
             <div className="mt-8 flex flex-wrap gap-4">
                <Link href="/services">
                   <button className="h-14 px-8 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-[15px] uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-[#2286BE]/20 active:scale-95">
@@ -86,7 +243,6 @@ export default function HeroSection() {
                </Link>
             </div>
 
-            {/* Trust Badges */}
             <div className="mt-8 flex flex-wrap gap-x-8 gap-y-4">
               <div className="flex items-center gap-3">
                 <div
@@ -129,7 +285,6 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Premium Image Collage */}
           <div className="lg:col-span-5 hidden sm:grid grid-cols-2 gap-3">
             <div className="relative h-[200px] sm:h-[220px] overflow-hidden rounded-[20px] shadow-xl shadow-slate-200/50">
               <Image
@@ -160,7 +315,6 @@ export default function HeroSection() {
               />
             </div>
           </div>
-
         </div>
       </div>
     </section>

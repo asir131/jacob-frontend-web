@@ -103,6 +103,7 @@ export default function BrowseServicesPage() {
     page,
     limit,
     radiusKm: radius,
+    requireCoverage: true,
     categorySlug: selectedCategory,
     search: searchQuery,
     lat,
