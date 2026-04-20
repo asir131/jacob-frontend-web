@@ -55,6 +55,8 @@ type ClientOrder = {
     id: string;
     name: string;
     avatar: string;
+    averageRating?: number;
+    reviewCount?: number;
     completedOrders?: number;
   };
   paymentStatus?: 'unpaid' | 'pending' | 'paid' | 'failed';
@@ -99,6 +101,8 @@ export default function OrderTrackingPage() {
   const [sendResolutionMessage, { isLoading: isSendingResolution }] = useSendClientResolutionMessageMutation();
 
   const order = useMemo(() => (data?.data?.order || null) as ClientOrder | null, [data]);
+  const providerRating = Number(order?.provider?.averageRating || 0);
+  const providerReviewCount = Number(order?.provider?.reviewCount || 0);
   const orderStatus = order?.status || 'pending';
   const displayStatus = statusLabel(orderStatus as ClientOrder['status']);
   const messagePath = order
@@ -427,8 +431,12 @@ export default function OrderTrackingPage() {
                 <h3 className="text-xl font-black text-slate-900 mb-1">{order.provider?.name || 'Provider'}</h3>
                 <div className="flex items-center justify-center gap-2 mb-8 text-sm font-bold text-slate-400">
                   <Star size={14} className="text-amber-400 fill-amber-400" />
-                  <span className="text-slate-900">4.9</span>
-                  <span>({Number(order.provider?.completedOrders || 0)} orders)</span>
+                  <span className="text-slate-900">{providerRating > 0 ? providerRating.toFixed(1) : 'New'}</span>
+                  <span>
+                    {providerReviewCount > 0
+                      ? `(${providerReviewCount} review${providerReviewCount === 1 ? '' : 's'})`
+                      : `(${Number(order.provider?.completedOrders || 0)} orders)`}
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <Link href={messagePath} className="block">

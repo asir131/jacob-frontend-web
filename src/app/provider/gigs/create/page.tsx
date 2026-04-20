@@ -28,15 +28,27 @@ type PackageState = {
 };
 
 const PACKAGE_NAMES = ['Basic', 'Standard', 'Premium'];
+const PACKAGE_TITLES = ['Basic Package', 'Standard Package', 'Premium Package'];
+const RADIUS_MILES_OPTIONS = ['5', '10', '25', '50'];
+const MILES_TO_KM = 1.60934;
+
+const convertMilesToKm = (miles: string) => Math.round((Number(miles) || 0) * MILES_TO_KM);
+const convertKmToNearestMilesOption = (km: number | null | undefined) => {
+  const miles = (Number(km) || 0) / MILES_TO_KM;
+  return RADIUS_MILES_OPTIONS.reduce((closest, option) => {
+    return Math.abs(Number(option) - miles) < Math.abs(Number(closest) - miles) ? option : closest;
+  }, RADIUS_MILES_OPTIONS[0]);
+};
+
 const INITIAL_PACKAGES: PackageState[] = PACKAGE_NAMES.map((name, index) => ({
   name,
-  title: '',
+  title: PACKAGE_TITLES[index],
   description: '',
   deliveryTime: String(index + 1),
   price: String((index + 1) * 15),
 }));
 
-const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 };
+const DEFAULT_CENTER = { lat: 40.7128, lng: -74.006 };
 const MAX_IMAGE_COUNT = 4;
 
 type LoadedGig = {
@@ -58,6 +70,12 @@ type LoadedGig = {
   status?: string;
 };
 
+type PublishGigResponseData = {
+  gigRequest?: {
+    status?: string;
+  };
+};
+
 export default function CreateGigPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,7 +94,7 @@ export default function CreateGigPage() {
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   const [gigDescription, setGigDescription] = useState('');
   const [gigRequirements, setGigRequirements] = useState('');
-  const [baseCity, setBaseCity] = useState('Dhaka, Bangladesh');
+  const [baseCity, setBaseCity] = useState('');
   const [selectedRadius, setSelectedRadius] = useState('25');
   const [selectedMapCoords, setSelectedMapCoords] = useState(DEFAULT_CENTER);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,7 +143,7 @@ export default function CreateGigPage() {
           (gig.packages?.length
             ? gig.packages.map((pkg, index) => ({
                 name: pkg.name || PACKAGE_NAMES[index] || `Package ${index + 1}`,
-                title: pkg.title || '',
+                title: PACKAGE_TITLES[index] || pkg.title || `${pkg.name || PACKAGE_NAMES[index] || 'Package'} Package`,
                 description: pkg.description || '',
                 deliveryTime: pkg.deliveryTime || String(index + 1),
                 price: String(pkg.price ?? ''),
@@ -138,7 +156,7 @@ export default function CreateGigPage() {
         setGigDescription(gig.description || '');
         setGigRequirements(gig.requirements || '');
         setBaseCity(gig.baseCity || '');
-        setSelectedRadius(String(gig.travelRadiusKm || 25));
+        setSelectedRadius(convertKmToNearestMilesOption(gig.travelRadiusKm));
         setSelectedMapCoords({
           lat: typeof gig.locationLat === 'number' ? gig.locationLat : DEFAULT_CENTER.lat,
           lng: typeof gig.locationLng === 'number' ? gig.locationLng : DEFAULT_CENTER.lng,
@@ -259,7 +277,7 @@ export default function CreateGigPage() {
       formData.append('baseCity', baseCity.trim());
       formData.append('locationLat', String(selectedMapCoords.lat));
       formData.append('locationLng', String(selectedMapCoords.lng));
-      formData.append('travelRadiusKm', String(Number(selectedRadius) || 0));
+      formData.append('travelRadiusKm', String(convertMilesToKm(selectedRadius)));
       formData.append('images', JSON.stringify(existingImageUrls));
       images.forEach((file) => {
         formData.append('images', file);
@@ -273,7 +291,8 @@ export default function CreateGigPage() {
         return;
       }
 
-      if (payload?.data?.gigRequest?.status === 'pending_approval') {
+      const payloadData = (payload?.data || {}) as PublishGigResponseData;
+      if (payloadData?.gigRequest?.status === 'pending_approval') {
         toast.success('Your gig is under admin review');
       } else if (editId) {
         toast.success('Your gig has been updated');
@@ -444,9 +463,8 @@ export default function CreateGigPage() {
                         <label className="text-xs font-semibold text-slate-500 mb-1 block">Title</label>
                         <Input
                           value={pkg.title}
-                          onChange={(e) => updatePackage(idx, 'title', e.target.value)}
-                          className="h-10 text-sm focus-visible:ring-[#2286BE]"
-                          placeholder={`${pkg.name} package`}
+                          readOnly
+                          className="h-10 text-sm bg-slate-100 text-slate-600 focus-visible:ring-[#2286BE]"
                         />
                       </div>
                       <div>
@@ -587,20 +605,25 @@ export default function CreateGigPage() {
                     </div>
                     <div className="relative">
                       <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <Input value={baseCity} onChange={(e) => setBaseCity(e.target.value)} className="h-12 pl-10 focus-visible:ring-[#2286BE]" />
+                      <Input
+                        value={baseCity}
+                        onChange={(e) => setBaseCity(e.target.value)}
+                        placeholder="Brooklyn, New York, USA"
+                        className="h-12 pl-10 focus-visible:ring-[#2286BE]"
+                      />
                     </div>
                   </div>
                   <div>
                     <label className="text-sm font-bold text-slate-800 mb-2 block">Maximum Travel Radius</label>
                     <RadioGroup value={selectedRadius} onValueChange={setSelectedRadius} className="grid grid-cols-2 gap-3">
-                      {['5', '10', '25', '50'].map((radius) => (
+                      {RADIUS_MILES_OPTIONS.map((radius) => (
                         <div key={radius} className="relative">
                           <RadioGroupItem value={radius} id={`rad-${radius}`} className="peer sr-only" />
                           <label
                             htmlFor={`rad-${radius}`}
                             className="flex items-center justify-center p-3 font-semibold text-slate-600 border border-slate-200 rounded-lg cursor-pointer peer-data-[state=checked]:border-[#2286BE] peer-data-[state=checked]:bg-primary-soft peer-data-[state=checked]:text-[#2286BE] hover:bg-slate-50 transition-colors"
                           >
-                            Within {radius} km
+                            Within {radius} miles
                           </label>
                         </div>
                       ))}
@@ -636,7 +659,7 @@ export default function CreateGigPage() {
                 <div className="flex justify-between gap-4"><span>Expert Type:</span> <span className="font-semibold text-slate-900 text-right">{expertType === 'team' ? 'Team' : 'Solo'}</span></div>
                 <div className="flex justify-between gap-4"><span>Images:</span> <span className="font-semibold text-slate-900 text-right">{displayedImagePreviews.length} selected</span></div>
                 <div className="flex justify-between gap-4"><span>Location:</span> <span className="font-semibold text-slate-900 text-right">{baseCity}</span></div>
-                <div className="flex justify-between gap-4"><span>Radius:</span> <span className="font-semibold text-slate-900 text-right">{selectedRadius} km</span></div>
+                <div className="flex justify-between gap-4"><span>Radius:</span> <span className="font-semibold text-slate-900 text-right">{selectedRadius} miles</span></div>
               </div>
             </div>
           )}

@@ -43,6 +43,11 @@ type StaticServiceMeta = {
   rating: number;
 };
 
+type CategoryOption = {
+  slug?: string;
+  name?: string;
+};
+
 const EXPERT_TYPES: StaticServiceMeta['expertType'][] = ['Solo', 'Team'];
 const SELLER_LEVELS: StaticServiceMeta['sellerLevel'][] = ['Top Rated', 'Level 3', 'Level 2', 'Level 1', 'New'];
 
@@ -90,8 +95,8 @@ export default function BrowseServicesPage() {
 
   const { data: categoriesPayload } = useGetCategoriesQuery();
   const categories = useMemo(() => {
-    const list = Array.isArray(categoriesPayload?.data) ? categoriesPayload.data : [];
-    const apiCategories = list.map((item: { slug?: string; name?: string }) => ({
+    const list = (Array.isArray(categoriesPayload?.data) ? categoriesPayload.data : []) as CategoryOption[];
+    const apiCategories = list.map((item) => ({
       slug: item?.slug || '',
       name: item?.name || 'Category',
     }));

@@ -65,6 +65,7 @@ const EMOJI_OPTIONS = ['😀', '😂', '😍', '👍', '🙏', '🔥', '🎉', '
 
 type CallInvite = {
   conversationId: string;
+  targetUserId?: string;
   callType: 'voice' | 'video';
   offer?: RTCSessionDescriptionInit;
   senderId?: string;

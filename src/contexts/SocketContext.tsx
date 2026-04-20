@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   addNotification,
   clearNotifications as clearNotificationsAction,
+  hydrateNotifications,
   LiveNotification,
   markAllNotificationsAsRead as markAllNotificationsAsReadAction,
   setSocketConnectedState,
@@ -22,6 +23,7 @@ type SocketContextValue = {
 };
 
 const SocketContext = createContext<SocketContextValue | undefined>(undefined);
+const NOTIFICATIONS_STORAGE_KEY = 'live_notifications';
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, updateProfile, user } = useAuth();
@@ -35,6 +37,27 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     walletBalanceRef.current = Number(user?.walletBalance || 0);
     totalEarningsRef.current = Number(user?.totalEarnings || 0);
   }, [user?.totalEarnings, user?.walletBalance]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isAuthenticated) return;
+
+    try {
+      const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as LiveNotification[];
+      if (!Array.isArray(parsed)) return;
+      dispatch(hydrateNotifications(parsed));
+    } catch {
+      localStorage.removeItem(NOTIFICATIONS_STORAGE_KEY);
+    }
+  }, [dispatch, isAuthenticated]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isAuthenticated) return;
+    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
+  }, [isAuthenticated, notifications]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

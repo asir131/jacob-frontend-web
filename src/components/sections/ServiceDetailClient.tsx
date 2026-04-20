@@ -39,6 +39,23 @@ interface ServiceDetailClientProps {
   service: any;
 }
 
+type ReviewItem = {
+  id: string;
+  name: string;
+  avatar: string;
+  rating: number;
+  date: string;
+  text: string;
+};
+
+type ApiPackage = {
+  name?: string;
+  title?: string;
+  description?: string;
+  deliveryTime?: string;
+  price?: number | string;
+};
+
 const REVIEWS_PER_PAGE = 5;
 
 const calculateDistanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
@@ -78,7 +95,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
     () => (Array.isArray(faqResponse?.data) ? faqResponse.data : []),
     [faqResponse]
   );
-  const allReviews = React.useMemo(() => {
+  const allReviews = React.useMemo<ReviewItem[]>(() => {
     if (!Array.isArray(service.reviews)) return [];
     return service.reviews
       .filter((review: any) => Number(review?.rating) > 0 && String(review?.text || '').trim())
@@ -99,14 +116,14 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   }, [service.reviews]);
   const reviewCounts = React.useMemo(
     () =>
-      allReviews.reduce((acc, review) => {
+      allReviews.reduce((acc: Record<number, number>, review: ReviewItem) => {
         acc[review.rating] = (acc[review.rating] || 0) + 1;
         return acc;
       }, {} as Record<number, number>),
     [allReviews]
   );
   const filteredReviews = React.useMemo(
-    () => (reviewFilter === 0 ? allReviews : allReviews.filter((review) => review.rating === reviewFilter)),
+    () => (reviewFilter === 0 ? allReviews : allReviews.filter((review: ReviewItem) => review.rating === reviewFilter)),
     [allReviews, reviewFilter]
   );
   const totalReviewPages = Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE));
@@ -126,15 +143,15 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   }, [reviewFilter, service.id]);
 
   const packageTabs = React.useMemo(() => {
-    const sourcePackages = Array.isArray(service.packages) ? service.packages : [];
-    const byName = new Map(
+    const sourcePackages = (Array.isArray(service.packages) ? service.packages : []) as ApiPackage[];
+    const byName = new Map<string, ApiPackage>(
       sourcePackages
-        .filter((item: any) => item && typeof item === 'object')
-        .map((item: any) => [String(item.name || '').toLowerCase(), item])
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => [String(item.name || '').toLowerCase(), item])
     );
 
     return ['basic', 'standard', 'premium'].map((key) => {
-      const fromApi = byName.get(key) || {};
+      const fromApi = byName.get(key);
       const fallbackPrice =
         key === 'basic'
           ? Number(service.startingPrice) || 0
@@ -145,17 +162,17 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
       return {
         key,
         name: key.charAt(0).toUpperCase() + key.slice(1),
-        title: String(fromApi.title || `${key.charAt(0).toUpperCase() + key.slice(1)} package`),
+        title: String(fromApi?.title || `${key.charAt(0).toUpperCase() + key.slice(1)} package`),
         description:
-          String(fromApi.description || '') ||
+          String(fromApi?.description || '') ||
           (key === 'basic'
             ? 'Standard on-site service with essentials covered.'
             : key === 'standard'
               ? 'Comprehensive service with premium materials and double duration.'
               : 'VIP priority service, team of experts, and full cleanup guarantee.'),
         deliveryTime:
-          String(fromApi.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
-        price: Number(fromApi.price) || fallbackPrice,
+          String(fromApi?.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
+        price: Number(fromApi?.price) || fallbackPrice,
       };
     });
   }, [service.packages, service.startingPrice]);

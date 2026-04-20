@@ -39,6 +39,17 @@ const normalizeAddressText = (value: string) => {
   return 'Area unavailable, District unavailable, ZIP N/A';
 };
 
+type ClientProfileResponseUser = {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  preferredLanguage?: string;
+  avatar?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
+};
+
 export default function ClientProfilePage() {
   const { user, role, logout, updateProfile } = useAuth();
   const { detectLocation } = useLocation();
@@ -230,7 +241,7 @@ export default function ClientProfilePage() {
         return;
       }
 
-      const nextUser = payload?.data?.user;
+      const nextUser = (payload?.data?.user || {}) as ClientProfileResponseUser;
       updateProfile({
         firstName: nextUser?.firstName ?? firstName,
         lastName: nextUser?.lastName ?? lastName,

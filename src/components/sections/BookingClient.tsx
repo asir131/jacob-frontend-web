@@ -50,16 +50,24 @@ interface BookingClientProps {
   service: any;
 }
 
+type ApiPackage = {
+  name?: string;
+  title?: string;
+  description?: string;
+  deliveryTime?: string;
+  price?: number | string;
+};
+
 export default function BookingClient({ service }: BookingClientProps) {
   const router = useRouter();
-  const sourcePackages = Array.isArray(service?.packages) ? service.packages : [];
-  const byName = new Map(
+  const sourcePackages = (Array.isArray(service?.packages) ? service.packages : []) as ApiPackage[];
+  const byName = new Map<string, ApiPackage>(
     sourcePackages
-      .filter((item: any) => item && typeof item === 'object')
-      .map((item: any) => [String(item.name || '').toLowerCase(), item])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => [String(item.name || '').toLowerCase(), item])
   );
   const packageOptions = ['basic', 'standard', 'premium'].map((key) => {
-    const fromApi = byName.get(key) || {};
+    const fromApi = byName.get(key);
     const fallbackPrice =
       key === 'basic'
         ? Number(service?.startingPrice) || 0
@@ -70,17 +78,17 @@ export default function BookingClient({ service }: BookingClientProps) {
     return {
       key,
       label: `${key.charAt(0).toUpperCase() + key.slice(1)} Package`,
-      title: String(fromApi.title || `${key.charAt(0).toUpperCase() + key.slice(1)} package`),
+      title: String(fromApi?.title || `${key.charAt(0).toUpperCase() + key.slice(1)} package`),
       description:
-        String(fromApi.description || '') ||
+        String(fromApi?.description || '') ||
         (key === 'basic'
           ? 'Standard on-site service with essentials covered.'
           : key === 'standard'
             ? 'Comprehensive service with premium materials and double duration.'
             : 'VIP priority service, team of experts, and full cleanup guarantee.'),
       deliveryTime:
-        String(fromApi.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
-      price: Number(fromApi.price) || fallbackPrice,
+        String(fromApi?.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
+      price: Number(fromApi?.price) || fallbackPrice,
     };
   });
 

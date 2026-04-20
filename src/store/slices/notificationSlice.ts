@@ -24,8 +24,18 @@ const notificationSlice = createSlice({
   name: 'notifications',
   initialState,
   reducers: {
+    hydrateNotifications: (state, action: PayloadAction<LiveNotification[]>) => {
+      state.items = Array.isArray(action.payload) ? action.payload : [];
+    },
     addNotification: (state, action: PayloadAction<LiveNotification>) => {
-      state.items.unshift(action.payload);
+      const nextNotification = action.payload;
+      state.items = [
+        nextNotification,
+        ...state.items.filter((item) => item.id !== nextNotification.id),
+      ];
+    },
+    removeNotification: (state, action: PayloadAction<string>) => {
+      state.items = state.items.filter((item) => item.id !== action.payload);
     },
     markAllNotificationsAsRead: (state) => {
       state.items = state.items.map((item) => ({ ...item, unread: false }));
@@ -40,7 +50,9 @@ const notificationSlice = createSlice({
 });
 
 export const {
+  hydrateNotifications,
   addNotification,
+  removeNotification,
   markAllNotificationsAsRead,
   clearNotifications,
   setSocketConnectedState,

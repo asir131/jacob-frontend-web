@@ -56,6 +56,12 @@ type PendingRequest = {
   customCategoryName?: string;
   gigRef?: string | { _id?: string } | null;
   status: string;
+  expertType?: 'solo' | 'team';
+  images?: string[];
+  packages?: GigPackage[];
+  baseCity?: string;
+  travelRadiusKm?: number | null;
+  description?: string;
   createdAt?: string;
 };
 

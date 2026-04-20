@@ -4,12 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-  Bell,
   Banknote,
   Briefcase,
   Camera,
   ChevronRight,
-  CreditCard,
   LogOut,
   Mail,
   MapPin,
@@ -40,6 +38,25 @@ const normalizeAddressText = (value: string) => {
   const isLatLng = /^lat\s*-?\d+(\.\d+)?\s*,\s*lng\s*-?\d+(\.\d+)?$/i.test(trimmed);
   if (!isLatLng) return value;
   return 'Area unavailable, District unavailable, ZIP N/A';
+};
+
+type ProviderProfileResponseUser = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  avatar?: string;
+  phone?: string;
+  address?: string;
+  preferredLanguage?: string;
+  businessBio?: string;
+  experienceLevel?: string;
+  serviceCity?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
+  serviceLocationLat?: number | null;
+  serviceLocationLng?: number | null;
+  payoutVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  payoutInfo?: Record<string, unknown>;
 };
 
 export default function ProviderProfilePage() {
@@ -276,7 +293,7 @@ export default function ProviderProfilePage() {
         return;
       }
 
-      const nextUser = payload?.data?.user;
+      const nextUser = (payload?.data?.user || {}) as ProviderProfileResponseUser;
       updateProfile({
         firstName: nextUser?.firstName ?? firstName,
         lastName: nextUser?.lastName ?? lastName,
@@ -508,11 +525,8 @@ export default function ProviderProfilePage() {
               <div className="mt-10 space-y-2">
                 {[
                   { id: 'profile', icon: <Briefcase size={18} />, label: 'Business Profile' },
-                  { id: 'business', icon: <User size={18} />, label: 'Service Details' },
                   { id: 'payouts', icon: <Banknote size={18} />, label: 'Payout Info' },
-                  { id: 'billing', icon: <CreditCard size={18} />, label: 'Billing & Stripe' },
                   { id: 'security', icon: <Shield size={18} />, label: 'Security' },
-                  { id: 'notifications', icon: <Bell size={18} />, label: 'Notifications' },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -800,18 +814,6 @@ export default function ProviderProfilePage() {
                   </div>
                 )}
 
-                {activeTab === 'business' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Service Details</h3>
-                      <p className="text-slate-500 font-medium">Service details section is back. We can wire full service API next.</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
-                      <p className="text-sm text-slate-700 font-semibold">Configure offered services, pricing and availability here.</p>
-                    </div>
-                  </div>
-                )}
-
                 {activeTab === 'payouts' && (
                   <div className="space-y-6">
                     <div>
@@ -843,7 +845,7 @@ export default function ProviderProfilePage() {
                       </div>
 
                       <div className="space-y-3">
-                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Routing Number (ABA Routing Number)</label>
+                        <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Routing Number</label>
                         <Input
                           value={routingNumber}
                           onChange={(e) => setRoutingNumber(e.target.value)}
@@ -936,29 +938,6 @@ export default function ProviderProfilePage() {
                   </div>
                 )}
 
-                {activeTab === 'billing' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Billing & Stripe</h3>
-                      <p className="text-slate-500 font-medium">View billing methods and Stripe configuration.</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
-                      <p className="text-sm text-slate-700 font-semibold">Billing section restored placeholder.</p>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'notifications' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Notifications</h3>
-                      <p className="text-slate-500 font-medium">Control provider notification preferences.</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 p-6 bg-slate-50">
-                      <p className="text-sm text-slate-700 font-semibold">Notifications section restored placeholder.</p>
-                    </div>
-                  </div>
-                )}
               </div>
             </motion.div>
           </div>
