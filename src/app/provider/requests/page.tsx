@@ -47,6 +47,7 @@ const itemVariants = {
 export default function ProviderRequestsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const { notifications } = useSocketNotifications();
   const lastHandledNotificationIdRef = useRef<string | null>(null);
 
@@ -85,19 +86,25 @@ export default function ProviderRequestsPage() {
 
   const handleAccept = async (id: string) => {
     try {
+      setActingRequestId(id);
       await acceptRequest(id).unwrap();
       toast.success('Request accepted. The client has been notified.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to accept request.');
+    } finally {
+      setActingRequestId(null);
     }
   };
 
   const handleIgnore = async (id: string) => {
     try {
+      setActingRequestId(id);
       await ignoreRequest(id).unwrap();
       toast.info('Request removed from your inbox.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to ignore request.');
+    } finally {
+      setActingRequestId(null);
     }
   };
 
@@ -207,16 +214,18 @@ export default function ProviderRequestsPage() {
                             variant="outline"
                             className="h-14 font-black uppercase tracking-widest text-[11px] border-slate-100 text-slate-500 hover:bg-slate-50 rounded-2xl transition-all"
                             onClick={() => handleIgnore(request.id)}
-                            disabled={isIgnoring}
+                            disabled={isIgnoring && actingRequestId === request.id}
                           >
-                            <XCircle size={18} className="mr-2" /> Ignore
+                            <XCircle size={18} className="mr-2" />
+                            {isIgnoring && actingRequestId === request.id ? 'Ignoring...' : 'Ignore'}
                           </Button>
                           <Button
                             className="h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white shadow-xl shadow-[#2286BE]/20 rounded-2xl transition-all"
                             onClick={() => handleAccept(request.id)}
-                            disabled={isAccepting}
+                            disabled={isAccepting && actingRequestId === request.id}
                           >
-                            <CheckCircle2 size={18} className="mr-2" /> Accept
+                            <CheckCircle2 size={18} className="mr-2" />
+                            {isAccepting && actingRequestId === request.id ? 'Accepting...' : 'Accept'}
                           </Button>
                         </div>
                       </div>

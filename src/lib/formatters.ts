@@ -1,5 +1,5 @@
-export const formatRating = (value: unknown, fallback = '0.00') => {
+export const formatRating = (value: unknown, fallback = '0.0') => {
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue)) return fallback;
-  return numberValue.toFixed(2);
+  return numberValue.toFixed(1);
 };

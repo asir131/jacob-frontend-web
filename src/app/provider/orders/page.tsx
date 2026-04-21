@@ -88,6 +88,7 @@ export default function ProviderOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [profileOrder, setProfileOrder] = useState<ProviderOrder | null>(null);
+  const [actingOrderId, setActingOrderId] = useState<string | null>(null);
   const { notifications } = useSocketNotifications();
   const lastHandledNotificationIdRef = useRef<string | null>(null);
 
@@ -112,19 +113,25 @@ export default function ProviderOrdersPage() {
 
   const handleAccept = async (id: string) => {
     try {
+      setActingOrderId(id);
       await acceptOrder(id).unwrap();
       toast.success('Order accepted! Client has been notified.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to accept order.');
+    } finally {
+      setActingOrderId(null);
     }
   };
 
   const handleReject = async (id: string) => {
     try {
+      setActingOrderId(id);
       await declineOrder(id).unwrap();
       toast.success('Order declined.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to decline order.');
+    } finally {
+      setActingOrderId(null);
     }
   };
 
@@ -300,16 +307,16 @@ export default function ProviderOrdersPage() {
                               variant="outline"
                               className="h-14 font-black uppercase tracking-widest text-[11px] border-slate-100 text-slate-500 hover:bg-slate-50 rounded-2xl transition-all"
                               onClick={() => handleReject(order.id)}
-                              disabled={isDeclining}
+                              disabled={isDeclining && actingOrderId === order.id}
                             >
-                              Decline
+                              {isDeclining && actingOrderId === order.id ? 'Declining...' : 'Decline'}
                             </Button>
                             <Button
                               className="h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white shadow-xl shadow-[#2286BE]/20 rounded-2xl transition-all"
                               onClick={() => handleAccept(order.id)}
-                              disabled={isAccepting}
+                              disabled={isAccepting && actingOrderId === order.id}
                             >
-                              Accept Job
+                              {isAccepting && actingOrderId === order.id ? 'Accepting...' : 'Accept Job'}
                             </Button>
                           </div>
                         )}

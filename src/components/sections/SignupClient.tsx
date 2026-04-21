@@ -16,6 +16,7 @@ type SignupForm = {
   lastName: string;
   email: string;
   password: string;
+  confirmPassword: string;
 };
 
 type SignupResponse = {
@@ -37,10 +38,24 @@ export default function SignupClient() {
     lastName: '',
     email: '',
     password: '',
+    confirmPassword: '',
   });
 
   const handleChange = (field: keyof SignupForm, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const resolveSignupErrorMessage = (error: unknown) => {
+    const apiMessage =
+      typeof error === 'object' && error !== null && 'data' in error
+        ? (error as { data?: { message?: string } }).data?.message
+        : '';
+
+    if (typeof apiMessage === 'string' && apiMessage.toLowerCase().includes('email already')) {
+      return 'Email already in use';
+    }
+
+    return 'Registration failed. Please try again or contact support.';
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,13 +69,18 @@ export default function SignupClient() {
       role,
     };
 
-    if (!payload.firstName || !payload.lastName || !payload.email || !payload.password) {
+    if (!payload.firstName || !payload.lastName || !payload.email || !payload.password || !formData.confirmPassword) {
       toast.error('Please fill in all required fields.');
       return;
     }
 
     if (payload.password.length < 8) {
       toast.error('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (payload.password !== formData.confirmPassword) {
+      toast.error('Password and confirm password do not match.');
       return;
     }
 
@@ -83,6 +103,7 @@ export default function SignupClient() {
         lastName: '',
         email: payload.email,
         password: '',
+        confirmPassword: '',
       });
 
       const expiresIn = data.data?.otpExpiresInMinutes;
@@ -105,8 +126,8 @@ export default function SignupClient() {
       }
 
       router.push(`/signup/verify-otp?email=${encodeURIComponent(payload.email)}`);
-    } catch {
-      toast.error('Registration failed. Please try again or contact support.');
+    } catch (error) {
+      toast.error(resolveSignupErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -219,6 +240,27 @@ export default function SignupClient() {
                   placeholder="Min. 8 characters"
                   value={formData.password}
                   onChange={(e) => handleChange('password', e.target.value)}
+                  className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
+                  required
+                  minLength={8}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="signup-confirm-password" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                Confirm Password
+              </label>
+              <div className="relative group">
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors" aria-hidden="true" />
+                <Input
+                  id="signup-confirm-password"
+                  type="password"
+                  name="confirmPassword"
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleChange('confirmPassword', e.target.value)}
                   className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                   minLength={8}

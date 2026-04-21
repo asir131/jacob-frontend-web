@@ -310,7 +310,7 @@ export default function ProviderWithdrawalsPage() {
                       disabled={isRequesting}
                       className="h-16 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-lg shadow-xl shadow-[#2286BE]/20 transition-all active:scale-95"
                     >
-                      {isRequesting ? 'Submitting...' : 'Confirm Withdrawal'}
+                      {isRequesting ? 'Submitting Withdrawal...' : 'Confirm Withdrawal'}
                     </Button>
                     <Button
                       type="button"

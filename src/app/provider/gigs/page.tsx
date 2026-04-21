@@ -86,6 +86,11 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
+const kmToMiles = (km?: number | null) => {
+  const numericKm = Number(km || 0);
+  return (numericKm * 0.621371).toFixed(1);
+};
+
 export default function ProviderGigsPage() {
   const PAGE_SIZE = 9;
   const { role, user } = useAuth();
@@ -330,7 +335,7 @@ export default function ProviderGigsPage() {
                         <div className="space-y-2 text-sm text-slate-500 mb-5">
                           {gig.baseCity ? <p className="font-medium">{gig.baseCity}</p> : null}
                           <p className="font-medium">Expert type: {gig.expertType === 'team' ? 'Team' : 'Solo'}</p>
-                          {gig.travelRadiusKm ? <p className="font-medium">Service radius: {gig.travelRadiusKm} km</p> : null}
+                          {gig.travelRadiusKm ? <p className="font-medium">Service radius: {kmToMiles(gig.travelRadiusKm)} miles</p> : null}
                           {gig.description ? <p className="line-clamp-2">{gig.description}</p> : null}
                         </div>
 
@@ -354,7 +359,7 @@ export default function ProviderGigsPage() {
                           <div className="flex items-center gap-1.5">
                             <div className="flex items-center bg-amber-50 px-2 py-1 rounded-lg">
                               <Star size={14} className="text-amber-500 mr-1 fill-amber-500" />
-                              <span className="text-sm font-black text-amber-700">{providerRating.toFixed(2)}</span>
+                              <span className="text-sm font-black text-amber-700">{providerRating.toFixed(1)}</span>
                             </div>
                             <span className="text-xs font-bold text-slate-400">from your profile</span>
                           </div>
@@ -383,7 +388,7 @@ export default function ProviderGigsPage() {
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">Radius</p>
                             <div className="flex items-center justify-center text-[#2286BE] gap-1">
                               <TrendingUp size={12} />
-                              <p className="font-extrabold text-xs">{gig.travelRadiusKm || 0}km</p>
+                              <p className="font-extrabold text-xs">{kmToMiles(gig.travelRadiusKm)}mi</p>
                             </div>
                           </div>
                         </div>

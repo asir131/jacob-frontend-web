@@ -34,6 +34,7 @@ export default function SavedServicesPage() {
   const { updateProfile } = useAuth();
   const { data, isLoading } = useGetSavedServicesQuery();
   const [removeSavedService, { isLoading: isRemoving }] = useRemoveSavedServiceMutation();
+  const [removingId, setRemovingId] = React.useState<string | null>(null);
 
   const savedServices = React.useMemo(
     () => ((data?.data?.items || []) as SavedService[]).filter(Boolean),
@@ -42,6 +43,7 @@ export default function SavedServicesPage() {
 
   const handleRemove = async (id: string) => {
     try {
+      setRemovingId(id);
       const response = await removeSavedService(id).unwrap();
       const nextUser = response?.data?.user as { savedServiceIds?: string[] } | undefined;
       if (nextUser) {
@@ -52,6 +54,8 @@ export default function SavedServicesPage() {
       toast.success('Service removed from saved list.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to remove saved service.');
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -122,10 +126,13 @@ export default function SavedServicesPage() {
                     </div>
                     <button
                       onClick={() => handleRemove(service.id)}
-                      disabled={isRemoving}
-                      className="absolute top-4 right-4 h-10 w-10 bg-white/95 backdrop-blur-md rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm flex items-center justify-center"
+                      disabled={isRemoving && removingId === service.id}
+                      className="absolute top-4 right-4 min-w-10 h-10 px-3 bg-white/95 backdrop-blur-md rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2"
                     >
                       <Trash2 size={18} />
+                      {isRemoving && removingId === service.id ? (
+                        <span className="text-[9px] font-black uppercase tracking-widest">Removing</span>
+                      ) : null}
                     </button>
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/60 to-transparent p-6 pt-10">
                       <Link href={`/provider/${service.provider?.id || ''}`} className="flex items-center gap-2 w-fit hover:opacity-90 transition-opacity">

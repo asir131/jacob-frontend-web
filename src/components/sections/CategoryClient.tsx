@@ -49,6 +49,7 @@ export default function CategoryClient({ slug }: { slug: string }) {
   const { user, isAuthenticated, updateProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [activeFavoriteId, setActiveFavoriteId] = useState<string | null>(null);
   const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
   const [removeSavedService, { isLoading: isRemovingSavedService }] = useRemoveSavedServiceMutation();
   const { data: categoriesPayload, isFetching: isCategoriesLoading } = useGetCategoriesQuery();
@@ -99,6 +100,7 @@ export default function CategoryClient({ slug }: { slug: string }) {
 
     const isSaved = Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(serviceId));
     try {
+      setActiveFavoriteId(String(serviceId));
       const response = isSaved
         ? await removeSavedService(String(serviceId)).unwrap()
         : await saveService(String(serviceId)).unwrap();
@@ -111,6 +113,8 @@ export default function CategoryClient({ slug }: { slug: string }) {
       toast.success(isSaved ? 'Service removed from saved list.' : 'Service saved successfully.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to update saved services.');
+    } finally {
+      setActiveFavoriteId(null);
     }
   };
 
@@ -192,6 +196,9 @@ export default function CategoryClient({ slug }: { slug: string }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {services.map((service, index) => {
               const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
+              const isSaved = Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id));
+              const isUpdatingFavorite =
+                activeFavoriteId === String(service.id) && (isSavingService || isRemovingSavedService);
               return (
                 <motion.div key={service.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
                   <Link href={`/services/${service.id}`} className="group block h-full">
@@ -214,9 +221,9 @@ export default function CategoryClient({ slug }: { slug: string }) {
                             event.stopPropagation();
                             await handleToggleFavorite(service.id);
                           }}
-                          disabled={isSavingService || isRemovingSavedService}
-                          className={`absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-md transition ${
-                            Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id))
+                          disabled={isUpdatingFavorite}
+                          className={`absolute right-4 top-4 flex min-w-10 h-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-md transition px-3 gap-2 ${
+                            isSaved
                               ? 'text-red-500'
                               : 'text-slate-400 hover:text-red-500'
                           }`}
@@ -224,12 +231,13 @@ export default function CategoryClient({ slug }: { slug: string }) {
                         >
                           <Heart
                             size={18}
-                            fill={
-                              Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id))
-                                ? 'currentColor'
-                                : 'none'
-                            }
+                            fill={isSaved ? 'currentColor' : 'none'}
                           />
+                          {isUpdatingFavorite ? (
+                            <span className="text-[9px] font-black uppercase tracking-widest">
+                              {isSaved ? 'Removing' : 'Saving'}
+                            </span>
+                          ) : null}
                         </button>
                       </div>
 

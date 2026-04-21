@@ -387,14 +387,14 @@ export default function ProviderOrderDetailPage() {
                                 variant="outline"
                                 className="h-14 rounded-2xl font-black uppercase tracking-widest text-[11px] border-red-100 text-red-600"
                               >
-                                Decline Revision
+                                {isRespondingRevision ? 'Processing...' : 'Decline Revision'}
                               </Button>
                               <Button
                                 onClick={() => handleRevisionResponse('accept')}
                                 disabled={isRespondingRevision}
                                 className="h-14 rounded-2xl font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white"
                               >
-                                Accept Revision
+                                {isRespondingRevision ? 'Processing...' : 'Accept Revision'}
                               </Button>
                             </div>
                           ) : null}

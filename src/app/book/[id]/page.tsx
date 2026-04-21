@@ -62,7 +62,7 @@ const toBookingShape = (service: ApiService, id: string) => {
       type: service.provider?.type || 'Solo',
       avatar: service.provider?.avatar || '',
       level: service.provider?.level || 'Level 2',
-      rating: Number(service.provider?.rating) || 4.8,
+      rating: Number(service.provider?.rating) || 0,
       completedOrders: Number(service.provider?.completedOrders) || 0,
     },
     location: {

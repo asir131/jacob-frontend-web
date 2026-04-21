@@ -91,6 +91,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   const [reviewPage, setReviewPage] = React.useState(1);
   const isFavorited =
     Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id));
+  const isFavoriteUpdating = isSavingService || isRemovingSavedService;
   const faqItems = React.useMemo(
     () => (Array.isArray(faqResponse?.data) ? faqResponse.data : []),
     [faqResponse]
@@ -295,13 +296,18 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 <div className="absolute top-6 right-6 flex gap-3">
                   <button
                     onClick={handleToggleFavorite}
-                    disabled={isSavingService || isRemovingSavedService}
-                    className={`h-12 w-12 bg-white/95 backdrop-blur-md rounded-2xl transition-all shadow-xl flex items-center justify-center ${
+                    disabled={isFavoriteUpdating}
+                    className={`min-w-12 h-12 px-4 bg-white/95 backdrop-blur-md rounded-2xl transition-all shadow-xl flex items-center justify-center gap-2 ${
                       isFavorited ? 'text-red-500' : 'text-slate-900 hover:text-red-500'
                     }`}
                     aria-label="Add to favorites"
                   >
                     <Heart size={20} fill={isFavorited ? 'currentColor' : 'none'} />
+                    {isFavoriteUpdating ? (
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        {isFavorited ? 'Removing' : 'Saving'}
+                      </span>
+                    ) : null}
                   </button>
                   <button
                     onClick={() => setIsShareModalOpen(true)}

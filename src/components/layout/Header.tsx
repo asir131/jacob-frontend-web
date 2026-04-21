@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -35,18 +35,9 @@ import { toast } from 'sonner';
 export default function Header() {
   const { user, role, setRole, logout, isAuthenticated } = useAuth();
   const { unreadCount } = useSocketNotifications();
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const navLinks = useMemo(() => {
     const baseLinks =
@@ -66,21 +57,17 @@ export default function Header() {
 
   return (
     <header 
-      className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 ${
-        isScrolled 
-        ? 'bg-white/80 backdrop-blur-md border-b border-slate-100 py-3 shadow-sm' 
-        : 'bg-transparent py-5'
-      }`}
+      className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-slate-100 py-3 shadow-sm"
     >
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
         <nav className="flex items-center justify-between">
           
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-all ${isScrolled ? 'bg-[#2286BE] shadow-lg shadow-primary/20 scale-95' : 'bg-white shadow-xl shadow-slate-200/50'}`}>
-               <Image src={BRAND.logo} alt={BRAND.name} width={24} height={24} className={isScrolled ? 'invert' : ''} />
+            <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-white shadow-xl shadow-slate-200/50 transition-all">
+               <Image src={BRAND.logo} alt={BRAND.name} width={24} height={24} />
             </div>
-            <span className={`text-[22px] font-black tracking-tight transition-colors ${isScrolled ? 'text-slate-900' : 'text-slate-950'}`}>
+            <span className="text-[22px] font-black tracking-tight text-slate-950 transition-colors">
                {BRAND.name}
             </span>
           </Link>
@@ -94,7 +81,7 @@ export default function Header() {
                 className={`text-[15px] font-bold transition-all relative py-2 ${
                   isActive(link.href) 
                   ? 'text-[#2286BE]' 
-                  : (isScrolled ? 'text-slate-600 hover:text-slate-900' : 'text-slate-500 hover:text-slate-950')
+                  : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {link.name}
@@ -112,7 +99,7 @@ export default function Header() {
                 {/* Notification + Chat icons - only when logged in */}
                 <div className="flex items-center gap-1 pr-4 border-r border-slate-200">
                   <Link href="/notifications" aria-label="Notifications">
-                    <button className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors relative ${isScrolled ? 'hover:bg-slate-100 text-slate-500 hover:text-[#2286BE]' : 'bg-white/50 hover:bg-white text-slate-500 hover:text-[#2286BE]'}`}>
+                    <button className="h-10 w-10 rounded-xl flex items-center justify-center transition-colors relative hover:bg-slate-100 text-slate-500 hover:text-[#2286BE]">
                       <Bell size={20} strokeWidth={2.5} />
                       {unreadCount > 0 ? (
                         <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
@@ -122,7 +109,7 @@ export default function Header() {
                     </button>
                   </Link>
                   <Link href="/messages" aria-label="Messages">
-                    <button className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors relative ${isScrolled ? 'hover:bg-slate-100 text-slate-500 hover:text-[#2286BE]' : 'bg-white/50 hover:bg-white text-slate-500 hover:text-[#2286BE]'}`}>
+                    <button className="h-10 w-10 rounded-xl flex items-center justify-center transition-colors relative hover:bg-slate-100 text-slate-500 hover:text-[#2286BE]">
                       <MessageSquare size={20} strokeWidth={2.5} />
                     </button>
                   </Link>
@@ -232,12 +219,12 @@ export default function Header() {
           </div>
 
           {/* Mobile Menu Toggle */}
-          <div className="flex items-center gap-4 lg:hidden">
+          <div className="flex items-center gap-3 lg:hidden">
             <button 
                aria-label="Toggle Mobile Menu"
                aria-expanded={isMobileMenuOpen}
                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-               className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors ${isScrolled ? 'bg-slate-100 text-slate-900' : 'bg-white text-slate-900 shadow-xl'}`}
+               className="h-10 w-10 rounded-xl flex items-center justify-center transition-colors bg-slate-100 text-slate-900"
             >
                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -253,13 +240,13 @@ export default function Header() {
            role="dialog"
            aria-modal="true"
         >
-          <div className="p-4 space-y-4">
+          <div className="p-3 space-y-3">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
                 href={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`block w-full p-4 rounded-2xl text-lg font-black transition-colors ${
+                className={`block w-full p-3.5 rounded-2xl text-base font-black transition-colors ${
                   isActive(link.href) 
                   ? 'bg-[#2286BE]/10 text-[#2286BE]' 
                   : 'text-slate-900 hover:bg-slate-50'
@@ -268,27 +255,107 @@ export default function Header() {
                 {link.name}
               </Link>
             ))}
-            <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
-               {isAuthenticated && (
-                 <div className="flex gap-4 px-2 mb-2">
-                   <Link href="/notifications" aria-label="Notifications">
-                     <button className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 relative">
-                       <Bell size={24} />
-                       {unreadCount > 0 ? (
-                         <span className="absolute top-0 right-0 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
-                           {unreadCount > 9 ? '9+' : unreadCount}
-                         </span>
-                       ) : null}
-                     </button>
-                   </Link>
-                   <Link href="/messages" aria-label="Messages">
-                     <button className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500"><MessageSquare size={24} /></button>
-                   </Link>
-                   <Link href={role === 'provider' ? '/provider/profile' : '/client/profile'} className="flex-1 h-12 rounded-2xl bg-slate-100 flex items-center px-4 gap-3 text-slate-900 font-bold">
-                      <User size={20} /> My Account
-                   </Link>
-                 </div>
-               )}
+             <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                {isAuthenticated && (
+                 <div className="flex flex-col gap-2.5 px-1 mb-1">
+                    <div className="flex gap-3">
+                      <Link href="/notifications" aria-label="Notifications" onClick={() => setIsMobileMenuOpen(false)}>
+                        <button className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 relative">
+                          <Bell size={24} />
+                          {unreadCount > 0 ? (
+                            <span className="absolute top-0 right-0 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                              {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                          ) : null}
+                        </button>
+                      </Link>
+                      <Link href="/messages" aria-label="Messages" onClick={() => setIsMobileMenuOpen(false)}>
+                        <button className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500">
+                          <MessageSquare size={24} />
+                        </button>
+                      </Link>
+                      <Link
+                        href={role === 'provider' ? '/provider/profile' : '/client/profile'}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex-1 h-12 rounded-2xl bg-slate-100 flex items-center px-4 gap-3 text-slate-900 font-bold"
+                      >
+                         <User size={20} /> My Account
+                      </Link>
+                    </div>
+
+                    <Button
+                      onClick={async () => {
+                        const nextRole = role === 'client' ? 'provider' : 'client';
+                        await setRole(nextRole);
+                        toast.success(
+                          nextRole === 'provider'
+                            ? 'Switched to selling mode.'
+                            : 'Switched to buying mode.'
+                        );
+                        setIsMobileMenuOpen(false);
+                        router.push(nextRole === 'provider' ? '/provider/dashboard' : '/client/dashboard');
+                      }}
+                      className="w-full h-12 bg-[#2286BE]/5 hover:bg-[#2286BE]/10 text-[#2286BE] font-black rounded-2xl transition-all border border-[#2286BE]/10"
+                    >
+                      <ArrowLeftRight size={16} className="mr-2" />
+                      Switch to {role === 'client' ? 'Selling' : 'Buying'}
+                    </Button>
+
+                    <Link
+                      href={role === 'provider' ? '/provider/dashboard' : '/client/dashboard'}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex h-12 rounded-2xl bg-slate-100 items-center px-4 gap-3 text-slate-900 font-bold"
+                    >
+                      <LayoutDashboard size={20} /> Dashboard
+                    </Link>
+
+                    <Link
+                      href={role === 'provider' ? '/provider/orders' : '/client/orders'}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex h-12 rounded-2xl bg-slate-100 items-center px-4 gap-3 text-slate-900 font-bold"
+                    >
+                      <Briefcase size={20} /> My Orders
+                    </Link>
+
+                    {role === 'provider' ? (
+                      <Link
+                        href="/provider/gigs"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex h-12 rounded-2xl bg-slate-100 items-center px-4 gap-3 text-slate-900 font-bold"
+                      >
+                        <LayoutDashboard size={20} /> My Gig
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/client/saved-services"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex h-12 rounded-2xl bg-slate-100 items-center px-4 gap-3 text-slate-900 font-bold"
+                      >
+                        <Heart size={20} /> Saved Services
+                      </Link>
+                    )}
+
+                    <Link
+                      href={role === 'provider' ? '/provider/profile' : '/client/profile'}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex h-12 rounded-2xl bg-slate-100 items-center px-4 gap-3 text-slate-900 font-bold"
+                    >
+                      <Settings size={20} /> Settings
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        logout();
+                        router.push('/login');
+                      }}
+                      className="flex h-12 w-full rounded-2xl bg-red-50 items-center px-4 gap-3 text-red-500 font-bold"
+                    >
+                      <LogOut size={20} /> Logout
+                    </button>
+                  </div>
+                )}
                {!isAuthenticated && (
                  <div className="flex flex-col gap-3">
                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>

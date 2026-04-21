@@ -79,7 +79,7 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
       avatar: service.provider?.avatar || '',
       bio: service.provider?.bio || '',
       level: service.provider?.level || 'Level 2',
-      rating: Number(service.provider?.rating) || 4.8,
+      rating: Number(service.provider?.rating) || 0,
       completedOrders: Number(service.provider?.completedOrders) || 0,
     },
     location: {

@@ -223,7 +223,7 @@ export default function ProviderDashboardClient() {
                 </div>
               </CardHeader>
               <CardContent className="pb-6">
-                <div className="text-3xl font-black text-slate-900">{averageRating ? averageRating.toFixed(2) : '0.00'}</div>
+                <div className="text-3xl font-black text-slate-900">{averageRating.toFixed(1)}</div>
                 <p className="text-xs text-slate-400 font-bold mt-2">Based on {reviewCount} reviews</p>
               </CardContent>
             </Card>

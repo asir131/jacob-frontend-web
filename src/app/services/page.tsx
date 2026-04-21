@@ -40,7 +40,6 @@ type ServiceCard = {
 type StaticServiceMeta = {
   expertType: 'Solo' | 'Team';
   sellerLevel: 'Top Rated' | 'Level 3' | 'Level 2' | 'Level 1' | 'New';
-  rating: number;
 };
 
 type CategoryOption = {
@@ -56,7 +55,6 @@ const getStaticMetaById = (id: string): StaticServiceMeta => {
   return {
     expertType: EXPERT_TYPES[value % EXPERT_TYPES.length],
     sellerLevel: SELLER_LEVELS[value % SELLER_LEVELS.length],
-    rating: 4 + ((value % 10) / 10),
   };
 };
 
@@ -73,6 +71,8 @@ const getLocationParts = (rawAddress: string, fallbackCity: string) => {
   };
 };
 
+const kmToMiles = (km: number) => Number((km * 0.621371).toFixed(1));
+
 export default function BrowseServicesPage() {
   const router = useRouter();
   const { city, coordinates, radius, setRadius } = useLocation();
@@ -86,6 +86,7 @@ export default function BrowseServicesPage() {
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [activeFavoriteId, setActiveFavoriteId] = useState<string | null>(null);
   const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
   const [removeSavedService, { isLoading: isRemovingSavedService }] = useRemoveSavedServiceMutation();
 
@@ -133,7 +134,7 @@ export default function BrowseServicesPage() {
       if (providerTypes.length > 0 && !providerTypes.includes(serviceExpertType)) return false;
       const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
       if (selectedLevels.length > 0 && !selectedLevels.includes(providerLevel)) return false;
-      const providerRating = Number(service.provider?.rating) || staticMeta.rating;
+      const providerRating = Number(service.provider?.rating) || 0;
       if (minRating > 0 && providerRating < minRating) return false;
       return true;
     });
@@ -167,6 +168,7 @@ export default function BrowseServicesPage() {
 
     const isSaved = Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(serviceId));
     try {
+      setActiveFavoriteId(String(serviceId));
       const response = isSaved
         ? await removeSavedService(String(serviceId)).unwrap()
         : await saveService(String(serviceId)).unwrap();
@@ -179,6 +181,8 @@ export default function BrowseServicesPage() {
       toast.success(isSaved ? 'Service removed from saved list.' : 'Service saved successfully.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to update saved services.');
+    } finally {
+      setActiveFavoriteId(null);
     }
   };
 
@@ -238,7 +242,7 @@ export default function BrowseServicesPage() {
 
               <div className="mb-10">
                 <h3 className="text-sm font-black text-slate-900 mb-6 flex items-center justify-between uppercase tracking-widest">
-                  Distance <span className="text-[#2286BE]">{radius}km</span>
+                  Distance <span className="text-[#2286BE]">{kmToMiles(radius)}mi</span>
                 </h3>
                 <Slider
                   value={[radius]}
@@ -368,9 +372,12 @@ export default function BrowseServicesPage() {
               <div className="grid gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                 {availableServices.map((service) => {
                   const staticMeta = getStaticMetaById(service.id);
-                  const providerRating = Number(service.provider?.rating) || staticMeta.rating;
+                  const providerRating = Number(service.provider?.rating) || 0;
                   const providerLevel = service.provider?.level || service.provider?.sellerLevel || 'New';
                   const serviceExpertType = service.expertType === 'team' ? 'Team' : 'Solo';
+                  const isSaved = Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id));
+                  const isUpdatingFavorite =
+                    activeFavoriteId === String(service.id) && (isSavingService || isRemovingSavedService);
                   return (
                      <Link key={service.id} href={`/services/${service.id}`} className="group block h-full">
                        <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all duration-500 h-full flex flex-col">
@@ -397,21 +404,22 @@ export default function BrowseServicesPage() {
                                event.stopPropagation();
                                await handleToggleFavorite(service.id);
                              }}
-                             disabled={isSavingService || isRemovingSavedService}
-                             className={`absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-md transition ${
-                               Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id))
+                             disabled={isUpdatingFavorite}
+                             className={`absolute right-4 top-4 flex min-w-10 h-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-md transition px-3 gap-2 ${
+                               isSaved
                                  ? 'text-red-500'
                                  : 'text-slate-400 hover:text-red-500'
                              }`}
                            >
                              <Heart
                                size={18}
-                               fill={
-                                 Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id))
-                                   ? 'currentColor'
-                                   : 'none'
-                               }
+                               fill={isSaved ? 'currentColor' : 'none'}
                              />
+                             {isUpdatingFavorite ? (
+                               <span className="text-[9px] font-black uppercase tracking-widest">
+                                 {isSaved ? 'Removing' : 'Saving'}
+                               </span>
+                             ) : null}
                            </button>
                          </div>
 
@@ -451,7 +459,7 @@ export default function BrowseServicesPage() {
                           <div className="mt-auto pt-5 border-t border-slate-50 flex items-end justify-between">
                             <div className="flex items-center text-[10px] font-black text-[#2286BE] uppercase tracking-widest bg-[#2286BE]/5 px-3 py-1.5 rounded-full">
                               <MapPin size={10} className="mr-1" />
-                              {service.distanceKm ?? 'N/A'}km
+                              {typeof service.distanceKm === 'number' ? `${kmToMiles(service.distanceKm)}mi` : 'N/A'}
                             </div>
                             <div className="flex items-center gap-1.5">
                               <Star size={16} className="text-amber-400 fill-amber-400" />

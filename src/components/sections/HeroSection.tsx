@@ -113,9 +113,7 @@ export default function HeroSection() {
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
           <div className="lg:col-span-7">
             <h1 className="text-[38px] font-[800] leading-[1.2] text-[#111827] sm:text-[48px]">
-              You. Your Neighbors. Saving time{' '}
-              and money on home services{' '}
-              with <span className="text-[#2286BE]">{BRAND.name}.</span>
+              Your Home,Our Priority
             </h1>
 
             <form

@@ -431,7 +431,7 @@ export default function OrderTrackingPage() {
                 <h3 className="text-xl font-black text-slate-900 mb-1">{order.provider?.name || 'Provider'}</h3>
                 <div className="flex items-center justify-center gap-2 mb-8 text-sm font-bold text-slate-400">
                   <Star size={14} className="text-amber-400 fill-amber-400" />
-                  <span className="text-slate-900">{providerRating > 0 ? providerRating.toFixed(1) : 'New'}</span>
+                  <span className="text-slate-900">{providerRating.toFixed(1)}</span>
                   <span>
                     {providerReviewCount > 0
                       ? `(${providerReviewCount} review${providerReviewCount === 1 ? '' : 's'})`

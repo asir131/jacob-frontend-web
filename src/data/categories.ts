@@ -45,7 +45,7 @@ export const DEFAULT_CATEGORIES: CategoryCard[] = [
   { name: 'Pest Control', slug: 'pest-control', iconName: 'Trash2', color: 'bg-green-50 text-green-500', count: 38 },
   { name: 'Appliance Repair', slug: 'appliance-repair', iconName: 'Cpu', color: 'bg-indigo-50 text-indigo-500', count: 112 },
   { name: 'Carpentry', slug: 'carpentry', iconName: 'Hammer', color: 'bg-amber-50 text-amber-500', count: 64 },
-  { name: 'Shifting', slug: 'shifting', iconName: 'Truck', color: 'bg-purple-50 text-purple-500', count: 57 },
+  { name: 'Shipping', slug: 'shipping', iconName: 'Truck', color: 'bg-purple-50 text-purple-500', count: 57 },
   { name: 'Beauty', slug: 'beauty', iconName: 'Scissors', color: 'bg-rose-50 text-rose-500', count: 142 },
   { name: 'Personal Care', slug: 'personal-care', iconName: 'Heart', color: 'bg-red-50 text-red-500', count: 78 },
 ];
@@ -148,15 +148,15 @@ export const CATEGORY_MAP: Record<string, CategoryData> = {
       { id: 1, title: 'Custom Furniture Design & Build', rating: 4.96, reviews: 89, price: 8000, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Custom', 'Furniture'], image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600&q=80' },
     ],
   },
-  'shifting': {
-    name: 'Shifting',
-    slug: 'shifting',
+  'shipping': {
+    name: 'Shipping',
+    slug: 'shipping',
     iconName: 'Truck',
     description: 'Safe and efficient home and office moving services with professional movers.',
     color: 'text-purple-500',
     bgGradient: 'from-purple-50 to-white',
     services: [
-      { id: 1, title: 'Full Home Shifting Package', rating: 4.91, reviews: 178, price: 6000, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Full Home', 'Insured'], image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80' },
+      { id: 1, title: 'Full Home Shipping Package', rating: 4.91, reviews: 178, price: 6000, location: 'Dhaka', badge: 'Top Rated', level: 'Top Rated', tags: ['Full Home', 'Insured'], image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80' },
     ],
   },
   'beauty': {
