@@ -26,6 +26,7 @@ import {
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { BRAND } from '@/lib/constants';
+import { formatMilesFromKm } from '@/lib/distance';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
@@ -229,7 +230,7 @@ export default function PostRequestClient() {
             Post a Custom Request
           </h1>
           <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto font-medium leading-relaxed">
-            Tell us what you need and we&apos;ll notify nearby providers within 30 km of your selected location.
+            Tell us what you need and we&apos;ll notify nearby providers within {formatMilesFromKm(30)} of your selected location.
           </p>
         </motion.div>
 
@@ -482,7 +483,7 @@ export default function PostRequestClient() {
               </div>
               <div className="text-left">
                 <p className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none mb-1">Nearby providers only</p>
-                <p className="text-xs font-bold text-slate-400">Matched providers must be within 30 km.</p>
+                <p className="text-xs font-bold text-slate-400">Matched providers must be within {formatMilesFromKm(30)}.</p>
               </div>
             </div>
             <div className="flex gap-4 w-full sm:w-auto">

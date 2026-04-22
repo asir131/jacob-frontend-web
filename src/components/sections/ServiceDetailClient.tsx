@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { BRAND } from '@/lib/constants';
+import { formatMilesFromKm } from '@/lib/distance';
 import { formatRating } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { Copy, Facebook, Twitter, Linkedin, X } from 'lucide-react';
@@ -356,7 +357,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                         { title: 'Verified Expert', subtitle: 'Individually Screened', icon: <ShieldCheck className="text-[#2286BE]" size={24} /> },
                         { title: 'Materials Included', subtitle: 'Standard consumables', icon: <CheckCircle2 className="text-[#2286BE]" size={24} /> },
                         { title: 'Home Service', subtitle: 'At your doorstep', icon: <MapPin className="text-[#2286BE]" size={24} /> },
-                        { title: `Within ${service.travelRadius || 25}km`, subtitle: 'Max Travel Radius', icon: <CheckCircle2 className="text-[#2286BE]" size={24} /> },
+                        { title: `Within ${formatMilesFromKm(service.travelRadius || 25)}`, subtitle: 'Max Travel Radius', icon: <CheckCircle2 className="text-[#2286BE]" size={24} /> },
                       ].map((feat, idx) => (
                         <div key={idx} className="flex items-center gap-4 p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
                           <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center flex-shrink-0" aria-hidden="true">

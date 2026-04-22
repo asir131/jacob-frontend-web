@@ -12,7 +12,7 @@ const DEFAULT_COORDS = { lat: 40.7128, lng: -74.0060 };
 
 const initialState: LocationState = {
   city: 'New York, USA',
-  radius: 25,
+  radius: 15,
   coordinates: DEFAULT_COORDS,
 };
 

@@ -11,7 +11,7 @@ import {
 interface LocationState {
   city: string;
   setCity: (city: string) => void;
-  radius: number; // in km
+  radius: number; // in miles
   setRadius: (radius: number) => void;
   coordinates: { lat: number; lng: number } | null;
   detectLocation: () => void;

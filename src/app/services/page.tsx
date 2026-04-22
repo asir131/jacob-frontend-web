@@ -16,6 +16,7 @@ import AuthModal from '@/components/ui/AuthModal';
 import { toast } from 'sonner';
 import { useGetCategoriesQuery, useGetPublicServicesQuery, useRemoveSavedServiceMutation, useSaveServiceMutation } from '@/store/services/apiSlice';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
+import { kmToMiles, milesToKm } from '@/lib/distance';
 import { formatRating } from '@/lib/formatters';
 
 type ServiceCard = {
@@ -71,8 +72,6 @@ const getLocationParts = (rawAddress: string, fallbackCity: string) => {
   };
 };
 
-const kmToMiles = (km: number) => Number((km * 0.621371).toFixed(1));
-
 export default function BrowseServicesPage() {
   const router = useRouter();
   const { city, coordinates, radius, setRadius } = useLocation();
@@ -114,7 +113,7 @@ export default function BrowseServicesPage() {
   const { data: servicesPayload, isFetching } = useGetPublicServicesQuery({
     page,
     limit,
-    radiusKm: radius,
+    radiusKm: milesToKm(radius),
     requireCoverage: true,
     categorySlug: selectedCategory,
     search: searchQuery,
@@ -242,11 +241,11 @@ export default function BrowseServicesPage() {
 
               <div className="mb-10">
                 <h3 className="text-sm font-black text-slate-900 mb-6 flex items-center justify-between uppercase tracking-widest">
-                  Distance <span className="text-[#2286BE]">{kmToMiles(radius)}mi</span>
+                  Distance <span className="text-[#2286BE]">{radius}mi</span>
                 </h3>
                 <Slider
                   value={[radius]}
-                  max={100}
+                  max={60}
                   min={5}
                   step={5}
                   onValueChange={(val: number[]) => {

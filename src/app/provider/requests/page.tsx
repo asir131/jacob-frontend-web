@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAcceptServiceRequestMutation, useGetProviderServiceRequestsQuery, useIgnoreServiceRequestMutation } from '@/store/services/apiSlice';
 import { useSocketNotifications } from '@/contexts/SocketContext';
+import { formatMilesFromKm } from '@/lib/distance';
 import { toast } from 'sonner';
 
 type ProviderServiceRequest = {
@@ -115,7 +116,7 @@ export default function ProviderRequestsPage() {
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight text-center md:text-left">Requested Orders</h1>
             <p className="text-slate-500 mt-2 text-lg text-center md:text-left">
-              Nearby service requests within 30 km of your service area.
+              Nearby service requests within {formatMilesFromKm(30)} of your service area.
             </p>
           </div>
 
@@ -203,7 +204,7 @@ export default function ProviderRequestsPage() {
                         <p className="pt-2 text-sm font-medium text-slate-500 line-clamp-3">{request.description}</p>
                         {typeof request.distanceKm === 'number' ? (
                           <p className="text-[11px] font-black uppercase tracking-widest text-[#2286BE]">
-                            {request.distanceKm.toFixed(1)} km away
+                            {formatMilesFromKm(request.distanceKm)} away
                           </p>
                         ) : null}
                       </div>

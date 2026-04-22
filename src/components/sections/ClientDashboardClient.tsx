@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle2, MapPin, Bell, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BRAND } from '@/lib/constants';
+import { formatMilesFromKm } from '@/lib/distance';
 import { formatRating } from '@/lib/formatters';
 import {
   useGetClientDashboardQuery,
@@ -411,7 +412,7 @@ export default function ClientDashboardClient() {
                           </div>
                           <div className="flex items-center justify-between mt-1">
                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight flex items-center">
-                                <MapPin size={10} className="mr-1" /> {typeof svc.distanceKm === 'number' ? `${svc.distanceKm.toFixed(1)} km away` : 'Distance unavailable'}
+                                <MapPin size={10} className="mr-1" /> {typeof svc.distanceKm === 'number' ? `${formatMilesFromKm(svc.distanceKm)} away` : 'Distance unavailable'}
                              </p>
                              <p className="text-xs font-black text-slate-900">${formatMoney(svc.avgPackagePrice)}</p>
                           </div>
