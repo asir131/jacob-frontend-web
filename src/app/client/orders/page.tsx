@@ -66,6 +66,10 @@ type ClientServiceRequest = {
   id: string;
   requestNumber: string;
   categoryName: string;
+  requestSource?: 'existing_category' | 'custom_category';
+  customCategoryName?: string;
+  customCategoryApprovalStatus?: 'not_requested' | 'pending' | 'approved' | 'rejected';
+  pendingAdminCategoryApproval?: boolean;
   linkedOrderId?: string | null;
   linkedOrderNumber?: string;
   linkedOrderStatus?: string;
@@ -232,7 +236,8 @@ export default function ClientOrdersPage() {
       type === 'order_after_sell_revision_cancelled' ||
       type === 'order_after_sell_revision_completed' ||
       type === 'order_finalized' ||
-      type === 'service_request_accepted'
+      type === 'service_request_accepted' ||
+      type === 'custom_category_request_approved'
     ) {
       lastHandledNotificationIdRef.current = latest.id;
       refetchOrders();
@@ -346,6 +351,13 @@ export default function ClientOrdersPage() {
                               <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                                 Location: {request.serviceAddress || 'Location unavailable'}
                               </p>
+                              {request.requestSource === 'custom_category' ? (
+                                <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-indigo-500">
+                                  {request.customCategoryApprovalStatus === 'approved'
+                                    ? 'Custom category approved'
+                                    : 'Waiting for admin category approval'}
+                                </p>
+                              ) : null}
                             </div>
                               <Badge
                                 className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -407,6 +419,11 @@ export default function ClientOrdersPage() {
                             <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 font-medium">
                               {request.description}
                             </div>
+                            {request.requestSource === 'custom_category' && request.pendingAdminCategoryApproval ? (
+                              <div className="mt-4 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700">
+                                Your new category request for {request.customCategoryName || request.categoryName} is waiting for admin approval.
+                              </div>
+                            ) : null}
 
                             <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <Button

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import {
+  useCreateCustomOrderProposalMutation,
   useEnsureConversationByOrderMutation,
   useClearConversationHistoryMutation,
   useBlockConversationUserMutation,
@@ -27,14 +28,17 @@ import {
   useGetConversationsQuery,
   useMarkAllMessagesAsReadMutation,
   useMarkConversationMessagesAsReadMutation,
+  useRespondToCustomOrderProposalMutation,
   useSendConversationMessageMutation,
 } from '@/store/services/apiSlice';
 
 type Conversation = {
   id: string;
   orderId?: string;
+  gigId?: string;
   orderNumber?: string;
   orderName?: string;
+  orderStatus?: string;
   packageTitle?: string;
   categoryName?: string;
   blockedBy?: string | null;
@@ -47,17 +51,36 @@ type Conversation = {
   };
 };
 
+type CustomOrderProposal = {
+  id: string;
+  proposalType?: 'custom' | 'repeat_order';
+  sourceOrderId?: string | null;
+  repeatIteration?: number;
+  title: string;
+  description?: string;
+  price: number;
+  serviceAddress: string;
+  scheduledDate?: string;
+  scheduledTime: string;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
+  createdOrderId?: string | null;
+};
+
 type ApiMessage = {
   id: string;
   conversationId: string;
+  orderId?: string | null;
   senderId: string;
+  receiverId?: string;
   text: string;
+  messageType?: 'text' | 'custom_order_proposal' | 'system';
   attachments?: Array<{
     url?: string;
     fileName?: string;
     mimeType?: string;
     resourceType?: string;
   }>;
+  customOrderProposal?: CustomOrderProposal | null;
   createdAt: string;
 };
 
@@ -110,6 +133,8 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const orderIdParam = searchParams.get('orderId') || '';
   const conversationIdParam = searchParams.get('conversationId') || '';
+  const sourceOrderIdParam = searchParams.get('sourceOrderId') || '';
+  const proposalTypeParam = searchParams.get('proposalType') || '';
 
   const [search, setSearch] = useState('');
   const [manualConversationId, setManualConversationId] = useState('');
@@ -123,6 +148,13 @@ export default function MessagesPage() {
   const [activeCall, setActiveCall] = useState<'voice' | 'video' | null>(null);
   const [liveMessages, setLiveMessages] = useState<ApiMessage[]>([]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showProposalComposer, setShowProposalComposer] = useState(false);
+  const [proposalTitle, setProposalTitle] = useState('');
+  const [proposalDescription, setProposalDescription] = useState('');
+  const [proposalPrice, setProposalPrice] = useState('');
+  const [proposalAddress, setProposalAddress] = useState('');
+  const [proposalDate, setProposalDate] = useState('');
+  const [proposalTime, setProposalTime] = useState('');
   const [incomingCall, setIncomingCall] = useState<CallInvite | null>(null);
   const [callStatus, setCallStatus] = useState<'idle' | 'ringing' | 'connecting' | 'active'>('idle');
   const [callError, setCallError] = useState('');
@@ -142,6 +174,8 @@ export default function MessagesPage() {
   const { data: conversationResponse, refetch: refetchConversations } = useGetConversationsQuery();
   const [ensureConversationByOrder] = useEnsureConversationByOrderMutation();
   const [sendConversationMessage, { isLoading: isSending }] = useSendConversationMessageMutation();
+  const [createCustomOrderProposal, { isLoading: isCreatingProposal }] = useCreateCustomOrderProposalMutation();
+  const [respondToCustomOrderProposal, { isLoading: isRespondingProposal }] = useRespondToCustomOrderProposalMutation();
   const [clearConversationHistory] = useClearConversationHistoryMutation();
   const [blockConversationUser] = useBlockConversationUserMutation();
   const [unblockConversationUser] = useUnblockConversationUserMutation();
@@ -214,10 +248,21 @@ export default function MessagesPage() {
   );
 
   const blockedBy = selectedConversation?.blockedBy || null;
+  const selectedGigId = String(selectedConversation?.gigId || '');
   const isBlockedByMe = Boolean(blockedBy && String(blockedBy) === String(user?.id || ''));
   const isBlockedByOther = Boolean(blockedBy && String(blockedBy) !== String(user?.id || ''));
   const canSendMessage = !blockedBy;
   const canSendCurrentMessage = canSendMessage && (Boolean(newMessage.trim()) || selectedAttachments.length > 0);
+  const repeatSourceOrderId =
+    sourceOrderIdParam ||
+    (selectedConversation?.orderStatus === 'completed' && selectedConversation?.orderId
+      ? String(selectedConversation.orderId)
+      : '');
+  const isRepeatProposalMode = proposalTypeParam === 'repeat_order' || Boolean(repeatSourceOrderId);
+  const canCreateProposal = userRole === 'provider' && Boolean(selectedConversationId) && Boolean(selectedGigId);
+  const canCreateCustomProposal = canCreateProposal && !selectedConversation?.orderId;
+  const canCreateRepeatProposal = canCreateProposal && Boolean(repeatSourceOrderId);
+  const canOpenProposalComposer = canCreateCustomProposal || canCreateRepeatProposal;
   const attachmentPreviews = useMemo(
     () => selectedAttachments.map((file) => (file.type.startsWith('image/') ? URL.createObjectURL(file) : '')),
     [selectedAttachments]
@@ -584,6 +629,74 @@ export default function MessagesPage() {
     }, 0);
   };
 
+  const resetProposalComposer = () => {
+    setProposalTitle('');
+    setProposalDescription('');
+    setProposalPrice('');
+    setProposalAddress('');
+    setProposalDate('');
+    setProposalTime('');
+    setShowProposalComposer(false);
+  };
+
+  const handleCreateProposal = async () => {
+    if (!canOpenProposalComposer) return;
+    const numericPrice = Number(proposalPrice);
+    if (!proposalTitle.trim() || !proposalAddress.trim() || !proposalDate || !proposalTime || !Number.isFinite(numericPrice) || numericPrice <= 0) {
+      toast.error(`Fill all ${isRepeatProposalMode ? 'repeat order' : 'custom order'} fields first.`);
+      return;
+    }
+
+    try {
+      const result = await createCustomOrderProposal({
+        conversationId: selectedConversationId,
+        gigId: selectedGigId,
+        proposalType: isRepeatProposalMode ? 'repeat_order' : 'custom',
+        sourceOrderId: repeatSourceOrderId || undefined,
+        title: proposalTitle.trim(),
+        description: proposalDescription.trim(),
+        price: numericPrice,
+        serviceAddress: proposalAddress.trim(),
+        scheduledDate: proposalDate,
+        scheduledTime: proposalTime,
+      }).unwrap();
+      const message = (result?.data || null) as ApiMessage | null;
+      if (message) {
+        setLiveMessages((prev) => (prev.some((item) => item.id === message.id) ? prev : [...prev, message]));
+      }
+      resetProposalComposer();
+      refetchMessages();
+      refetchConversations();
+      toast.success(isRepeatProposalMode ? 'Repeat order request sent.' : 'Custom order request sent.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || `Failed to send ${isRepeatProposalMode ? 'repeat order' : 'custom order'} request.`);
+    }
+  };
+
+  const handleRespondProposal = async (proposalId: string, action: 'accept' | 'decline') => {
+    try {
+      const result = await respondToCustomOrderProposal({ proposalId, action }).unwrap();
+      const message = (result?.data?.message || null) as ApiMessage | null;
+      const proposalType = message?.customOrderProposal?.proposalType || 'custom';
+      if (message) {
+        setLiveMessages((prev) => (prev.some((item) => item.id === message.id) ? prev : [...prev, message]));
+      }
+      refetchMessages();
+      refetchConversations();
+      toast.success(
+        action === 'accept'
+          ? proposalType === 'repeat_order'
+            ? 'Repeat order accepted.'
+            : 'Custom order accepted.'
+          : proposalType === 'repeat_order'
+            ? 'Repeat order declined.'
+            : 'Custom order declined.'
+      );
+    } catch (error: any) {
+      toast.error(error?.data?.message || `Could not update the ${isRepeatProposalMode ? 'repeat order' : 'custom order'} request.`);
+    }
+  };
+
   useEffect(() => {
     return () => {
       attachmentPreviews.forEach((url) => {
@@ -760,6 +873,65 @@ export default function MessagesPage() {
                       <div className={`px-5 py-3.5 rounded-[2rem] shadow-sm relative group ${mine ? 'bg-[#2286BE] text-white rounded-br-none' : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'}`}>
                         <p className={`text-[11px] font-black mb-1 ${mine ? 'text-white/80 text-right' : 'text-slate-500'}`}>{senderName}</p>
                         {message.text ? <p className="text-sm md:text-base font-medium leading-relaxed">{message.text}</p> : null}
+                        {message.customOrderProposal ? (
+                          <div className={`mt-3 rounded-3xl border p-4 ${mine ? 'border-white/20 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${mine ? 'text-white/70' : 'text-[#2286BE]'}`}>
+                                  {message.customOrderProposal.proposalType === 'repeat_order' ? 'Repeat Order' : 'Custom Order'}
+                                </p>
+                                <h4 className={`mt-2 text-sm font-black ${mine ? 'text-white' : 'text-slate-900'}`}>{message.customOrderProposal.title}</h4>
+                              </div>
+                              <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+                                message.customOrderProposal.status === 'accepted'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : message.customOrderProposal.status === 'declined'
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {message.customOrderProposal.status}
+                              </span>
+                            </div>
+                            {message.customOrderProposal.description ? (
+                              <p className={`mt-3 text-sm leading-relaxed ${mine ? 'text-white/85' : 'text-slate-600'}`}>{message.customOrderProposal.description}</p>
+                            ) : null}
+                            <div className={`mt-3 grid grid-cols-2 gap-3 text-xs font-semibold ${mine ? 'text-white/80' : 'text-slate-500'}`}>
+                              <div>
+                                <p className="uppercase tracking-widest text-[10px]">Price</p>
+                                <p className={`mt-1 text-sm font-black ${mine ? 'text-white' : 'text-slate-900'}`}>${Number(message.customOrderProposal.price || 0).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="uppercase tracking-widest text-[10px]">Time</p>
+                                <p className={`mt-1 text-sm font-black ${mine ? 'text-white' : 'text-slate-900'}`}>{message.customOrderProposal.scheduledTime}</p>
+                              </div>
+                            </div>
+                            <div className={`mt-3 text-xs font-semibold ${mine ? 'text-white/80' : 'text-slate-500'}`}>
+                              <p className="uppercase tracking-widest text-[10px]">Address</p>
+                              <p className={`mt-1 text-sm font-black ${mine ? 'text-white' : 'text-slate-900'}`}>{message.customOrderProposal.serviceAddress}</p>
+                            </div>
+                            {!mine && userRole === 'client' && message.customOrderProposal.status === 'pending' ? (
+                              <div className="mt-4 flex gap-2">
+                                <Button
+                                  type="button"
+                                  onClick={() => handleRespondProposal(message.customOrderProposal!.id, 'accept')}
+                                  disabled={isRespondingProposal}
+                                  className="flex-1 rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]"
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => handleRespondProposal(message.customOrderProposal!.id, 'decline')}
+                                  disabled={isRespondingProposal}
+                                  className="flex-1 rounded-2xl"
+                                >
+                                  Decline
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {Array.isArray(message.attachments) && message.attachments.length > 0 ? (
                           <div className={`mt-3 grid gap-2 ${message.attachments.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             {message.attachments.map((attachment, index) => {
@@ -822,6 +994,41 @@ export default function MessagesPage() {
 
         <footer className="p-6 bg-white border-t border-slate-100">
           <div className="max-w-4xl mx-auto">
+            {canOpenProposalComposer ? (
+              <div className="mb-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#2286BE]">Provider Tools</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">
+                      {isRepeatProposalMode
+                        ? 'Send a repeat order offer after agreeing on updated scope and price.'
+                        : 'Send a custom order request after agreeing on scope and price.'}
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" className="rounded-2xl" onClick={() => setShowProposalComposer((prev) => !prev)}>
+                    {showProposalComposer ? 'Hide' : isRepeatProposalMode ? 'Create Repeat Order' : 'Create Custom Order'}
+                  </Button>
+                </div>
+                {showProposalComposer ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <Input value={proposalTitle} onChange={(e) => setProposalTitle(e.target.value)} placeholder="Order title" className="rounded-2xl bg-white" />
+                    <Input value={proposalPrice} onChange={(e) => setProposalPrice(e.target.value)} placeholder="Price" type="number" min="1" className="rounded-2xl bg-white" />
+                    <Input value={proposalAddress} onChange={(e) => setProposalAddress(e.target.value)} placeholder="Service address" className="rounded-2xl bg-white md:col-span-2" />
+                    <Input value={proposalDate} onChange={(e) => setProposalDate(e.target.value)} type="date" className="rounded-2xl bg-white" />
+                    <Input value={proposalTime} onChange={(e) => setProposalTime(e.target.value)} type="time" className="rounded-2xl bg-white" />
+                    <Input value={proposalDescription} onChange={(e) => setProposalDescription(e.target.value)} placeholder={isRepeatProposalMode ? 'Describe the updated repeat order details' : 'Describe the custom work'} className="rounded-2xl bg-white md:col-span-2" />
+                    <div className="md:col-span-2 flex gap-2">
+                      <Button type="button" onClick={handleCreateProposal} disabled={isCreatingProposal} className="rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]">
+                        {isCreatingProposal ? 'Sending...' : isRepeatProposalMode ? 'Send Offer' : 'Send Request'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={resetProposalComposer} className="rounded-2xl">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {selectedAttachments.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-3">
                 {selectedAttachments.map((file, index) => {

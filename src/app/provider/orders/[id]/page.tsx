@@ -29,6 +29,8 @@ type ProviderOrder = {
   id: string;
   orderNumber: string;
   conversationId?: string | null;
+  repeatIteration?: number;
+  repeatOrderCount?: number;
   orderName: string;
   categoryName?: string;
   status:
@@ -110,6 +112,7 @@ export default function ProviderOrderDetailPage() {
   const [respondRevision, { isLoading: isRespondingRevision }] = useRespondProviderRevisionMutation();
 
   const order = useMemo(() => (data?.data?.order || null) as ProviderOrder | null, [data]);
+  const repeatOrderCount = Math.max(1, Number(order?.repeatOrderCount || order?.repeatIteration || 1));
 
   useEffect(() => {
     if (!notifications.length || !id) return;
@@ -258,6 +261,11 @@ export default function ProviderOrderDetailPage() {
                 <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3">
                   Category: {order.categoryName || 'General'}
                 </p>
+                {repeatOrderCount > 1 ? (
+                  <Badge className="bg-[#2286BE]/10 text-[#2286BE] border-none px-3 py-1 font-black text-[10px] uppercase tracking-widest">
+                    Ordered {repeatOrderCount} Times
+                  </Badge>
+                ) : null}
                 <div className="flex items-center gap-4 text-sm font-bold text-slate-400">
                   <div className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(order.scheduledDate).toLocaleDateString()}</div>
                   <div className="flex items-center gap-1.5"><Clock size={14} /> {order.scheduledTime}</div>

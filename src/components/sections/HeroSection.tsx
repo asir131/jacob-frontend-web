@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
+import { useAuth } from '@/contexts/AuthContext';
 import { useGetCategoriesQuery, useLazyGetPublicServicesQuery } from '@/store/services/apiSlice';
 import { extractZipCode, isValidZipCode } from '@/lib/zip';
 
@@ -23,14 +24,23 @@ type PublicGigItem = {
   zipCode?: string;
 };
 
+const slugifySearchTerm = (value: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 export default function HeroSection() {
   const router = useRouter();
+  const { user, role } = useAuth();
   const searchBoxRef = React.useRef<HTMLFormElement | null>(null);
   const [searchText, setSearchText] = React.useState('');
   const [zipCode, setZipCode] = React.useState('');
   const [selectedCategorySlug, setSelectedCategorySlug] = React.useState('');
   const [showCategorySuggestions, setShowCategorySuggestions] = React.useState(false);
   const [searchedGigs, setSearchedGigs] = React.useState<PublicGigItem[]>([]);
+  const [showNoResultsSuggestion, setShowNoResultsSuggestion] = React.useState(false);
   const { data: categoriesPayload } = useGetCategoriesQuery();
   const [triggerSearch, { isFetching }] = useLazyGetPublicServicesQuery();
 
@@ -70,6 +80,40 @@ export default function HeroSection() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  const openCustomRequestFlow = React.useCallback(() => {
+    const categoryName = searchText.trim();
+    const categorySlug = selectedCategorySlug || slugifySearchTerm(categoryName);
+
+    if (!categoryName || !categorySlug) {
+      toast.error('Type a service name first so we can prefill your request.');
+      return;
+    }
+
+    if (!user) {
+      toast.info('Please sign in as a client to submit a custom request.');
+      router.push('/login');
+      return;
+    }
+
+    if (role !== 'client') {
+      toast.error('Only client accounts can submit custom service requests.');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      categoryName,
+      categorySlug,
+      source: 'hero-search',
+    });
+
+    const normalizedZip = extractZipCode(zipCode);
+    if (normalizedZip) {
+      params.set('zipCode', normalizedZip);
+    }
+
+    router.push(`/post-request?${params.toString()}`);
+  }, [role, router, searchText, selectedCategorySlug, user, zipCode]);
+
   const handleSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -92,6 +136,7 @@ export default function HeroSection() {
       const items = Array.isArray(payload?.data?.items) ? (payload.data.items as PublicGigItem[]) : [];
       setSearchedGigs(items);
       setShowCategorySuggestions(false);
+      setShowNoResultsSuggestion(items.length === 0);
 
       if (!items.length) {
         toast.info('No gigs found in this zip area.');
@@ -137,6 +182,7 @@ export default function HeroSection() {
                       setSelectedCategorySlug('');
                       setShowCategorySuggestions(true);
                       setSearchedGigs([]);
+                      setShowNoResultsSuggestion(false);
                     }}
                     onFocus={() => setShowCategorySuggestions(true)}
                     placeholder="Search category"
@@ -158,6 +204,7 @@ export default function HeroSection() {
                     onChange={(e) => {
                       setZipCode(e.target.value.replace(/\D/g, '').slice(0, 5));
                       setSearchedGigs([]);
+                      setShowNoResultsSuggestion(false);
                     }}
                     placeholder="Zip"
                     className="w-20 bg-transparent text-[15px] text-slate-700 outline-none placeholder:text-gray-400 font-medium"
@@ -195,7 +242,16 @@ export default function HeroSection() {
                         </button>
                       ))
                     ) : (
-                      <div className="px-4 py-3 text-sm font-medium text-slate-500">No matching category found.</div>
+                      <div className="px-4 py-4">
+                        <p className="text-sm font-medium text-slate-500">No matching category found.</p>
+                        <button
+                          type="button"
+                          onClick={openCustomRequestFlow}
+                          className="mt-3 inline-flex rounded-xl bg-[#2286BE] px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#1b6da0]"
+                        >
+                          Request This Service
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -224,6 +280,22 @@ export default function HeroSection() {
                       </button>
                     ))}
                   </div>
+                </div>
+              ) : null}
+
+              {showNoResultsSuggestion ? (
+                <div className="mt-3 rounded-2xl border border-[#2286BE]/15 bg-[#2286BE]/5 p-4">
+                  <p className="text-sm font-black text-slate-900">Couldn&apos;t find a matching category or gig?</p>
+                  <p className="mt-1 text-sm font-medium text-slate-600">
+                    Submit a custom request and let {BRAND.name} notify admins and nearby providers for you.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCustomRequestFlow}
+                    className="mt-3 inline-flex rounded-xl bg-[#2286BE] px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#1b6da0]"
+                  >
+                    Request Gig
+                  </button>
                 </div>
               ) : null}
             </form>

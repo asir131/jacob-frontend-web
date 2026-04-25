@@ -12,13 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   useCancelClientRevisionMutation,
   useConfirmClientCheckoutPaymentMutation,
   useCreateClientCheckoutSessionMutation,
   useGetClientOrderDetailQuery,
   useRequestClientRevisionMutation,
+  useStartRepeatOrderConversationMutation,
   useSubmitClientOrderReviewMutation,
   useSendClientResolutionMessageMutation,
 } from '@/store/services/apiSlice';
@@ -28,6 +29,11 @@ type ClientOrder = {
   id: string;
   orderNumber: string;
   conversationId?: string | null;
+  repeatRootOrderId?: string | null;
+  repeatSourceOrderId?: string | null;
+  repeatIteration?: number;
+  repeatOrderCount?: number;
+  canRequestRepeatOrder?: boolean;
   orderName: string;
   categoryName?: string;
   status:
@@ -78,6 +84,7 @@ const statusLabel = (status: ClientOrder['status']) => {
 export default function OrderTrackingPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const orderIdOrNumber = typeof params?.id === 'string' ? params.id : '';
 
   const [activeModal, setActiveModal] = useState<null | 'complete' | 'review' | 'revision' | 'cancel'>(null);
@@ -95,6 +102,7 @@ export default function OrderTrackingPage() {
   const { data, isLoading, refetch } = useGetClientOrderDetailQuery(orderIdOrNumber, { skip: !orderIdOrNumber });
   const [createCheckoutSession, { isLoading: isCreatingCheckout }] = useCreateClientCheckoutSessionMutation();
   const [confirmCheckoutPayment, { isLoading: isConfirmingPayment }] = useConfirmClientCheckoutPaymentMutation();
+  const [startRepeatOrderConversation, { isLoading: isStartingRepeatOrder }] = useStartRepeatOrderConversationMutation();
   const [submitOrderReview, { isLoading: isSubmittingReview }] = useSubmitClientOrderReviewMutation();
   const [requestRevision, { isLoading: isRequestingRevision }] = useRequestClientRevisionMutation();
   const [cancelRevision, { isLoading: isCancelingRevision }] = useCancelClientRevisionMutation();
@@ -110,6 +118,7 @@ export default function OrderTrackingPage() {
       ? `/messages?conversationId=${String(order.conversationId)}&orderId=${order.id}`
       : `/messages?orderId=${order.id}&user=${order.provider?.id || ''}`
     : '/messages';
+  const repeatOrderCount = Math.max(1, Number(order?.repeatOrderCount || order?.repeatIteration || 1));
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id') || searchParams.get('sessionId');
@@ -280,6 +289,21 @@ export default function OrderTrackingPage() {
     }
   };
 
+  const handleRepeatOrder = async () => {
+    if (!order) return;
+    try {
+      const result = await startRepeatOrderConversation({ sourceOrderId: order.id }).unwrap();
+      const conversationId = String(result?.data?.conversation?.id || '');
+      if (!conversationId) {
+        toast.error('Repeat order chat is unavailable right now.');
+        return;
+      }
+      router.push(`/messages?conversationId=${conversationId}&sourceOrderId=${order.id}&proposalType=repeat_order`);
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to start repeat order chat.');
+    }
+  };
+
   const closeModal = () => {
     setActiveModal(null);
     setRevisionMode('delivery');
@@ -328,6 +352,13 @@ export default function OrderTrackingPage() {
                   <p className="mt-2 text-[11px] font-black uppercase tracking-wider text-slate-400">
                     Category: {order.categoryName || 'General'}
                   </p>
+                  {repeatOrderCount > 1 ? (
+                    <div className="mt-4">
+                      <Badge className="bg-[#2286BE]/10 text-[#2286BE] border-none px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">
+                        Ordered {repeatOrderCount} Times
+                      </Badge>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="text-left md:text-right shrink-0">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
@@ -460,6 +491,15 @@ export default function OrderTrackingPage() {
                       }}
                     >
                       Request After-Sale Revision
+                    </Button>
+                  ) : null}
+                  {order.canRequestRepeatOrder ? (
+                    <Button
+                      onClick={() => void handleRepeatOrder()}
+                      disabled={isStartingRepeatOrder}
+                      className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-black text-white font-black transition-all"
+                    >
+                      {isStartingRepeatOrder ? 'Opening chat...' : 'Order This Again'}
                     </Button>
                   ) : null}
                 </div>

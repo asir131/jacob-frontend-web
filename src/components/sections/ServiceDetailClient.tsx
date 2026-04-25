@@ -19,7 +19,12 @@ import { formatRating } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { Copy, Facebook, Twitter, Linkedin, X } from 'lucide-react';
 import ReviewFilter from '@/components/ui/ReviewFilter';
-import { useGetFaqsQuery, useRemoveSavedServiceMutation, useSaveServiceMutation } from '@/store/services/apiSlice';
+import {
+  useGetFaqsQuery,
+  useRemoveSavedServiceMutation,
+  useSaveServiceMutation,
+  useStartCustomOrderConversationMutation,
+} from '@/store/services/apiSlice';
 
 const container = {
   hidden: { opacity: 0 },
@@ -86,6 +91,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   const [selectedImage, setSelectedImage] = React.useState(galleryImages[0] || '');
   const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
   const [removeSavedService, { isLoading: isRemovingSavedService }] = useRemoveSavedServiceMutation();
+  const [startCustomOrderConversation, { isLoading: isStartingCustomOrder }] = useStartCustomOrderConversationMutation();
   const [isAuthModalOpen, setIsAuthModalOpen] = React.useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
   const [reviewFilter, setReviewFilter] = useState(0);
@@ -225,6 +231,32 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
       toast.success(isFavorited ? 'Service removed from saved list.' : 'Service saved successfully.');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to update saved services.');
+    }
+  };
+
+  const handleStartCustomOrder = async () => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    if (user?.role !== 'client') {
+      toast.error('Only clients can request a custom order.');
+      return;
+    }
+
+    try {
+      const response = await startCustomOrderConversation({
+        providerId: String(service.provider.id || ''),
+        gigId: String(service.id || ''),
+      }).unwrap();
+      const conversationId = String((response.data as any)?.conversation?.id || '');
+      if (!conversationId) {
+        throw new Error('Conversation could not be started.');
+      }
+      toast.success('Custom order conversation started.');
+      router.push(`/messages?conversationId=${conversationId}`);
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Could not start the custom order conversation.');
     }
   };
 
@@ -519,6 +551,15 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                     <Button onClick={handleBooking} className="w-full bg-[#2286BE] hover:bg-[#1b6da0] text-white h-16 text-lg font-black rounded-2xl flex items-center justify-center shadow-xl shadow-[#2286BE]/20 mb-6 group">
                       Order Now <ChevronRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
+
+                    <button
+                      type="button"
+                      onClick={handleStartCustomOrder}
+                      disabled={isStartingCustomOrder}
+                      className="mb-6 w-full text-center text-sm font-black text-[#2286BE] hover:text-[#1b6da0] transition-colors"
+                    >
+                      {isStartingCustomOrder ? 'Starting custom order...' : 'You can create your custom order'}
+                    </button>
 
                     <div className="flex items-center justify-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                       <ShieldCheck size={14} className="text-[#2286BE]" /> Money Back Guarantee

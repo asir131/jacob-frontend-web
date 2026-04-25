@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateServiceRequestMutation, useGetCategoriesQuery } from '@/store/services/apiSlice';
 import { Button } from '@/components/ui/button';
@@ -52,27 +52,57 @@ type CategoryItem = {
   slug?: string;
 };
 
+const slugifySearchTerm = (value: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 export default function PostRequestClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, role } = useAuth();
   const { data: categoriesData, isLoading: isCategoriesLoading } = useGetCategoriesQuery();
   const [createServiceRequest, { isLoading: isSubmitting }] = useCreateServiceRequestMutation();
+
+  const queryCategoryName = searchParams.get('categoryName')?.trim() || '';
+  const queryCategorySlug = searchParams.get('categorySlug')?.trim() || slugifySearchTerm(queryCategoryName);
+  const queryZipCode = searchParams.get('zipCode')?.trim() || '';
 
   const categories = useMemo(() => {
     const approvedCategories = ((categoriesData?.data || []) as CategoryItem[]).filter((category) => Boolean(category?.slug));
     const defaultSlugs = new Set(DEFAULT_CATEGORIES.map((category) => category.slug));
     const customCategories = approvedCategories.filter((category) => !defaultSlugs.has(String(category.slug)));
-
-    return [
+    const merged = [
       ...DEFAULT_CATEGORIES,
       ...customCategories.map((category) => ({
         name: category.name || '',
         slug: category.slug || '',
       })),
     ].filter((category) => Boolean(category.slug));
-  }, [categoriesData]);
+
+    const hasQueryCategory =
+      queryCategorySlug &&
+      !merged.some((category) => String(category.slug) === queryCategorySlug);
+
+    if (hasQueryCategory) {
+      return [
+        {
+          name: queryCategoryName || queryCategorySlug,
+          slug: queryCategorySlug,
+        },
+        ...merged,
+      ];
+    }
+
+    return merged;
+  }, [categoriesData, queryCategoryName, queryCategorySlug]);
 
   const [categorySlug, setCategorySlug] = useState('');
+  const [categoryMode, setCategoryMode] = useState<'existing' | 'custom'>('existing');
+  const [customCategoryName, setCustomCategoryName] = useState('');
+  const [customCategoryDescription, setCustomCategoryDescription] = useState('');
   const [serviceAddress, setServiceAddress] = useState('');
   const [description, setDescription] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
@@ -104,12 +134,35 @@ export default function PostRequestClient() {
       });
     }
 
-    if (!serviceAddress.trim() && user.address) {
-      setServiceAddress(user.address);
+    if (!serviceAddress.trim()) {
+      if (user.address) {
+        setServiceAddress(user.address);
+      } else if (queryZipCode) {
+        setServiceAddress(`ZIP ${queryZipCode}`);
+      }
     }
 
     hasInitializedLocationRef.current = true;
-  }, [serviceAddress, user]);
+  }, [queryZipCode, serviceAddress, user]);
+
+  useEffect(() => {
+    if (!queryCategorySlug) return;
+    setCategorySlug((current) => current || queryCategorySlug);
+  }, [queryCategorySlug]);
+
+  useEffect(() => {
+    const approvedCategoryItems = ((categoriesData?.data || []) as CategoryItem[]).filter((category) => Boolean(category?.slug));
+    const hasApprovedQueryCategory = approvedCategoryItems.some((category) => category.slug === queryCategorySlug);
+    if (queryCategorySlug && !hasApprovedQueryCategory) {
+      setCategoryMode('custom');
+      setCustomCategoryName((current) => current || queryCategoryName || queryCategorySlug);
+      return;
+    }
+
+    if (queryCategorySlug && hasApprovedQueryCategory) {
+      setCategoryMode('existing');
+    }
+  }, [categoriesData, queryCategoryName, queryCategorySlug]);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.slug === categorySlug) || categories[0] || null,
@@ -177,8 +230,13 @@ export default function PostRequestClient() {
       return;
     }
 
-    if (!effectiveCategorySlug || !selectedCategory) {
+    if (categoryMode === 'existing' && (!effectiveCategorySlug || !selectedCategory)) {
       toast.error('Please choose a service category.');
+      return;
+    }
+
+    if (categoryMode === 'custom' && !customCategoryName.trim()) {
+      toast.error('Please enter the custom category you want to request.');
       return;
     }
 
@@ -194,8 +252,18 @@ export default function PostRequestClient() {
     }
 
     const formData = new FormData();
-    formData.append('categorySlug', effectiveCategorySlug);
-    formData.append('categoryName', selectedCategory.name || categorySlug);
+    formData.append('requestCustomCategory', String(categoryMode === 'custom'));
+    if (categoryMode === 'custom') {
+      formData.append('customCategoryName', customCategoryName.trim());
+      if (customCategoryDescription.trim()) {
+        formData.append('customCategoryDescription', customCategoryDescription.trim());
+      }
+      formData.append('categorySlug', slugifySearchTerm(customCategoryName));
+      formData.append('categoryName', customCategoryName.trim());
+    } else {
+      formData.append('categorySlug', effectiveCategorySlug);
+      formData.append('categoryName', selectedCategory?.name || categorySlug);
+    }
     formData.append('serviceAddress', serviceAddress.trim());
     formData.append('serviceLocationLat', String(selectedMapCoords.lat));
     formData.append('serviceLocationLng', String(selectedMapCoords.lng));
@@ -207,7 +275,11 @@ export default function PostRequestClient() {
 
     try {
       await createServiceRequest(formData).unwrap();
-      toast.success('Your request has been posted. Nearby providers have been notified.');
+      toast.success(
+        categoryMode === 'custom'
+          ? 'Your custom category request has been sent to admin for approval.'
+          : 'Your request has been posted. Nearby providers have been notified.'
+      );
       router.push('/client/orders?tab=requested');
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to submit your request.');
@@ -252,26 +324,75 @@ export default function PostRequestClient() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <label htmlFor="category" className="text-sm font-bold text-slate-800 uppercase tracking-wider block">
                       Service Category
                     </label>
-    <Select value={effectiveCategorySlug || ''} onValueChange={setCategorySlug} disabled={isCategoriesLoading || categories.length === 0}>
-                      <SelectTrigger id="category" className="w-full h-14 rounded-xl border-slate-200 focus:ring-[#2286BE] bg-slate-50/50 font-medium text-slate-900">
-                        <SelectValue placeholder="Choose a category" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl p-2">
-                        {categories.map((category) => (
-                          <SelectItem
-                            key={category.slug}
-                            value={String(category.slug)}
-                            className="py-3 pl-6 pr-12 rounded-lg"
-                          >
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setCategoryMode('existing')}
+                        className={`rounded-2xl border px-4 py-3 text-center text-[12px] font-bold transition ${
+                          categoryMode === 'existing'
+                            ? 'border-[#2286BE] bg-[#2286BE]/10 text-[#2286BE]'
+                            : 'border-slate-200 bg-white text-slate-500'
+                        }`}
+                      >
+                        Select existing category
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategoryMode('custom');
+                          setCustomCategoryName((current) => current || queryCategoryName || selectedCategory?.name || '');
+                        }}
+                        className={`rounded-2xl border px-4 py-3 text-center text-[12px] font-bold transition ${
+                          categoryMode === 'custom'
+                            ? 'border-[#2286BE] bg-[#2286BE]/10 text-[#2286BE]'
+                            : 'border-slate-200 bg-white text-slate-500'
+                        }`}
+                      >
+                        Request new category
+                      </button>
+                    </div>
+
+                    {categoryMode === 'existing' ? (
+                      <Select value={effectiveCategorySlug || ''} onValueChange={setCategorySlug} disabled={isCategoriesLoading || categories.length === 0}>
+                        <SelectTrigger id="category" className="w-full h-14 rounded-xl border-slate-200 focus:ring-[#2286BE] bg-slate-50/50 font-medium text-slate-900">
+                          <SelectValue placeholder="Choose a category" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl p-2">
+                          {categories.map((category) => (
+                            <SelectItem
+                              key={category.slug}
+                              value={String(category.slug)}
+                              className="py-3 pl-6 pr-12 rounded-lg"
+                            >
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="space-y-3 rounded-[1.5rem] border border-dashed border-[#2286BE]/30 bg-[#2286BE]/5 p-4">
+                        <Input
+                          value={customCategoryName}
+                          onChange={(event) => setCustomCategoryName(event.target.value)}
+                          placeholder="Enter the category you want admin to add"
+                          className="h-14 rounded-xl border-slate-200 focus-visible:ring-[#2286BE] bg-white font-medium"
+                        />
+                        <textarea
+                          rows={3}
+                          value={customCategoryDescription}
+                          onChange={(event) => setCustomCategoryDescription(event.target.value)}
+                          placeholder="Optional: explain this new category for admin"
+                          className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2286BE] focus:ring-2 focus:ring-[#2286BE]"
+                        />
+                        <p className="text-xs font-semibold text-slate-500">
+                          Admin will review this category first. Once approved, your request will go live to nearby providers.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3">
