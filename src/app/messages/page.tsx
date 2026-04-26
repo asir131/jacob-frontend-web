@@ -259,7 +259,7 @@ export default function MessagesPage() {
       ? String(selectedConversation.orderId)
       : '');
   const isRepeatProposalMode = proposalTypeParam === 'repeat_order' || Boolean(repeatSourceOrderId);
-  const canCreateProposal = userRole === 'provider' && Boolean(selectedConversationId) && Boolean(selectedGigId);
+  const canCreateProposal = userRole === 'provider' && Boolean(selectedConversationId);
   const canCreateCustomProposal = canCreateProposal && !selectedConversation?.orderId;
   const canCreateRepeatProposal = canCreateProposal && Boolean(repeatSourceOrderId);
   const canOpenProposalComposer = canCreateCustomProposal || canCreateRepeatProposal;
@@ -650,7 +650,7 @@ export default function MessagesPage() {
     try {
       const result = await createCustomOrderProposal({
         conversationId: selectedConversationId,
-        gigId: selectedGigId,
+        gigId: selectedGigId || undefined,
         proposalType: isRepeatProposalMode ? 'repeat_order' : 'custom',
         sourceOrderId: repeatSourceOrderId || undefined,
         title: proposalTitle.trim(),

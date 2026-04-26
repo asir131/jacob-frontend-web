@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAcceptServiceRequestMutation, useGetProviderServiceRequestsQuery, useIgnoreServiceRequestMutation } from '@/store/services/apiSlice';
+import { useAcceptServiceRequestMutation, useGetProviderServiceRequestsQuery, useIgnoreServiceRequestMutation, useRespondToAdminServiceRequestInvitationMutation } from '@/store/services/apiSlice';
 import { useSocketNotifications } from '@/contexts/SocketContext';
 import { formatMilesFromKm } from '@/lib/distance';
 import { toast } from 'sonner';
@@ -33,6 +33,9 @@ type ProviderServiceRequest = {
     address: string;
   };
   imageUrls?: string[];
+  adminRequestedForViewer?: boolean;
+  adminInvitationStatus?: string;
+  assignedToOtherProvider?: boolean;
 };
 
 const containerVariants = {
@@ -62,6 +65,7 @@ export default function ProviderRequestsPage() {
   );
   const [acceptRequest, { isLoading: isAccepting }] = useAcceptServiceRequestMutation();
   const [ignoreRequest, { isLoading: isIgnoring }] = useIgnoreServiceRequestMutation();
+  const [respondToAdminInvitation, { isLoading: isRespondingAdminInvitation }] = useRespondToAdminServiceRequestInvitationMutation();
 
   const requests = useMemo(
     () => ((data?.data?.items || []) as ProviderServiceRequest[]).filter(Boolean),
@@ -75,21 +79,34 @@ export default function ProviderRequestsPage() {
     if (!latest?.id || latest.id === lastHandledNotificationIdRef.current) return;
 
     const type = latest?.data?.notificationType;
-    if (
+      if (
       type === 'service_request_created' ||
       type === 'service_request_accepted' ||
-      type === 'service_request_ignored'
+      type === 'service_request_ignored' ||
+      type === 'admin_service_request_invitation' ||
+      type === 'admin_service_request_unavailable' ||
+      type === 'service_request_negotiation_started_provider'
     ) {
       lastHandledNotificationIdRef.current = latest.id;
       refetch();
     }
   }, [notifications, refetch]);
 
-  const handleAccept = async (id: string) => {
+  const handleAccept = async (request: ProviderServiceRequest) => {
     try {
-      setActingRequestId(id);
-      await acceptRequest(id).unwrap();
-      toast.success('Request accepted. The client has been notified.');
+      setActingRequestId(request.id);
+      if (request.adminRequestedForViewer) {
+        const payload = await respondToAdminInvitation({ id: request.id, action: 'accept' }).unwrap();
+        const conversationId = payload.data?.conversationId;
+        toast.success('Negotiation started with the client.');
+        if (conversationId) {
+          window.location.href = `/messages?conversationId=${conversationId}`;
+          return;
+        }
+      } else {
+        await acceptRequest(request.id).unwrap();
+        toast.success('Request accepted. The client has been notified.');
+      }
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to accept request.');
     } finally {
@@ -97,11 +114,16 @@ export default function ProviderRequestsPage() {
     }
   };
 
-  const handleIgnore = async (id: string) => {
+  const handleIgnore = async (request: ProviderServiceRequest) => {
     try {
-      setActingRequestId(id);
-      await ignoreRequest(id).unwrap();
-      toast.info('Request removed from your inbox.');
+      setActingRequestId(request.id);
+      if (request.adminRequestedForViewer) {
+        await respondToAdminInvitation({ id: request.id, action: 'decline' }).unwrap();
+        toast.info('Admin request declined.');
+      } else {
+        await ignoreRequest(request.id).unwrap();
+        toast.info('Request removed from your inbox.');
+      }
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to ignore request.');
     } finally {
@@ -167,8 +189,8 @@ export default function ProviderRequestsPage() {
                           Request from nearby client
                         </p>
                       </div>
-                      <Badge className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border-none bg-blue-50 text-blue-600">
-                        Open
+                      <Badge className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border-none ${request.assignedToOtherProvider ? 'bg-slate-100 text-slate-500' : request.adminRequestedForViewer ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                        {request.assignedToOtherProvider ? 'Taken' : request.adminRequestedForViewer ? 'Admin Request' : 'Open'}
                       </Badge>
                     </div>
 
@@ -202,7 +224,11 @@ export default function ProviderRequestsPage() {
                           <p className="text-sm font-bold text-slate-500">${Number(request.budget || 0).toFixed(2)} budget</p>
                         </div>
                         <p className="pt-2 text-sm font-medium text-slate-500 line-clamp-3">{request.description}</p>
-                        {typeof request.distanceKm === 'number' ? (
+                        {request.assignedToOtherProvider ? (
+                          <p className="text-[11px] font-black uppercase tracking-widest text-amber-600">
+                            Already accepted by another provider
+                          </p>
+                        ) : typeof request.distanceKm === 'number' ? (
                           <p className="text-[11px] font-black uppercase tracking-widest text-[#2286BE]">
                             {formatMilesFromKm(request.distanceKm)} away
                           </p>
@@ -214,19 +240,19 @@ export default function ProviderRequestsPage() {
                           <Button
                             variant="outline"
                             className="h-14 font-black uppercase tracking-widest text-[11px] border-slate-100 text-slate-500 hover:bg-slate-50 rounded-2xl transition-all"
-                            onClick={() => handleIgnore(request.id)}
-                            disabled={isIgnoring && actingRequestId === request.id}
+                            onClick={() => handleIgnore(request)}
+                            disabled={(isIgnoring || isRespondingAdminInvitation) && actingRequestId === request.id}
                           >
                             <XCircle size={18} className="mr-2" />
-                            {isIgnoring && actingRequestId === request.id ? 'Ignoring...' : 'Ignore'}
+                            {(isIgnoring || isRespondingAdminInvitation) && actingRequestId === request.id ? (request.adminRequestedForViewer ? 'Declining...' : 'Ignoring...') : request.adminRequestedForViewer ? 'Decline' : 'Ignore'}
                           </Button>
                           <Button
                             className="h-14 font-black uppercase tracking-widest text-[11px] bg-[#2286BE] hover:bg-[#1b6da0] text-white shadow-xl shadow-[#2286BE]/20 rounded-2xl transition-all"
-                            onClick={() => handleAccept(request.id)}
-                            disabled={isAccepting && actingRequestId === request.id}
+                            onClick={() => handleAccept(request)}
+                            disabled={request.assignedToOtherProvider || ((isAccepting || isRespondingAdminInvitation) && actingRequestId === request.id)}
                           >
                             <CheckCircle2 size={18} className="mr-2" />
-                            {isAccepting && actingRequestId === request.id ? 'Accepting...' : 'Accept'}
+                            {(isAccepting || isRespondingAdminInvitation) && actingRequestId === request.id ? 'Accepting...' : request.adminRequestedForViewer ? 'Negotiate' : 'Accept'}
                           </Button>
                         </div>
                       </div>
