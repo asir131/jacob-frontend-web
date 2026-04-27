@@ -13,6 +13,7 @@ import {
   markAllNotificationsAsRead as markAllNotificationsAsReadAction,
   setSocketConnectedState,
 } from '@/store/slices/notificationSlice';
+import { getAccessToken, getActiveAuthStorageKind } from '@/lib/authStorage';
 
 type SocketContextValue = {
   socketConnected: boolean;
@@ -23,7 +24,15 @@ type SocketContextValue = {
 };
 
 const SocketContext = createContext<SocketContextValue | undefined>(undefined);
-const NOTIFICATIONS_STORAGE_KEY = 'live_notifications';
+const LEGACY_NOTIFICATIONS_STORAGE_KEY = 'live_notifications';
+
+const getNotificationsStorageKey = (userId?: string) =>
+  userId ? `live_notifications:${userId}` : null;
+
+const getNotificationStorage = () => {
+  if (typeof window === 'undefined') return null;
+  return getActiveAuthStorageKind() === 'local' ? window.localStorage : window.sessionStorage;
+};
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, updateProfile, user } = useAuth();
@@ -40,30 +49,43 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!isAuthenticated) return;
+    const storageKey = getNotificationsStorageKey(user?.id);
+    const storage = getNotificationStorage();
+
+    if (!isAuthenticated || !storageKey) {
+      dispatch(clearNotificationsAction());
+      window.localStorage.removeItem(LEGACY_NOTIFICATIONS_STORAGE_KEY);
+      window.sessionStorage.removeItem(LEGACY_NOTIFICATIONS_STORAGE_KEY);
+      return;
+    }
 
     try {
-      const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      dispatch(clearNotificationsAction());
+      window.localStorage.removeItem(LEGACY_NOTIFICATIONS_STORAGE_KEY);
+      window.sessionStorage.removeItem(LEGACY_NOTIFICATIONS_STORAGE_KEY);
+      const raw = storage?.getItem(storageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw) as LiveNotification[];
       if (!Array.isArray(parsed)) return;
       dispatch(hydrateNotifications(parsed));
     } catch {
-      localStorage.removeItem(NOTIFICATIONS_STORAGE_KEY);
+      storage?.removeItem(storageKey);
     }
-  }, [dispatch, isAuthenticated]);
+  }, [dispatch, isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = getNotificationsStorageKey(user?.id);
+    const storage = getNotificationStorage();
+    if (!isAuthenticated || !storageKey || !storage) return;
+    storage.setItem(storageKey, JSON.stringify(notifications));
+  }, [isAuthenticated, notifications, user?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!isAuthenticated) return;
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
-  }, [isAuthenticated, notifications]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!isAuthenticated) return;
-
-    const token = localStorage.getItem('auth_token');
+    const token = getAccessToken();
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL;
     if (!token || !socketUrl) return;
 
@@ -91,11 +113,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         unread: true,
         createdAt: notification.createdAt || new Date().toISOString(),
       };
+
       dispatch(addNotification(normalized));
       const notificationData = (normalized.data || {}) as {
         notificationType?: string;
         targetPath?: string;
       };
+
       if (notificationData.notificationType === 'provider_verification_approved') {
         updateProfile({
           payoutVerificationStatus: 'verified',
@@ -105,6 +129,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           },
         });
       }
+
       if (notificationData.notificationType === 'provider_verification_rejected') {
         updateProfile({
           payoutVerificationStatus: 'rejected',
@@ -114,6 +139,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           },
         });
       }
+
       if (notificationData.notificationType === 'order_paid') {
         const earnings = Number((notificationData as { providerEarningsAmount?: number }).providerEarningsAmount || 0);
         if (earnings > 0) {
@@ -123,6 +149,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           });
         }
       }
+
       toast.info(normalized.title, {
         description: normalized.description,
         action:
@@ -153,7 +180,12 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const clearNotifications = useCallback(() => {
     dispatch(clearNotificationsAction());
-  }, [dispatch]);
+    const storageKey = getNotificationsStorageKey(user?.id);
+    const storage = getNotificationStorage();
+    if (storageKey && storage) {
+      storage.removeItem(storageKey);
+    }
+  }, [dispatch, user?.id]);
 
   return (
     <SocketContext.Provider

@@ -1,4 +1,13 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import {
+  clearAuthSession,
+  getAccessToken,
+  getRefreshToken,
+  getStoredUser,
+  isPersistentAuthSession,
+  setAuthSession,
+  updateStoredTokens,
+} from '@/lib/authStorage';
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -29,6 +38,60 @@ type SignupPayload = {
 type VerifySignupOtpPayload = {
   email: string;
   otp: string;
+};
+
+type ForgotPasswordPayload = {
+  email: string;
+};
+
+type VerifyForgotPasswordOtpPayload = {
+  email: string;
+  otp: string;
+};
+
+type ResetForgotPasswordPayload = {
+  email: string;
+  otp: string;
+  resetToken: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+type WebsiteReviewContext = 'client' | 'provider';
+
+type WebsiteReviewPromptResponse = {
+  context: WebsiteReviewContext;
+  currentOrderCount: number;
+  submittedAt?: string | null;
+  deferredOrderCount?: number;
+  shouldPrompt: boolean;
+};
+
+type PublicWebsiteReviewsResponse = {
+  providerReviews?: Array<{
+    id: string;
+    reviewText?: string;
+    websiteRating?: number;
+    reviewer?: {
+      id?: string;
+      name?: string;
+      avatar?: string;
+      sellerLevel?: string;
+      providerRating?: number;
+      monthlyIncome?: number;
+    };
+  }>;
+  clientReviews?: Array<{
+    id: string;
+    reviewText?: string;
+    websiteRating?: number;
+    reviewer?: {
+      id?: string;
+      name?: string;
+      avatar?: string;
+      monthlySpending?: number;
+    };
+  }>;
 };
 
 type CreateOrderPayload = {
@@ -197,22 +260,81 @@ type ServiceRequestPagination = {
   hasPrevPage: boolean;
 };
 
+type GigAnalyticsResponse = {
+  gig?: {
+    id?: string;
+    title?: string;
+    status?: string;
+  };
+  summary?: {
+    servicesPageVisibleClients?: number;
+    detailPageUniqueClients?: number;
+  };
+  detailViewSeries?: Array<{
+    date?: string;
+    label?: string;
+    count?: number;
+  }>;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl,
+  prepareHeaders: (headers) => {
+    const token = getAccessToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    return headers;
+  },
+});
 
 export const apiSlice = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
-    baseUrl,
-    prepareHeaders: (headers) => {
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
+  baseQuery: async (args, api, extraOptions) => {
+    const result = await rawBaseQuery(args, api, extraOptions);
+
+    if (result.error?.status === 401) {
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        const refreshResult = await rawBaseQuery(
+          {
+            url: '/api/auth/refresh-token',
+            method: 'POST',
+            body: { refreshToken },
+          },
+          api,
+          extraOptions
+        );
+
+        const refreshPayload = refreshResult.data as
+          | ApiEnvelope<{ accessToken: string; refreshToken: string }>
+          | undefined;
+
+        if (refreshPayload?.success && refreshPayload.data?.accessToken) {
+          const currentUser = getStoredUser();
+          if (currentUser) {
+            setAuthSession({
+              accessToken: refreshPayload.data.accessToken,
+              refreshToken: refreshPayload.data.refreshToken || refreshToken,
+              user: currentUser,
+              persistent: isPersistentAuthSession(),
+            });
+          } else {
+            updateStoredTokens({
+              accessToken: refreshPayload.data.accessToken,
+              refreshToken: refreshPayload.data.refreshToken || refreshToken,
+            });
+          }
+          return rawBaseQuery(args, api, extraOptions);
         }
       }
-      return headers;
-    },
-  }),
+
+      clearAuthSession();
+    }
+
+    return result;
+  },
   tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats', 'ServiceRequests'],
   endpoints: (builder) => ({
     getFaqs: builder.query<ApiEnvelope<FaqItem[]>, void>({
@@ -276,6 +398,22 @@ export const apiSlice = createApi({
     }),
     getPublicServiceById: builder.query<ApiEnvelope<unknown>, string>({
       query: (id) => `/api/gigs/public/${id}`,
+    }),
+    trackGigImpressions: builder.mutation<ApiEnvelope<{ trackedGigIds?: string[] }>, string[]>({
+      query: (gigIds) => ({
+        url: '/api/gigs/analytics/impressions',
+        method: 'POST',
+        body: { gigIds },
+      }),
+    }),
+    trackGigDetailView: builder.mutation<ApiEnvelope<{ tracked?: boolean }>, string>({
+      query: (id) => ({
+        url: `/api/gigs/public/${id}/view`,
+        method: 'POST',
+      }),
+    }),
+    getGigAnalytics: builder.query<ApiEnvelope<GigAnalyticsResponse>, string>({
+      query: (id) => `/api/gigs/${id}/analytics`,
     }),
     getPublicProviderProfile: builder.query<ApiEnvelope<PublicProviderProfileResponse>, string>({
       query: (providerId) => `/api/profile/provider/${providerId}/public`,
@@ -796,6 +934,59 @@ export const apiSlice = createApi({
         body: payload,
       }),
     }),
+    getWebsiteReviewPrompt: builder.query<ApiEnvelope<WebsiteReviewPromptResponse>, WebsiteReviewContext>({
+      query: (context) => `/api/website-reviews/prompt?context=${context}`,
+    }),
+    submitWebsiteReview: builder.mutation<
+      ApiEnvelope<unknown>,
+      { context: WebsiteReviewContext; rating: number; reviewText?: string }
+    >({
+      query: (payload) => ({
+        url: '/api/website-reviews',
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    remindWebsiteReviewLater: builder.mutation<
+      ApiEnvelope<{ context: WebsiteReviewContext; deferredUntilOrderCount?: number }>,
+      { context: WebsiteReviewContext }
+    >({
+      query: (payload) => ({
+        url: '/api/website-reviews/remind-later',
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    getPublicWebsiteReviews: builder.query<ApiEnvelope<PublicWebsiteReviewsResponse>, void>({
+      query: () => '/api/website-reviews/public',
+    }),
+    requestForgotPasswordOtp: builder.mutation<
+      ApiEnvelope<{ email: string; otpExpiresInMinutes: number }>,
+      ForgotPasswordPayload
+    >({
+      query: (payload) => ({
+        url: '/api/auth/forgot-password/request-otp',
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    verifyForgotPasswordOtp: builder.mutation<
+      ApiEnvelope<{ email: string; resetToken: string }>,
+      VerifyForgotPasswordOtpPayload
+    >({
+      query: (payload) => ({
+        url: '/api/auth/forgot-password/verify-otp',
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    resetForgotPassword: builder.mutation<ApiEnvelope<unknown>, ResetForgotPasswordPayload>({
+      query: (payload) => ({
+        url: '/api/auth/forgot-password/reset',
+        method: 'POST',
+        body: payload,
+      }),
+    }),
   }),
 });
 
@@ -806,6 +997,9 @@ export const {
   useLazyGetMyGigsQuery,
   useGetPublicServicesQuery,
   useGetPublicServiceByIdQuery,
+  useTrackGigImpressionsMutation,
+  useTrackGigDetailViewMutation,
+  useLazyGetGigAnalyticsQuery,
   useGetPublicProviderProfileQuery,
   useCreateOrderMutation,
   useCreateServiceRequestMutation,
@@ -860,4 +1054,11 @@ export const {
   useLoginMutation,
   useSignupMutation,
   useVerifySignupOtpMutation,
+  useLazyGetWebsiteReviewPromptQuery,
+  useSubmitWebsiteReviewMutation,
+  useRemindWebsiteReviewLaterMutation,
+  useGetPublicWebsiteReviewsQuery,
+  useRequestForgotPasswordOtpMutation,
+  useVerifyForgotPasswordOtpMutation,
+  useResetForgotPasswordMutation,
 } = apiSlice;

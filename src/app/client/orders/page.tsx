@@ -337,8 +337,8 @@ export default function ClientOrdersPage() {
                     className="grid grid-cols-1 md:grid-cols-2 gap-6"
                   >
                     {requestedOrders.map((request) => (
-                      <motion.div key={request.id} variants={itemVariants}>
-                        <Card className="overflow-hidden border-slate-200 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group">
+                      <motion.div key={request.id} variants={itemVariants} className="h-full">
+                        <Card className="h-full overflow-hidden border-slate-200 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group">
                           <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50/30 group-hover:bg-slate-50 transition-colors">
                             <div>
                               <div className="flex items-center gap-2 mb-2">
@@ -379,7 +379,7 @@ export default function ClientOrdersPage() {
                                 : ORDER_STYLE_STATUS_LABEL[resolveRequestedStatus(request)] || REQUEST_STATUS_LABEL[request.status] || request.status}
                             </Badge>
                           </div>
-                          <CardContent className="p-6">
+                          <CardContent className="flex h-full flex-col p-6">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
                               <div className="flex items-center gap-4">
                                 <Avatar className="h-14 w-14 border border-slate-100">
@@ -419,13 +419,16 @@ export default function ClientOrdersPage() {
                             <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 font-medium">
                               {request.description}
                             </div>
-                            {request.requestSource === 'custom_category' && request.pendingAdminCategoryApproval ? (
-                              <div className="mt-4 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700">
-                                Your new category request for {request.customCategoryName || request.categoryName} is waiting for admin approval.
-                              </div>
-                            ) : null}
 
-                            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="mt-4 min-h-[74px]">
+                              {request.requestSource === 'custom_category' && request.pendingAdminCategoryApproval ? (
+                                <div className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700">
+                                  Your new category request for {request.customCategoryName || request.categoryName} is waiting for admin approval.
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                               <Button
                                 variant="outline"
                                 className="w-full h-12 font-bold text-slate-600 border-slate-200 hover:bg-slate-50 active:scale-95 transition-all"

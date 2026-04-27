@@ -225,7 +225,7 @@ export default function ProviderOrdersPage() {
                             <p className="font-black text-slate-900 text-sm tracking-tight truncate">{order.client.name || 'Client'}</p>
                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest truncate">{order.orderNumber || order.id}</p>
                             {order.isRequestedOrder && (
-                              <p className="mt-2 inline-flex w-fit rounded-full bg-[#2286BE]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#2286BE]">
+                              <p className="mt-2 inline-flex min-w-[132px] whitespace-nowrap rounded-full bg-[#2286BE]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#2286BE]">
                                 Requested Order
                               </p>
                             )}

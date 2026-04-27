@@ -13,6 +13,7 @@ import {
 } from '@/store/slices/authSlice';
 import { store } from '@/store';
 import { apiSlice } from '@/store/services/apiSlice';
+import { clearAuthSession, getAccessToken, getStoredUser, updateStoredUser } from '@/lib/authStorage';
 
 interface LoginPayload {
   id?: string;
@@ -65,7 +66,6 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-const AUTH_USER_KEY = 'auth_user';
 const LEGACY_DUMMY_AVATARS = [
   'https://i.pravatar.cc/150?u=default-client',
   'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
@@ -78,19 +78,11 @@ const normalizeAvatar = (avatar?: string) => {
 };
 
 const readStoredUser = (): AuthUser | null => {
-  if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem('auth_token');
+  const token = getAccessToken();
   if (!token) return null;
-  const raw = localStorage.getItem(AUTH_USER_KEY);
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as AuthUser;
-    if (!parsed?.id || !parsed?.email) return null;
-    return { ...parsed, avatar: normalizeAvatar(parsed.avatar) };
-  } catch {
-    return null;
-  }
+  const parsed = getStoredUser<AuthUser>();
+  if (!parsed?.id || !parsed?.email) return null;
+  return { ...parsed, avatar: normalizeAvatar(parsed.avatar) };
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -105,11 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setRole = async (nextRole: Role) => {
     dispatch(setAuthRole(nextRole));
 
-    if (typeof window !== 'undefined' && user) {
+    if (user) {
       const nextUser = { ...user, role: nextRole };
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+      updateStoredUser(nextUser);
 
-      const token = localStorage.getItem('auth_token');
+      const token = getAccessToken();
       if (token) {
         try {
           await store.dispatch(
@@ -172,17 +164,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     dispatch(loginSuccess(nextUser));
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
-    }
+    updateStoredUser(nextUser);
   };
 
   const logout = () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem(AUTH_USER_KEY);
+      clearAuthSession();
       sessionStorage.removeItem('pending_signup_auth');
     }
 
@@ -200,9 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : { ...(user.payoutInfo || {}), ...payload.payoutInfo },
     };
     dispatch(updateAuthProfile(payload));
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
-    }
+    updateStoredUser(nextUser);
   };
 
   return <AuthContext.Provider value={{ user, role, setRole, isAuthenticated, login, updateProfile, logout }}>{children}</AuthContext.Provider>;

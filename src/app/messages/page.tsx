@@ -6,6 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, CheckCheck, Smile, User } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAccessToken } from '@/lib/authStorage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -504,7 +505,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('auth_token');
+    const token = getAccessToken();
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL;
     if (!token || !socketUrl) return;
 

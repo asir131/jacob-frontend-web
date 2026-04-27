@@ -2,10 +2,8 @@
 
 import React from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { clearAuthSession, getAccessToken, refreshAccessToken } from '@/lib/authStorage';
 
-const AUTH_TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const AUTH_USER_KEY = 'auth_user';
 const PUBLIC_PATHS = ['/login', '/signup', '/signup/verify-otp'];
 const PROTECTED_PATH_PREFIXES = ['/book', '/client', '/provider', '/messages', '/notifications'];
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -32,7 +30,10 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
     let isMounted = true;
 
     const verifyToken = async () => {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      let token = getAccessToken();
+      if (!token && API_BASE_URL) {
+        token = await refreshAccessToken(API_BASE_URL);
+      }
       const tokenExists = Boolean(token);
 
       if (!tokenExists) {
@@ -51,12 +52,26 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/profile/me`, {
+        let response = await fetch(`${API_BASE_URL}/api/profile/me`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
+
+        if (response.status === 401) {
+          const refreshedToken = await refreshAccessToken(API_BASE_URL);
+          if (!refreshedToken) {
+            throw new Error('Invalid or expired token');
+          }
+
+          response = await fetch(`${API_BASE_URL}/api/profile/me`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${refreshedToken}`,
+            },
+          });
+        }
 
         if (!response.ok) {
           throw new Error('Invalid or expired token');
@@ -66,9 +81,7 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
         setHasToken(true);
         setChecked(true);
       } catch {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_USER_KEY);
+        clearAuthSession();
 
         if (!isMounted) return;
         setHasToken(false);

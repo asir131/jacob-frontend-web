@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import ServiceDetailClient from '@/components/sections/ServiceDetailClient';
-import { useGetPublicServiceByIdQuery } from '@/store/services/apiSlice';
+import { useAuth } from '@/contexts/AuthContext';
+import { useGetPublicServiceByIdQuery, useTrackGigDetailViewMutation } from '@/store/services/apiSlice';
 
 type ApiPackage = {
   name?: string;
@@ -116,10 +118,22 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
 export default function ServiceDetailPage() {
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === 'string' ? params.id : '';
+  const trackedGigIdRef = useRef<string | null>(null);
+  const { isAuthenticated, role } = useAuth();
+  const [trackGigDetailView] = useTrackGigDetailViewMutation();
 
   const { data, isLoading, isError } = useGetPublicServiceByIdQuery(id, {
     skip: !id,
   });
+
+  useEffect(() => {
+    if (!id || !data?.success || !data?.data) return;
+    if (!isAuthenticated || role !== 'client') return;
+    if (trackedGigIdRef.current === id) return;
+
+    trackedGigIdRef.current = id;
+    void trackGigDetailView(id);
+  }, [data?.data, data?.success, id, isAuthenticated, role, trackGigDetailView]);
 
   if (isLoading) {
     return (

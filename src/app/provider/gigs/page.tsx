@@ -5,11 +5,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Play, Trash2, Eye, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,7 @@ import {
   useDeleteGigMutation,
   useDeleteGigRequestMutation,
   useLazyGetMyGigsQuery,
+  useLazyGetGigAnalyticsQuery,
   useGetPublicProviderProfileQuery,
 } from '@/store/services/apiSlice';
 import { calculateAdminFeeAmount } from '@/lib/pricing';
@@ -101,7 +104,9 @@ export default function ProviderGigsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [analyticsGig, setAnalyticsGig] = useState<{ id: string; title: string } | null>(null);
   const [getMyGigs] = useLazyGetMyGigsQuery();
+  const [getGigAnalytics, { data: gigAnalyticsData, isFetching: isGigAnalyticsFetching }] = useLazyGetGigAnalyticsQuery();
   const [deleteGig] = useDeleteGigMutation();
   const [deleteGigRequest] = useDeleteGigRequestMutation();
   const { data: providerProfileData } = useGetPublicProviderProfileQuery(user?.id || '', {
@@ -202,6 +207,23 @@ export default function ProviderGigsPage() {
     }
   };
 
+  const handleOpenAnalytics = async (gigId: string, title: string) => {
+    setAnalyticsGig({ id: gigId, title });
+    void getGigAnalytics(gigId);
+  };
+
+  const activeAnalyticsData =
+    gigAnalyticsData?.data?.gig?.id && gigAnalyticsData.data.gig.id === analyticsGig?.id
+      ? gigAnalyticsData.data
+      : null;
+  const analyticsSummary = activeAnalyticsData?.summary;
+  const analyticsSeries = Array.isArray(activeAnalyticsData?.detailViewSeries)
+    ? activeAnalyticsData.detailViewSeries.map((item) => ({
+        label: item.label || '',
+        count: Number(item.count || 0),
+      }))
+    : [];
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -281,7 +303,14 @@ export default function ProviderGigsPage() {
                               <DropdownMenuItem className="cursor-pointer py-3 rounded-lg">
                                 <Eye size={16} className="mr-3 text-slate-400" /> Preview Service
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer py-3 rounded-lg">
+                              <DropdownMenuItem
+                                className={`cursor-pointer py-3 rounded-lg ${isPending ? 'opacity-50' : ''}`}
+                                disabled={isPending}
+                                onClick={() => {
+                                  if (isPending) return;
+                                  void handleOpenAnalytics(gig._id, gig.title);
+                                }}
+                              >
                                 <TrendingUp size={16} className="mr-3 text-slate-400" /> View Analytics
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
@@ -469,6 +498,80 @@ export default function ProviderGigsPage() {
             </div>
           </div>
         ) : null}
+
+        <Dialog open={Boolean(analyticsGig)} onOpenChange={(open) => {
+          if (!open) setAnalyticsGig(null);
+        }}>
+          <DialogContent className="max-w-3xl rounded-[2rem] border-slate-200 p-0 overflow-hidden">
+            <div className="bg-white">
+              <DialogHeader className="border-b border-slate-100 px-8 py-6">
+                <DialogTitle className="text-2xl font-black text-slate-900">Gig Analytics</DialogTitle>
+                <DialogDescription className="text-slate-500 font-medium">
+                  {analyticsGig?.title || 'Selected gig'} performance from logged-in client activity.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="px-8 py-6">
+                <div className="grid gap-4 md:grid-cols-2 mb-6">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                      Visible On Services Page
+                    </p>
+                    <p className="text-4xl font-black text-slate-900">
+                      {isGigAnalyticsFetching ? '...' : Number(analyticsSummary?.servicesPageVisibleClients || 0)}
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-500">
+                      Unique logged-in clients who saw this gig on services.
+                    </p>
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                      Entered Detail Page
+                    </p>
+                    <p className="text-4xl font-black text-slate-900">
+                      {isGigAnalyticsFetching ? '...' : Number(analyticsSummary?.detailPageUniqueClients || 0)}
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-500">
+                      Unique logged-in clients who opened this gig detail page.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-black text-slate-900">Detail Page Visits Trend</h3>
+                    <p className="text-sm font-medium text-slate-500">
+                      Daily unique client visits over the last 14 days.
+                    </p>
+                  </div>
+
+                  {isGigAnalyticsFetching ? (
+                    <div className="h-[280px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
+                      Loading analytics...
+                    </div>
+                  ) : analyticsSeries.length > 0 ? (
+                    <div className="h-[280px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsSeries}>
+                          <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
+                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+                          <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+                          <Tooltip />
+                          <Bar dataKey="count" fill="#2286BE" radius={[10, 10, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[280px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
+                      No detail-page visits recorded yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {!loading && activeItems.length === 0 ? (
           <motion.div

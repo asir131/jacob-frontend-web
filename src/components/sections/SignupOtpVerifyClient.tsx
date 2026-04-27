@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { setAuthSession } from '@/lib/authStorage';
 import { useLoginMutation, useVerifySignupOtpMutation } from '@/store/services/apiSlice';
 
 type VerifyOtpResponse = {
@@ -162,11 +163,15 @@ export default function SignupOtpVerifyClient() {
         return;
       }
 
-      localStorage.setItem('auth_token', loginRes.data.accessToken);
-      localStorage.setItem('refresh_token', loginRes.data.refreshToken);
       const profileSnapshot = await fetchProfileSnapshot(loginRes.data.accessToken);
       const userSnapshot = profileSnapshot || loginRes.data.user;
       const normalizedRole = userSnapshot.role === 'provider' ? 'provider' : 'client';
+      setAuthSession({
+        accessToken: loginRes.data.accessToken,
+        refreshToken: loginRes.data.refreshToken,
+        user: userSnapshot,
+        persistent: true,
+      });
       login({
         id: userSnapshot.id,
         firstName: userSnapshot.firstName,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -14,7 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AuthModal from '@/components/ui/AuthModal';
 import { toast } from 'sonner';
-import { useGetCategoriesQuery, useGetPublicServicesQuery, useRemoveSavedServiceMutation, useSaveServiceMutation } from '@/store/services/apiSlice';
+import {
+  useGetCategoriesQuery,
+  useGetPublicServicesQuery,
+  useRemoveSavedServiceMutation,
+  useSaveServiceMutation,
+  useTrackGigImpressionsMutation,
+} from '@/store/services/apiSlice';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
 import { kmToMiles, milesToKm } from '@/lib/distance';
 import { formatRating } from '@/lib/formatters';
@@ -75,7 +81,7 @@ const getLocationParts = (rawAddress: string, fallbackCity: string) => {
 export default function BrowseServicesPage() {
   const router = useRouter();
   const { city, coordinates, radius, setRadius } = useLocation();
-  const { user, isAuthenticated, updateProfile } = useAuth();
+  const { user, role, isAuthenticated, updateProfile } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -86,8 +92,10 @@ export default function BrowseServicesPage() {
   const [page, setPage] = useState(1);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeFavoriteId, setActiveFavoriteId] = useState<string | null>(null);
+  const trackedImpressionGigIdsRef = useRef<Set<string>>(new Set());
   const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
   const [removeSavedService, { isLoading: isRemovingSavedService }] = useRemoveSavedServiceMutation();
+  const [trackGigImpressions] = useTrackGigImpressionsMutation();
 
   const limit = 9;
   const lat = typeof user?.locationLat === 'number' ? user.locationLat : coordinates?.lat ?? null;
@@ -184,6 +192,20 @@ export default function BrowseServicesPage() {
       setActiveFavoriteId(null);
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'client') return;
+
+    const visibleGigIds = availableServices
+      .map((service) => String(service.id || '').trim())
+      .filter(Boolean)
+      .filter((gigId) => !trackedImpressionGigIdsRef.current.has(gigId));
+
+    if (!visibleGigIds.length) return;
+
+    visibleGigIds.forEach((gigId) => trackedImpressionGigIdsRef.current.add(gigId));
+    void trackGigImpressions(visibleGigIds);
+  }, [availableServices, isAuthenticated, role, trackGigImpressions]);
 
   return (
     <div className="min-h-screen bg-slate-50/50 py-10">

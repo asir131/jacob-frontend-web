@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BRAND, SEO, CONTACT, SOCIAL_LINKS } from "@/lib/constants";
 import WebsiteAuthGate from "@/components/auth/WebsiteAuthGate";
+import WebsiteReviewPrompt from "@/components/feedback/WebsiteReviewPrompt";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SEO.siteUrl),
@@ -110,6 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <main className="flex-1">{children}</main>
                     </div>
                     <Footer />
+                    <WebsiteReviewPrompt />
                     <Toaster position="top-center" richColors />
                   </WebsiteAuthGate>
                 </LocationProvider>

@@ -1,7 +1,4 @@
-/**
- * Centralized API client for LocallyServe
- * All fetch calls should go through this module, never raw fetch() in components.
- */
+import { clearAuthSession, getAccessToken, refreshAccessToken } from '@/lib/authStorage';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -21,34 +18,20 @@ interface ApiResponse<T> {
   status: number;
 }
 
-/**
- * Retrieves the auth token from storage.
- * Replace with your actual auth token retrieval logic (e.g., from cookies or a store).
- */
 function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token');
+  return getAccessToken();
 }
 
-/**
- * Core fetch wrapper with:
- * - Auth token injection
- * - 10s timeout via AbortController
- * - Consistent error shape
- * - JSON serialization/deserialization
- */
 async function request<T>(
   endpoint: string,
-  options: RequestOptions = {}
+  options: RequestOptions = {},
+  allowRefresh = true
 ): Promise<ApiResponse<T>> {
   const { method = 'GET', body, headers = {}, signal } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
-  // Merge caller's signal with our timeout signal
   const mergedSignal = signal ?? controller.signal;
-
   const token = getAuthToken();
 
   const requestHeaders: Record<string, string> = {
@@ -58,7 +41,7 @@ async function request<T>(
   };
 
   if (token) {
-    requestHeaders['Authorization'] = `Bearer ${token}`;
+    requestHeaders.Authorization = `Bearer ${token}`;
   }
 
   try {
@@ -72,9 +55,15 @@ async function request<T>(
     clearTimeout(timeoutId);
 
     if (response.status === 401) {
-      // Token expired — clear local auth and redirect to login
+      if (allowRefresh && BASE_URL) {
+        const refreshedToken = await refreshAccessToken(BASE_URL);
+        if (refreshedToken) {
+          return request<T>(endpoint, options, false);
+        }
+      }
+
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
+        clearAuthSession();
         window.location.href = '/login';
       }
       return { data: null, error: 'Session expired. Please log in again.', status: 401 };
@@ -87,7 +76,7 @@ async function request<T>(
         const parsed = JSON.parse(errorBody) as { message?: string };
         if (parsed?.message) message = parsed.message;
       } catch {
-        // ignore JSON parse error — use default message
+        // ignore parse failures and keep default message
       }
       return { data: null, error: message, status: response.status };
     }
