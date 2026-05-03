@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Lock, UserCircle, Briefcase, Info, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, UserCircle, Briefcase, Info, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -33,6 +33,8 @@ export default function SignupClient() {
   const [signupMutation] = useSignupMutation();
   const [role, setRole] = useState<'client' | 'provider'>('client');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState<SignupForm>({
     firstName: '',
     lastName: '',
@@ -76,6 +78,11 @@ export default function SignupClient() {
 
     if (payload.password.length < 8) {
       toast.error('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (!/[^\w\s]/.test(payload.password)) {
+      toast.error('Password must include at least 1 special character.');
       return;
     }
 
@@ -234,16 +241,24 @@ export default function SignupClient() {
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors" aria-hidden="true" />
                 <Input
                   id="signup-password"
-                  type="password"
                   name="password"
                   autoComplete="new-password"
-                  placeholder="Min. 8 characters"
+                  placeholder="Min. 8 characters + symbol"
                   value={formData.password}
                   onChange={(e) => handleChange('password', e.target.value)}
-                  className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
+                  type={showPassword ? 'text' : 'password'}
+                  className="h-14 pl-12 pr-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2286BE]"
+                >
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
               </div>
             </div>
 
@@ -255,16 +270,24 @@ export default function SignupClient() {
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors" aria-hidden="true" />
                 <Input
                   id="signup-confirm-password"
-                  type="password"
                   name="confirmPassword"
                   autoComplete="new-password"
                   placeholder="Re-enter your password"
                   value={formData.confirmPassword}
                   onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                  className="h-14 pl-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className="h-14 pl-12 pr-12 rounded-2xl border-slate-100 bg-slate-50/50 focus-visible:ring-[#2286BE] font-bold"
                   required
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2286BE]"
+                >
+                  {showConfirmPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
               </div>
             </div>
 

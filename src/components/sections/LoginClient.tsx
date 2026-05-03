@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Mail, Lock, ChevronRight, Apple, Eye, EyeOff, CheckCircle2, KeyRound } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, ChevronRight, Eye, EyeOff, CheckCircle2, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { setAuthSession } from '@/lib/authStorage';
 import {
   useLoginMutation,
+  useLoginWithGoogleMutation,
   useRequestForgotPasswordOtpMutation,
   useResetForgotPasswordMutation,
   useVerifyForgotPasswordOtpMutation,
@@ -60,6 +61,26 @@ type LoginResponse = {
   };
 };
 
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: { theme?: string; size?: string; shape?: string; width?: number; text?: string }
+          ) => void;
+        };
+      };
+    };
+  }
+}
+
 type ProfileResponse = {
   success: boolean;
   data?: {
@@ -79,6 +100,7 @@ export default function LoginClient() {
   const { login } = useAuth();
   const router = useRouter();
   const [loginMutation] = useLoginMutation();
+  const [loginWithGoogleMutation] = useLoginWithGoogleMutation();
   const [requestForgotPasswordOtp] = useRequestForgotPasswordOtpMutation();
   const [verifyForgotPasswordOtp] = useVerifyForgotPasswordOtpMutation();
   const [resetForgotPassword] = useResetForgotPasswordMutation();
@@ -97,6 +119,7 @@ export default function LoginClient() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   const resetForgotPasswordState = () => {
     setOtpValues(['', '', '', '']);
@@ -126,6 +149,120 @@ export default function LoginClient() {
     }
   };
 
+  const storeLoginSession = useCallback(
+    async (data: LoginResponse['data'], persistent: boolean) => {
+      if (!data) return;
+      const profileSnapshot = await fetchProfileSnapshot(data.accessToken);
+      const userSnapshot = profileSnapshot || data.user;
+      const normalizedRole = userSnapshot.role === 'provider' ? 'provider' : 'client';
+
+      setAuthSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: userSnapshot,
+        persistent,
+      });
+      login({
+        id: userSnapshot.id,
+        firstName: userSnapshot.firstName,
+        lastName: userSnapshot.lastName,
+        email: userSnapshot.email,
+        role: normalizedRole,
+        avatar: userSnapshot.avatar,
+        phone: userSnapshot.phone,
+        address: userSnapshot.address,
+        preferredLanguage: userSnapshot.preferredLanguage,
+        locationLat: userSnapshot.locationLat ?? undefined,
+        locationLng: userSnapshot.locationLng ?? undefined,
+        businessBio: userSnapshot.businessBio,
+        experienceLevel: userSnapshot.experienceLevel,
+        serviceCity: userSnapshot.serviceCity,
+        serviceLocationLat: userSnapshot.serviceLocationLat ?? undefined,
+        serviceLocationLng: userSnapshot.serviceLocationLng ?? undefined,
+        payoutVerificationStatus: userSnapshot.payoutVerificationStatus || 'unverified',
+        payoutInfo: userSnapshot.payoutInfo,
+      });
+    },
+    [login]
+  );
+
+  const handleGoogleCredential = useCallback(
+    async (response: GoogleCredentialResponse) => {
+      if (!response.credential) {
+        toast.error('Google did not return a login token.');
+        return;
+      }
+
+      if (!process.env.NEXT_PUBLIC_API_URL) {
+        toast.error('Missing NEXT_PUBLIC_API_URL. Set frontend API base URL first.');
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const data = (await loginWithGoogleMutation({
+          idToken: response.credential,
+          role: 'client',
+        }).unwrap()) as LoginResponse;
+
+        if (!data?.success || !data?.data) {
+          toast.error(data?.message || 'Google login failed.');
+          return;
+        }
+
+        await storeLoginSession(data.data, rememberMe);
+        toast.success(`Welcome to ${BRAND.name}!`);
+        router.push('/');
+      } catch (error) {
+        toast.error(extractErrorMessage(error, 'Google login failed.'));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loginWithGoogleMutation, rememberMe, router, storeLoginSession]
+  );
+
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId || !googleButtonRef.current) return;
+
+    const renderGoogleButton = () => {
+      if (!window.google?.accounts?.id || !googleButtonRef.current) return;
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredential,
+      });
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        shape: 'rectangular',
+        width: 260,
+        text: 'continue_with',
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', renderGoogleButton, { once: true });
+      return () => existingScript.removeEventListener('load', renderGoogleButton);
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.addEventListener('load', renderGoogleButton, { once: true });
+    document.head.appendChild(script);
+
+    return () => script.removeEventListener('load', renderGoogleButton);
+  }, [handleGoogleCredential]);
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const loginPayload = {
@@ -151,35 +288,7 @@ export default function LoginClient() {
         return;
       }
 
-      const profileSnapshot = await fetchProfileSnapshot(data.data.accessToken);
-      const userSnapshot = profileSnapshot || data.data.user;
-      const normalizedRole = userSnapshot.role === 'provider' ? 'provider' : 'client';
-      setAuthSession({
-        accessToken: data.data.accessToken,
-        refreshToken: data.data.refreshToken,
-        user: userSnapshot,
-        persistent: rememberMe,
-      });
-      login({
-        id: userSnapshot.id,
-        firstName: userSnapshot.firstName,
-        lastName: userSnapshot.lastName,
-        email: userSnapshot.email,
-        role: normalizedRole,
-        avatar: userSnapshot.avatar,
-        phone: userSnapshot.phone,
-        address: userSnapshot.address,
-        preferredLanguage: userSnapshot.preferredLanguage,
-        locationLat: userSnapshot.locationLat ?? undefined,
-        locationLng: userSnapshot.locationLng ?? undefined,
-        businessBio: userSnapshot.businessBio,
-        experienceLevel: userSnapshot.experienceLevel,
-        serviceCity: userSnapshot.serviceCity,
-        serviceLocationLat: userSnapshot.serviceLocationLat ?? undefined,
-        serviceLocationLng: userSnapshot.serviceLocationLng ?? undefined,
-        payoutVerificationStatus: userSnapshot.payoutVerificationStatus || 'unverified',
-        payoutInfo: userSnapshot.payoutInfo,
-      });
+      await storeLoginSession(data.data, rememberMe);
       toast.success(`Welcome back to ${BRAND.name}!`);
       router.push('/');
     } catch {
@@ -418,13 +527,23 @@ export default function LoginClient() {
                 <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-4 text-slate-400 font-bold tracking-widest">Or continue with</span></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" type="button" aria-label="Continue with Google" className="h-14 rounded-2xl border-slate-100 font-bold hover:bg-slate-50">
-                  <Image src="https://www.google.com/favicon.ico" alt="" width={18} height={18} className="mr-2" /> Google
-                </Button>
-                <Button variant="outline" type="button" aria-label="Continue with Apple" className="h-14 rounded-2xl border-slate-100 font-bold hover:bg-slate-50">
-                  <Apple size={18} className="mr-2" /> Apple
-                </Button>
+              <div className="flex justify-center">
+                {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+                  <div
+                    className="flex h-14 w-full rounded-2xl  items-center justify-center overflow-hidden   bg-white "
+                    ref={googleButtonRef}
+                  />
+                ) : (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    aria-label="Continue with Google"
+                    onClick={() => toast.error('Set NEXT_PUBLIC_GOOGLE_CLIENT_ID first.')}
+                    className="h-14 rounded-2xl  font-bold hover:bg-slate-50"
+                  >
+                    <Image src="https://www.google.com/favicon.ico" alt="" width={18} height={18} className="mr-2" /> Google
+                  </Button>
+                )}
               </div>
 
               <p className="text-center mt-8 text-slate-500 font-bold">

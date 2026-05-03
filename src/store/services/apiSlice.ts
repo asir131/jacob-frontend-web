@@ -27,6 +27,11 @@ type LoginPayload = {
   password: string;
 };
 
+type GoogleLoginPayload = {
+  idToken: string;
+  role?: 'client' | 'provider';
+};
+
 type SignupPayload = {
   firstName: string;
   lastName: string;
@@ -68,6 +73,11 @@ type WebsiteReviewPromptResponse = {
 };
 
 type PublicWebsiteReviewsResponse = {
+  stats?: {
+    totalProviderWithdrawable?: number;
+    activeVerifiedProviders?: number;
+    sixMonthIncomeGrowthPercent?: number;
+  };
   providerReviews?: Array<{
     id: string;
     reviewText?: string;
@@ -76,6 +86,7 @@ type PublicWebsiteReviewsResponse = {
       id?: string;
       name?: string;
       avatar?: string;
+      location?: string;
       sellerLevel?: string;
       providerRating?: number;
       monthlyIncome?: number;
@@ -89,6 +100,7 @@ type PublicWebsiteReviewsResponse = {
       id?: string;
       name?: string;
       avatar?: string;
+      location?: string;
       monthlySpending?: number;
     };
   }>;
@@ -920,6 +932,13 @@ export const apiSlice = createApi({
         body: payload,
       }),
     }),
+    loginWithGoogle: builder.mutation<ApiEnvelope<unknown>, GoogleLoginPayload>({
+      query: (payload) => ({
+        url: '/api/auth/google',
+        method: 'POST',
+        body: payload,
+      }),
+    }),
     signup: builder.mutation<ApiEnvelope<unknown>, SignupPayload>({
       query: (payload) => ({
         url: '/api/auth/signup',
@@ -1052,6 +1071,7 @@ export const {
   useRemoveSavedServiceMutation,
   useSubmitProviderPayoutInfoMutation,
   useLoginMutation,
+  useLoginWithGoogleMutation,
   useSignupMutation,
   useVerifySignupOtpMutation,
   useLazyGetWebsiteReviewPromptQuery,
