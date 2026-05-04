@@ -511,12 +511,12 @@ export default function ClientProfilePage() {
                       )}
                     </div>
 
-                    <div className="pt-6 border-t border-slate-100 flex justify-end gap-4">
-                      <Button variant="ghost" onClick={handleCancel} className="font-bold rounded-xl px-10 h-14">
+                    <div className="pt-6 border-t border-slate-100 flex justify-end gap-2 sm:gap-4">
+                      <Button variant="ghost" onClick={handleCancel} className="h-11 rounded-xl px-4 text-sm font-bold sm:h-14 sm:px-10 sm:text-base">
                         Cancel
                       </Button>
-                      <Button onClick={handleSave} disabled={isSavingProfile} className="bg-[#2286BE] hover:bg-[#1b6da0] font-black rounded-xl px-12 h-14 shadow-xl shadow-[#2286BE]/20">
-                        <Save size={18} className="mr-2" /> {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                      <Button onClick={handleSave} disabled={isSavingProfile} className="h-11 rounded-xl bg-[#2286BE] px-5 text-sm font-black shadow-xl shadow-[#2286BE]/20 hover:bg-[#1b6da0] sm:h-14 sm:px-12 sm:text-base">
+                        <Save size={16} className="mr-2 sm:h-[18px] sm:w-[18px]" /> {isSavingProfile ? 'Saving...' : 'Save Changes'}
                       </Button>
                     </div>
                   </>

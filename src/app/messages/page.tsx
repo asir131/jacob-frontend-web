@@ -49,6 +49,7 @@ type Conversation = {
     id?: string;
     name?: string;
     avatar?: string;
+    role?: string;
   };
 };
 
@@ -93,6 +94,7 @@ type CallInvite = {
   callType: 'voice' | 'video';
   offer?: RTCSessionDescriptionInit;
   senderId?: string;
+  senderRole?: string;
   senderName?: string;
   senderAvatar?: string;
 };
@@ -222,6 +224,7 @@ export default function MessagesPage() {
       otherUserId: conv.otherUser?.id || '',
       name: conv.otherUser?.name || 'User',
       avatar: conv.otherUser?.avatar || '',
+      role: conv.otherUser?.role || '',
       lastMessage: conv.lastMessage || 'No messages yet',
       time: conv.lastMessageAt
         ? new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -248,6 +251,9 @@ export default function MessagesPage() {
     [conversations, selectedConversationId]
   );
 
+  const isAdminConversation =
+    selectedContact?.role === 'superAdmin' || selectedConversation?.otherUser?.role === 'superAdmin';
+  const canStartCalls = !isAdminConversation;
   const blockedBy = selectedConversation?.blockedBy || null;
   const selectedGigId = String(selectedConversation?.gigId || '');
   const isBlockedByMe = Boolean(blockedBy && String(blockedBy) === String(user?.id || ''));
@@ -323,6 +329,11 @@ export default function MessagesPage() {
         return;
       }
 
+      if (!canStartCalls) {
+        toast.info('Audio and video calls are not available with admin support.');
+        return;
+      }
+
       try {
         cleanupCall(false);
         setCallStatus('connecting');
@@ -386,7 +397,7 @@ export default function MessagesPage() {
         toast.error('Could not start the call.');
       }
     },
-    [cleanupCall, selectedContact, selectedConversationId, user]
+    [canStartCalls, cleanupCall, selectedContact, selectedConversationId, user]
   );
 
   const acceptIncomingCall = useCallback(async () => {
@@ -540,6 +551,10 @@ export default function MessagesPage() {
     });
 
     socket.on('call:invite', (payload: CallInvite) => {
+      if (payload.senderRole === 'superAdmin') {
+        toast.info('Audio and video calls are not available with admin support.');
+        return;
+      }
       if (payload?.conversationId && payload.conversationId !== selectedConversationId) {
         setManualConversationId(payload.conversationId);
       }
@@ -576,6 +591,11 @@ export default function MessagesPage() {
       if (payload.conversationId !== activeCallRef.current?.conversationId) return;
       cleanupCall(false);
       toast.info('Call ended');
+    });
+
+    socket.on('call:blocked', (payload: { reason?: string }) => {
+      cleanupCall(false);
+      toast.info(payload?.reason || 'Audio and video calls are not available with admin support.');
     });
 
     return () => {
@@ -802,12 +822,16 @@ export default function MessagesPage() {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl" onClick={() => startCall('voice')}>
-              <Phone size={20} />
-            </Button>
-            <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl" onClick={() => startCall('video')}>
-              <Video size={20} />
-            </Button>
+            {canStartCalls ? (
+              <>
+                <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl" onClick={() => startCall('voice')}>
+                  <Phone size={20} />
+                </Button>
+                <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl" onClick={() => startCall('video')}>
+                  <Video size={20} />
+                </Button>
+              </>
+            ) : null}
             <Button variant="ghost" size="icon" className={`text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl transition-colors ${isInfoPanelOpen ? 'text-[#2286BE] bg-primary-soft' : ''}`} onClick={() => setIsInfoPanelOpen(!isInfoPanelOpen)}>
               <Info size={20} />
             </Button>

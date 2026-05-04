@@ -136,7 +136,7 @@ export default function AboutClient() {
                 <Button className="h-14 px-10 bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-base rounded-2xl">Find a Service</Button>
               </Link>
               <Link href="/join-provider">
-                <Button variant="outline" className="h-14 px-10 border-white/20 text-white hover:bg-white/10 font-black text-base rounded-2xl">Join as Provider</Button>
+                <Button variant="outline" className="h-14 px-10 border-white/20 text-black hover:text-white hover:bg-white/10 font-black text-base rounded-2xl">Join as Provider</Button>
               </Link>
             </div>
           </div>

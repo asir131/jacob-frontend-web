@@ -81,6 +81,7 @@ export default function CreateGigPage() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('editId');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const stepContentRef = useRef<HTMLDivElement | null>(null);
   const [step, setStep] = useState(1);
   const [gigTitle, setGigTitle] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORIES[0]?.slug || 'cleaning');
@@ -174,6 +175,16 @@ export default function CreateGigPage() {
     setPackages((prev) => prev.map((pkg, pkgIndex) => (pkgIndex === index ? { ...pkg, [field]: value } : pkg)));
   };
 
+  const transitionToStep = (nextStep: number) => {
+    setStep(nextStep);
+    window.requestAnimationFrame(() => {
+      stepContentRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
   const handleImageSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -232,10 +243,10 @@ export default function CreateGigPage() {
       return;
     }
 
-    setStep((current) => Math.min(6, current + 1));
+    transitionToStep(Math.min(6, step + 1));
   };
 
-  const handleBack = () => setStep((current) => Math.max(1, current - 1));
+  const handleBack = () => transitionToStep(Math.max(1, step - 1));
 
   const handleSetMyLocation = async () => {
     setIsResolvingLocation(true);
@@ -335,7 +346,7 @@ export default function CreateGigPage() {
             <React.Fragment key={s.num}>
               <div
                 className={`flex flex-col items-center flex-shrink-0 w-20 cursor-pointer ${step >= s.num ? 'opacity-100' : 'opacity-40'}`}
-                onClick={() => step > s.num && setStep(s.num)}
+                onClick={() => step > s.num && transitionToStep(s.num)}
               >
                 <div
                   className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm mb-1 transition-colors ${
@@ -353,7 +364,7 @@ export default function CreateGigPage() {
           ))}
         </div>
 
-          <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-sm min-h-[500px]">
+          <div ref={stepContentRef} className="scroll-mt-24 bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-sm min-h-[500px]">
             {isLoadingGig ? (
               <div className="flex min-h-[420px] items-center justify-center text-sm font-semibold text-slate-500">
                 Loading gig details...

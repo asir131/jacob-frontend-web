@@ -45,13 +45,21 @@ export default function Header() {
         ? [{ name: 'Requested Orders', href: '/provider/requests' }]
         : [{ name: 'Services', href: '/services' }];
 
+    const roleAwareLinks =
+      isAuthenticated && role === 'provider'
+        ? [
+            { name: 'My Gigs', href: '/provider/gigs' },
+            { name: 'Provider Hub', href: '/provider/dashboard' },
+          ]
+        : [{ name: 'Join as Pro', href: '/join-provider' }];
+
     return [
       ...baseLinks,
       { name: 'Categories', href: '/categories' },
-      { name: 'Join as Pro', href: '/join-provider' },
+      ...roleAwareLinks,
       { name: 'Success Stories', href: '/success-stories' },
     ];
-  }, [role]);
+  }, [isAuthenticated, role]);
 
   const isActive = (href: string) => pathname === href;
 

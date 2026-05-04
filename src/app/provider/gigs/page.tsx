@@ -246,17 +246,17 @@ export default function ProviderGigsPage() {
           ) : null}
         </motion.div>
 
-        <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 mb-8 inline-flex w-full md:w-auto">
+        <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 mb-8 w-full md:inline-flex md:w-auto">
           <Tabs defaultValue="published" className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="bg-transparent h-12 w-full md:w-auto justify-start gap-1">
-              <TabsTrigger value="published" className="px-8 rounded-xl data-[state=active]:bg-[#2286BE] data-[state=active]:text-white data-[state=active]:shadow-md font-bold transition-all">
-                Published <span className="ml-2 text-[10px] opacity-70 px-1.5 py-0.5 bg-black/10 rounded-full">{tabCounts.published}</span>
+            <TabsList className="grid h-auto w-full grid-cols-3 gap-1 bg-transparent md:flex md:h-12 md:w-auto md:justify-start">
+              <TabsTrigger value="published" className="min-w-0 rounded-xl px-2 py-2.5 text-[11px] font-bold transition-all data-[state=active]:bg-[#2286BE] data-[state=active]:text-white data-[state=active]:shadow-md sm:text-sm md:px-8">
+                <span className="truncate">Published</span> <span className="ml-1 shrink-0 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] opacity-70">{tabCounts.published}</span>
               </TabsTrigger>
-              <TabsTrigger value="pending" className="px-8 rounded-xl data-[state=active]:bg-[#2286BE] data-[state=active]:text-white data-[state=active]:shadow-md font-bold transition-all">
-                Review <span className="ml-2 text-[10px] opacity-70 px-1.5 py-0.5 bg-black/10 rounded-full">{tabCounts.pending}</span>
+              <TabsTrigger value="pending" className="min-w-0 rounded-xl px-2 py-2.5 text-[11px] font-bold transition-all data-[state=active]:bg-[#2286BE] data-[state=active]:text-white data-[state=active]:shadow-md sm:text-sm md:px-8">
+                <span className="truncate">Review</span> <span className="ml-1 shrink-0 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] opacity-70">{tabCounts.pending}</span>
               </TabsTrigger>
-              <TabsTrigger value="other" className="px-8 rounded-xl data-[state=active]:bg-[#2286BE] data-[state=active]:text-white data-[state=active]:shadow-md font-bold transition-all">
-                Other <span className="ml-2 text-[10px] opacity-70 px-1.5 py-0.5 bg-black/10 rounded-full">{tabCounts.rejected}</span>
+              <TabsTrigger value="other" className="min-w-0 rounded-xl px-2 py-2.5 text-[11px] font-bold transition-all data-[state=active]:bg-[#2286BE] data-[state=active]:text-white data-[state=active]:shadow-md sm:text-sm md:px-8">
+                <span className="truncate">Other</span> <span className="ml-1 shrink-0 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] opacity-70">{tabCounts.rejected}</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
