@@ -186,6 +186,11 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   }, [service.packages, service.startingPrice]);
 
   const handleBooking = () => {
+    if (user?.role === 'provider') {
+      toast.error('Please switch to a client account to place service orders.');
+      return;
+    }
+
     const clientLat = typeof user?.locationLat === 'number' ? user.locationLat : null;
     const clientLng = typeof user?.locationLng === 'number' ? user.locationLng : null;
     const serviceLat = typeof service?.location?.lat === 'number' ? service.location.lat : null;

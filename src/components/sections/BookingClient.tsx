@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCreateOrderMutation } from '@/store/services/apiSlice';
 
 const variants = {
@@ -60,6 +61,7 @@ type ApiPackage = {
 
 export default function BookingClient({ service }: BookingClientProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const sourcePackages = (Array.isArray(service?.packages) ? service.packages : []) as ApiPackage[];
   const byName = new Map<string, ApiPackage>(
     sourcePackages
@@ -136,6 +138,11 @@ export default function BookingClient({ service }: BookingClientProps) {
   const handleBack = () => setStep([Math.max(1, step - 1), -1]);
 
   const handleFinalizeOrder = async () => {
+    if (user?.role === 'provider') {
+      toast.error('Please switch to a client account to place service orders.');
+      return;
+    }
+
     if (!date) {
       toast.error('Please select a date.');
       return;
@@ -166,6 +173,32 @@ export default function BookingClient({ service }: BookingClientProps) {
       toast.error(error?.data?.message || error?.message || 'Failed to create order.');
     }
   };
+
+  if (user?.role === 'provider') {
+    return (
+      <div className="min-h-screen bg-slate-50/50 py-16">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="rounded-[2.5rem] border border-slate-200 bg-white p-10 text-center shadow-xl shadow-slate-200/40">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+              <ShieldCheck size={28} />
+            </div>
+            <h1 className="mt-6 text-3xl font-black text-slate-900">Switch to client to order</h1>
+            <p className="mt-3 text-base font-medium leading-7 text-slate-500">
+              Providers cannot place service orders from this account. Please switch to a client account to continue.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button variant="outline" className="rounded-2xl" onClick={() => router.back()}>
+                Go Back
+              </Button>
+              <Button className="rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]" onClick={() => router.push('/services')}>
+                Browse Services
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-24">

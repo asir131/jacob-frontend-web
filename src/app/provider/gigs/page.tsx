@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -92,6 +92,16 @@ const kmToMiles = (km?: number | null) => {
   const numericKm = Number(km || 0);
   return (numericKm * 0.621371).toFixed(1);
 };
+
+const formatMoney = (value?: number | null) => `$${Number(value || 0).toFixed(2)}`;
+
+const formatCompactMoney = (value?: number | null) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(Number(value || 0));
 
 export default function ProviderGigsPage() {
   const PAGE_SIZE = 9;
@@ -218,10 +228,34 @@ export default function ProviderGigsPage() {
   const analyticsSummary = activeAnalyticsData?.summary;
   const analyticsSeries = Array.isArray(activeAnalyticsData?.detailViewSeries)
     ? activeAnalyticsData.detailViewSeries.map((item) => ({
+        date: item.date || '',
         label: item.label || '',
         earnings: Number(item.earnings || 0),
       }))
     : [];
+  const analyticsTrendSummary = useMemo(() => {
+    if (!analyticsSeries.length) {
+      return {
+        averageDailyIncome: 0,
+        bestDayIncome: 0,
+        bestDayLabel: '',
+        activeIncomeDays: 0,
+      };
+    }
+
+    const totalIncome = analyticsSeries.reduce((sum, item) => sum + Number(item.earnings || 0), 0);
+    const bestDay = analyticsSeries.reduce(
+      (top, item) => (Number(item.earnings || 0) > Number(top.earnings || 0) ? item : top),
+      analyticsSeries[0]
+    );
+
+    return {
+      averageDailyIncome: totalIncome / analyticsSeries.length,
+      bestDayIncome: Number(bestDay?.earnings || 0),
+      bestDayLabel: bestDay?.label || '',
+      activeIncomeDays: analyticsSeries.filter((item) => Number(item.earnings || 0) > 0).length,
+    };
+  }, [analyticsSeries]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-12">
@@ -542,16 +576,87 @@ export default function ProviderGigsPage() {
                       Loading analytics...
                     </div>
                   ) : analyticsSeries.length > 0 ? (
-                    <div className="h-[280px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={analyticsSeries}>
-                          <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
-                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} tickFormatter={(value) => `$${Number(value).toFixed(0)}`} />
-                          <Tooltip />
-                          <Bar dataKey="earnings" fill="#2286BE" radius={[10, 10, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="mb-4 grid gap-3 md:grid-cols-3">
+                        <div className="rounded-2xl bg-white px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                            Avg / Day
+                          </p>
+                          <p className="mt-2 text-xl font-black text-slate-900">
+                            {formatMoney(analyticsTrendSummary.averageDailyIncome)}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                            Best Day
+                          </p>
+                          <p className="mt-2 text-xl font-black text-slate-900">
+                            {formatMoney(analyticsTrendSummary.bestDayIncome)}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-slate-500">
+                            {analyticsTrendSummary.bestDayLabel || 'No peak day'}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                            Earning Days
+                          </p>
+                          <p className="mt-2 text-xl font-black text-slate-900">
+                            {analyticsTrendSummary.activeIncomeDays}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-slate-500">
+                            Days with income recorded
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="h-[300px] rounded-[1.25rem] bg-white p-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={analyticsSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="gigIncomeFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#2286BE" stopOpacity={0.28} />
+                                <stop offset="95%" stopColor="#2286BE" stopOpacity={0.03} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="label"
+                              axisLine={false}
+                              tickLine={false}
+                              minTickGap={24}
+                              interval="preserveStartEnd"
+                              tick={{ fill: '#94A3B8', fontSize: 12 }}
+                            />
+                            <YAxis
+                              axisLine={false}
+                              tickLine={false}
+                              width={56}
+                              tick={{ fill: '#94A3B8', fontSize: 12 }}
+                              tickFormatter={(value) => formatCompactMoney(Number(value || 0))}
+                            />
+                            <Tooltip
+                              cursor={{ stroke: '#2286BE', strokeOpacity: 0.14, strokeWidth: 1 }}
+                              contentStyle={{
+                                borderRadius: '16px',
+                                border: '1px solid #E2E8F0',
+                                boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
+                                padding: '12px 14px',
+                              }}
+                              formatter={(value) => [formatMoney(Number(value || 0)), 'Income']}
+                              labelFormatter={(label) => `Date: ${label}`}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="earnings"
+                              stroke="#2286BE"
+                              strokeWidth={3}
+                              fill="url(#gigIncomeFill)"
+                              activeDot={{ r: 5, strokeWidth: 0, fill: '#2286BE' }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   ) : (
                     <div className="h-[280px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">

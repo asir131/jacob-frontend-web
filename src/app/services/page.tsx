@@ -154,6 +154,17 @@ export default function BrowseServicesPage() {
     hasPrevPage: false,
     hasNextPage: false,
   };
+  const requestGigPath = useMemo(() => {
+    const params = new URLSearchParams();
+    const trimmedSearch = searchQuery.trim();
+    if (trimmedSearch) {
+      params.set('categoryName', trimmedSearch);
+    }
+    if (selectedCategory && selectedCategory !== 'all') {
+      params.set('categorySlug', selectedCategory);
+    }
+    return params.toString() ? `/post-request?${params.toString()}` : '/post-request';
+  }, [searchQuery, selectedCategory]);
 
   const toggleProviderType = (type: string) => {
     setPage(1);
@@ -388,6 +399,18 @@ export default function BrowseServicesPage() {
               <div className="rounded-3xl bg-white border border-slate-100 p-10 text-center">
                 <h2 className="text-2xl font-black text-slate-900">No services found</h2>
                 <p className="mt-2 text-slate-500 font-medium">Try changing radius or category filters.</p>
+                {searchQuery.trim() ? (
+                  <div className="mt-6">
+                    <p className="text-sm font-medium text-slate-500">
+                      Didn&apos;t find the service you need?
+                    </p>
+                    <Link href={requestGigPath} className="inline-flex">
+                      <Button className="mt-3 rounded-xl bg-[#2286BE] hover:bg-[#1b6da0]">
+                        Request Gig
+                      </Button>
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="grid gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
