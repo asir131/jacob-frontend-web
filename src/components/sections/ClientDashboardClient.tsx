@@ -226,31 +226,35 @@ export default function ClientDashboardClient() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
         >
            <motion.div variants={item}>
-             <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
-               <CardHeader className="py-5 pb-2">
-                 <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Active Orders</CardTitle>
-               </CardHeader>
-               <CardContent className="pb-6">
-                 <div className="text-4xl font-black text-slate-900">{isDashboardLoading ? '0' : activeOrders}</div>
-                 <div className="flex items-center text-xs text-amber-500 font-bold mt-2 bg-amber-50 w-fit px-2 py-1 rounded-full">
-                    <Clock size={12} className="mr-1" /> {activeNote}
-                 </div>
-               </CardContent>
-             </Card>
+             <Link href="/client/orders?status=active" className="block">
+               <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
+                 <CardHeader className="py-5 pb-2">
+                   <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Active Orders</CardTitle>
+                 </CardHeader>
+                 <CardContent className="pb-6">
+                   <div className="text-4xl font-black text-slate-900">{isDashboardLoading ? '0' : activeOrders}</div>
+                   <div className="flex items-center text-xs text-amber-500 font-bold mt-2 bg-amber-50 w-fit px-2 py-1 rounded-full">
+                      <Clock size={12} className="mr-1" /> {activeNote}
+                   </div>
+                 </CardContent>
+               </Card>
+             </Link>
            </motion.div>
 
            <motion.div variants={item}>
-             <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
-               <CardHeader className="py-5 pb-2">
-                 <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Completed</CardTitle>
-               </CardHeader>
-               <CardContent className="pb-6">
-                 <div className="text-4xl font-black text-slate-900">{isDashboardLoading ? '0' : completedOrders}</div>
-                 <div className="flex items-center text-xs text-[#2286BE] font-bold mt-2 bg-[#2286BE]/5 w-fit px-2 py-1 rounded-full">
-                    <CheckCircle2 size={12} className="mr-1" /> {completionRate.toFixed(1)}% completion rate
-                 </div>
-               </CardContent>
-             </Card>
+             <Link href="/client/orders?status=completed" className="block">
+               <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
+                 <CardHeader className="py-5 pb-2">
+                   <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Completed</CardTitle>
+                 </CardHeader>
+                 <CardContent className="pb-6">
+                   <div className="text-4xl font-black text-slate-900">{isDashboardLoading ? '0' : completedOrders}</div>
+                   <div className="flex items-center text-xs text-[#2286BE] font-bold mt-2 bg-[#2286BE]/5 w-fit px-2 py-1 rounded-full">
+                      <CheckCircle2 size={12} className="mr-1" /> {completionRate.toFixed(1)}% completion rate
+                   </div>
+                 </CardContent>
+               </Card>
+             </Link>
            </motion.div>
 
            <motion.div variants={item}>

@@ -126,8 +126,17 @@ const ORDER_STYLE_STATUS_LABEL: Record<string, string> = {
 export default function ClientOrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const initialStatus = searchParams.get('status');
+  const initialTab =
+    searchParams.get('tab') === 'requested'
+      ? 'requested'
+      : initialStatus === 'active'
+        ? 'active'
+        : initialStatus === 'completed'
+          ? 'completed'
+          : 'all';
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'requested' ? 'requested' : 'all');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [page, setPage] = useState(1);
   const [requestedPage, setRequestedPage] = useState(1);
   const { notifications } = useSocketNotifications();
@@ -135,6 +144,7 @@ export default function ClientOrdersPage() {
 
   const statusParamMap: Record<string, string> = {
     all: 'all',
+    active: 'active',
     pending: 'pending',
     'in-progress': 'accepted',
     'payment-pending': 'payment_pending',
@@ -198,6 +208,7 @@ export default function ClientOrdersPage() {
   const filteredOrders = useMemo(() => {
     if (activeTab === 'requested') return [];
     if (activeTab === 'all') return orders;
+    if (activeTab === 'active') return orders;
     if (activeTab === 'pending') return orders.filter((o) => o.status === 'pending');
     if (activeTab === 'in-progress') return orders.filter((o) => o.status === 'accepted');
     if (activeTab === 'payment-pending') return orders.filter((o) => o.status === 'accepting_delivery');
@@ -289,6 +300,9 @@ export default function ClientOrdersPage() {
             <TabsList className="bg-transparent h-10 w-full md:w-auto justify-start">
               <TabsTrigger value="all" className="px-6 rounded-lg data-[state=active]:bg-[#2286BE] data-[state=active]:text-white">
                 All
+              </TabsTrigger>
+              <TabsTrigger value="active" className="px-6 rounded-lg data-[state=active]:bg-[#2286BE] data-[state=active]:text-white">
+                Active
               </TabsTrigger>
               <TabsTrigger value="pending" className="px-6 rounded-lg data-[state=active]:bg-[#2286BE] data-[state=active]:text-white">
                 Pending

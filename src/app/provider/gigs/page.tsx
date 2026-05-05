@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Play, Trash2, Eye, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -220,7 +219,7 @@ export default function ProviderGigsPage() {
   const analyticsSeries = Array.isArray(activeAnalyticsData?.detailViewSeries)
     ? activeAnalyticsData.detailViewSeries.map((item) => ({
         label: item.label || '',
-        count: Number(item.count || 0),
+        earnings: Number(item.earnings || 0),
       }))
     : [];
 
@@ -300,9 +299,6 @@ export default function ProviderGigsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48 p-2 rounded-xl">
-                              <DropdownMenuItem className="cursor-pointer py-3 rounded-lg">
-                                <Eye size={16} className="mr-3 text-slate-400" /> Preview Service
-                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={`cursor-pointer py-3 rounded-lg ${isPending ? 'opacity-50' : ''}`}
                                 disabled={isPending}
@@ -313,16 +309,11 @@ export default function ProviderGigsPage() {
                               >
                                 <TrendingUp size={16} className="mr-3 text-slate-400" /> View Analytics
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
                               {isPending ? (
                                 <DropdownMenuItem className="cursor-pointer py-3 rounded-lg text-amber-600 focus:text-amber-600 focus:bg-amber-50">
                                   <Clock size={16} className="mr-3" /> Waiting Review
                                 </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem className="cursor-pointer py-3 rounded-lg text-[#2286BE] focus:text-[#2286BE] focus:bg-primary-soft">
-                                  <Play size={16} className="mr-3" /> Activate Listing
-                                </DropdownMenuItem>
-                              )}
+                              ) : null}
                               <DropdownMenuItem
                                 className="cursor-pointer py-3 rounded-lg text-red-600 focus:text-red-600 focus:bg-red-50"
                                 onClick={() => {
@@ -507,7 +498,7 @@ export default function ProviderGigsPage() {
               <DialogHeader className="border-b border-slate-100 px-8 py-6">
                 <DialogTitle className="text-2xl font-black text-slate-900">Gig Analytics</DialogTitle>
                 <DialogDescription className="text-slate-500 font-medium">
-                  {analyticsGig?.title || 'Selected gig'} performance from logged-in client activity.
+                  {analyticsGig?.title || 'Selected gig'} income for the last 30 days.
                 </DialogDescription>
               </DialogHeader>
 
@@ -515,34 +506,34 @@ export default function ProviderGigsPage() {
                 <div className="grid gap-4 md:grid-cols-2 mb-6">
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
-                      Visible On Services Page
+                      Last 30 Days Income
                     </p>
                     <p className="text-4xl font-black text-slate-900">
-                      {isGigAnalyticsFetching ? '...' : Number(analyticsSummary?.servicesPageVisibleClients || 0)}
+                      {isGigAnalyticsFetching ? '...' : `$${Number(analyticsSummary?.totalIncome || 0).toFixed(2)}`}
                     </p>
                     <p className="mt-2 text-sm font-medium text-slate-500">
-                      Unique logged-in clients who saw this gig on services.
+                      Provider earnings from this gig over the last 30 days.
                     </p>
                   </div>
 
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
-                      Entered Detail Page
+                      Paid Completed Orders
                     </p>
                     <p className="text-4xl font-black text-slate-900">
-                      {isGigAnalyticsFetching ? '...' : Number(analyticsSummary?.detailPageUniqueClients || 0)}
+                      {isGigAnalyticsFetching ? '...' : Number(analyticsSummary?.completedPaidOrders || 0)}
                     </p>
                     <p className="mt-2 text-sm font-medium text-slate-500">
-                      Unique logged-in clients who opened this gig detail page.
+                      Orders that contributed income in this 30-day window.
                     </p>
                   </div>
                 </div>
 
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
                   <div className="mb-4">
-                    <h3 className="text-lg font-black text-slate-900">Detail Page Visits Trend</h3>
+                    <h3 className="text-lg font-black text-slate-900">Daily Income Trend</h3>
                     <p className="text-sm font-medium text-slate-500">
-                      Daily unique client visits over the last 14 days.
+                      Earnings from this gig across the last 30 days.
                     </p>
                   </div>
 
@@ -556,15 +547,15 @@ export default function ProviderGigsPage() {
                         <BarChart data={analyticsSeries}>
                           <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
                           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                          <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} tickFormatter={(value) => `$${Number(value).toFixed(0)}`} />
                           <Tooltip />
-                          <Bar dataKey="count" fill="#2286BE" radius={[10, 10, 0, 0]} />
+                          <Bar dataKey="earnings" fill="#2286BE" radius={[10, 10, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (
                     <div className="h-[280px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
-                      No detail-page visits recorded yet.
+                      No income recorded for this gig in the last 30 days.
                     </div>
                   )}
                 </div>

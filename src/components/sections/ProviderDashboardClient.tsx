@@ -161,7 +161,9 @@ export default function ProviderDashboardClient() {
           <motion.div variants={item}>
             <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
               <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
-                <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Revenue</CardTitle>
+                <Link href="/provider/revenue">
+                  <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest hover:text-[#2286BE]">Revenue</CardTitle>
+                </Link>
                 <div className="p-2 bg-[#2286BE]/5 rounded-lg" aria-hidden="true">
                   <DollarSign size={16} className="text-[#2286BE]" />
                 </div>
@@ -169,10 +171,12 @@ export default function ProviderDashboardClient() {
               <CardContent className="pb-6">
                 <div className="flex items-end justify-between">
                   <div>
-                    <div className="text-3xl font-black text-slate-900">${revenue.toFixed(2)}</div>
-                    <div className="flex items-center text-xs text-[#2286BE] font-bold mt-2">
-                      <TrendingUp size={14} className="mr-1" /> Total earnings
-                    </div>
+                    <Link href="/provider/revenue" className="block">
+                      <div className="text-3xl font-black text-slate-900">${revenue.toFixed(2)}</div>
+                      <div className="flex items-center text-xs text-[#2286BE] font-bold mt-2">
+                        <TrendingUp size={14} className="mr-1" /> Total earnings
+                      </div>
+                    </Link>
                   </div>
                   <Link href="/provider/withdrawals">
                     <Button size="sm" className="h-9 px-4 rounded-lg bg-[#2286BE]/10 text-[#2286BE] hover:bg-[#2286BE] hover:text-white font-bold transition-all border-none">
@@ -185,48 +189,54 @@ export default function ProviderDashboardClient() {
           </motion.div>
 
           <motion.div variants={item}>
-            <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
-              <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
-                <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Active Orders</CardTitle>
-                <div className="p-2 bg-blue-50 rounded-lg" aria-hidden="true">
-                  <Clock size={16} className="text-blue-500" />
-                </div>
-              </CardHeader>
-              <CardContent className="pb-6">
-                <div className="text-3xl font-black text-slate-900">{isLoading ? '0' : activeOrders}</div>
-                <p className="text-xs text-slate-400 font-bold mt-2">{pendingOrders} waiting confirmation</p>
-              </CardContent>
-            </Card>
+            <Link href="/provider/orders?status=active" className="block">
+              <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
+                <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
+                  <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Active Orders</CardTitle>
+                  <div className="p-2 bg-blue-50 rounded-lg" aria-hidden="true">
+                    <Clock size={16} className="text-blue-500" />
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-6">
+                  <div className="text-3xl font-black text-slate-900">{isLoading ? '0' : activeOrders}</div>
+                  <p className="text-xs text-slate-400 font-bold mt-2">{pendingOrders} waiting confirmation</p>
+                </CardContent>
+              </Card>
+            </Link>
           </motion.div>
 
           <motion.div variants={item}>
-            <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
-              <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
-                <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Completed</CardTitle>
-                <div className="p-2 bg-indigo-50 rounded-lg" aria-hidden="true">
-                  <CheckSquare size={16} className="text-indigo-500" />
-                </div>
-              </CardHeader>
-              <CardContent className="pb-6">
-                <div className="text-3xl font-black text-slate-900">{isLoading ? '0' : completedOrders}</div>
-                <p className="text-xs text-slate-400 font-bold mt-2">{completionRate.toFixed(1)}% Completion Rate</p>
-              </CardContent>
-            </Card>
+            <Link href="/provider/orders?status=completed" className="block">
+              <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
+                <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
+                  <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Completed</CardTitle>
+                  <div className="p-2 bg-indigo-50 rounded-lg" aria-hidden="true">
+                    <CheckSquare size={16} className="text-indigo-500" />
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-6">
+                  <div className="text-3xl font-black text-slate-900">{isLoading ? '0' : completedOrders}</div>
+                  <p className="text-xs text-slate-400 font-bold mt-2">{completionRate.toFixed(1)}% Completion Rate</p>
+                </CardContent>
+              </Card>
+            </Link>
           </motion.div>
 
           <motion.div variants={item}>
-            <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
-              <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
-                <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Avg. Rating</CardTitle>
-                <div className="p-2 bg-amber-50 rounded-lg" aria-hidden="true">
-                  <Star size={16} className="text-amber-500 fill-amber-500" />
-                </div>
-              </CardHeader>
-              <CardContent className="pb-6">
-                <div className="text-3xl font-black text-slate-900">{averageRating.toFixed(1)}</div>
-                <p className="text-xs text-slate-400 font-bold mt-2">Based on {reviewCount} reviews</p>
-              </CardContent>
-            </Card>
+            <Link href="/provider/ratings" className="block">
+              <Card className="border-none shadow-md shadow-slate-200/50 bg-white group hover:scale-[1.02] transition-transform duration-300">
+                <CardHeader className="flex flex-row items-center justify-between py-5 pb-2">
+                  <CardTitle className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">Avg. Rating</CardTitle>
+                  <div className="p-2 bg-amber-50 rounded-lg" aria-hidden="true">
+                    <Star size={16} className="text-amber-500 fill-amber-500" />
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-6">
+                  <div className="text-3xl font-black text-slate-900">{averageRating.toFixed(1)}</div>
+                  <p className="text-xs text-slate-400 font-bold mt-2">Based on {reviewCount} reviews</p>
+                </CardContent>
+              </Card>
+            </Link>
           </motion.div>
         </motion.div>
 

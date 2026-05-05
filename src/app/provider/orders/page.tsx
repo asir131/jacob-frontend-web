@@ -10,7 +10,7 @@ import { Search, MessageSquare, CheckCircle2, MapPin, Calendar as CalendarIcon, 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import {
   useAcceptProviderOrderMutation,
@@ -84,8 +84,10 @@ const itemVariants = {
 
 export default function ProviderOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams.get('status') || 'all';
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [page, setPage] = useState(1);
   const [profileOrder, setProfileOrder] = useState<ProviderOrder | null>(null);
   const [actingOrderId, setActingOrderId] = useState<string | null>(null);
@@ -192,6 +194,7 @@ export default function ProviderOrdersPage() {
               className="w-full sm:w-[180px] h-14 bg-white border-none shadow-sm rounded-2xl font-bold px-4 text-slate-700"
             >
               <option value="all">All Status</option>
+              <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="accepted">Accepted</option>
               <option value="accepting_delivery">Accepting Delivery</option>

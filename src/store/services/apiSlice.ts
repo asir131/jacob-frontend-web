@@ -141,6 +141,20 @@ type ProviderOrdersQuery = {
   status?: string;
 };
 
+type ProviderPagedQuery = {
+  page?: number;
+  limit?: number;
+};
+
+type Pagination = {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+};
+
 type WithdrawalRequestPayload = {
   amount: number;
   note?: string;
@@ -279,13 +293,14 @@ type GigAnalyticsResponse = {
     status?: string;
   };
   summary?: {
-    servicesPageVisibleClients?: number;
-    detailPageUniqueClients?: number;
+    totalIncome?: number;
+    completedPaidOrders?: number;
+    periodDays?: number;
   };
   detailViewSeries?: Array<{
     date?: string;
     label?: string;
-    count?: number;
+    earnings?: number;
   }>;
 };
 
@@ -531,6 +546,46 @@ export const apiSlice = createApi({
     }),
     getProviderDashboard: builder.query<ApiEnvelope<ProviderDashboardResponse>, void>({
       query: () => '/api/orders/provider/dashboard',
+      providesTags: ['Orders', 'Profile'],
+    }),
+    getProviderRevenueHistory: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        summary?: {
+          totalEarnings?: number;
+          totalPaid?: number;
+          totalPlatformFees?: number;
+          paidOrders?: number;
+        };
+        pagination?: Pagination;
+      }>,
+      ProviderPagedQuery | void
+    >({
+      query: (args) => {
+        const params = new URLSearchParams();
+        params.set('page', String(args?.page ?? 1));
+        params.set('limit', String(args?.limit ?? 8));
+        return `/api/orders/provider/revenue?${params.toString()}`;
+      },
+      providesTags: ['Orders', 'Profile'],
+    }),
+    getProviderRatings: builder.query<
+      ApiEnvelope<{
+        items?: Record<string, unknown>[];
+        summary?: {
+          averageRating?: number;
+          reviewCount?: number;
+        };
+        pagination?: Pagination;
+      }>,
+      ProviderPagedQuery | void
+    >({
+      query: (args) => {
+        const params = new URLSearchParams();
+        params.set('page', String(args?.page ?? 1));
+        params.set('limit', String(args?.limit ?? 8));
+        return `/api/orders/provider/ratings?${params.toString()}`;
+      },
       providesTags: ['Orders', 'Profile'],
     }),
     getClientDashboard: builder.query<ApiEnvelope<ClientDashboardResponse>, void>({
@@ -1029,6 +1084,8 @@ export const {
   useIgnoreServiceRequestMutation,
   useGetProviderOrdersQuery,
   useGetProviderDashboardQuery,
+  useGetProviderRevenueHistoryQuery,
+  useGetProviderRatingsQuery,
   useGetClientDashboardQuery,
   useGetClientOrdersQuery,
   useGetClientOrderDetailQuery,

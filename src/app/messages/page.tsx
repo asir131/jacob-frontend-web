@@ -88,6 +88,55 @@ type ApiMessage = {
 
 const EMOJI_OPTIONS = ['😀', '😂', '😍', '👍', '🙏', '🔥', '🎉', '❤️', '😢', '😎', '🤝', '💯'];
 
+const EXTERNAL_LINK_REGEX = /((?:https?:\/\/|www\.)[^\s]+)/gi;
+
+const getMessageLinks = (text = '') => {
+  const matches = text.match(EXTERNAL_LINK_REGEX);
+  return matches ? matches.filter(Boolean) : [];
+};
+
+const normalizeExternalUrl = (value: string) => {
+  if (!value) return '#';
+  return value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`;
+};
+
+const renderMessageText = (text: string) => {
+  const matches = Array.from(text.matchAll(EXTERNAL_LINK_REGEX));
+  if (!matches.length) return text;
+
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  matches.forEach((match, index) => {
+    const url = match[0] || '';
+    const startIndex = match.index ?? 0;
+
+    if (startIndex > lastIndex) {
+      nodes.push(<React.Fragment key={`text-${index}`}>{text.slice(lastIndex, startIndex)}</React.Fragment>);
+    }
+
+    nodes.push(
+      <a
+        key={`link-${index}`}
+        href={normalizeExternalUrl(url)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-all underline underline-offset-2"
+      >
+        {url}
+      </a>
+    );
+
+    lastIndex = startIndex + url.length;
+  });
+
+  if (lastIndex < text.length) {
+    nodes.push(<React.Fragment key="text-tail">{text.slice(lastIndex)}</React.Fragment>);
+  }
+
+  return nodes;
+};
+
 type CallInvite = {
   conversationId: string;
   targetUserId?: string;
@@ -260,6 +309,8 @@ export default function MessagesPage() {
   const isBlockedByOther = Boolean(blockedBy && String(blockedBy) !== String(user?.id || ''));
   const canSendMessage = !blockedBy;
   const canSendCurrentMessage = canSendMessage && (Boolean(newMessage.trim()) || selectedAttachments.length > 0);
+  const canSendQuickEtaMessage =
+    userRole === 'provider' && Boolean(selectedConversation?.orderId) && Boolean(selectedConversationId) && canSendMessage;
   const repeatSourceOrderId =
     sourceOrderIdParam ||
     (selectedConversation?.orderStatus === 'completed' && selectedConversation?.orderId
@@ -694,6 +745,27 @@ export default function MessagesPage() {
     }
   };
 
+  const handleSendQuickEtaMessage = async (text: string) => {
+    if (!canSendQuickEtaMessage || !text.trim()) return;
+
+    try {
+      const result = await sendConversationMessage({
+        conversationId: selectedConversationId,
+        text: text.trim(),
+      }).unwrap();
+      const message = (result?.data || null) as ApiMessage | null;
+      if (message) {
+        setLiveMessages((prev) => (prev.some((item) => item.id === message.id) ? prev : [...prev, message]));
+      }
+      setIsEmojiPickerOpen(false);
+      refetchMessages();
+      refetchConversations();
+      toast.success('Customer notified.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to send quick update.');
+    }
+  };
+
   const handleRespondProposal = async (proposalId: string, action: 'accept' | 'decline') => {
     try {
       const result = await respondToCustomOrderProposal({ proposalId, action }).unwrap();
@@ -873,6 +945,32 @@ export default function MessagesPage() {
           </div>
         </header>
 
+        {canSendQuickEtaMessage ? (
+          <div className="border-b border-slate-100 bg-white px-6 py-3">
+            <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2">
+              <p className="mr-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Quick updates</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => void handleSendQuickEtaMessage("I'm 30 minutes out.")}
+                disabled={isSending}
+              >
+                30 minutes out
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => void handleSendQuickEtaMessage("I'm 60 minutes out.")}
+                disabled={isSending}
+              >
+                60 minutes out
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         <ScrollArea className="flex-1 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex justify-center my-4">
@@ -886,6 +984,11 @@ export default function MessagesPage() {
                   ? user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'You'
                   : selectedContact?.name || 'User';
                 const senderAvatar = mine ? (user?.avatar || '') : (selectedContact?.avatar || '');
+                const providerSentExternalLinks =
+                  userRole === 'client' &&
+                  !mine &&
+                  selectedConversation?.otherUser?.role === 'provider' &&
+                  getMessageLinks(message.text || '').length > 0;
                 return (
                   <motion.div key={message.id} initial={{ opacity: 0, scale: 0.9, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div className={`flex items-end gap-2 max-w-[90%] md:max-w-[75%] ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -897,7 +1000,12 @@ export default function MessagesPage() {
                       </Avatar>
                       <div className={`px-5 py-3.5 rounded-[2rem] shadow-sm relative group ${mine ? 'bg-[#2286BE] text-white rounded-br-none' : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'}`}>
                         <p className={`text-[11px] font-black mb-1 ${mine ? 'text-white/80 text-right' : 'text-slate-500'}`}>{senderName}</p>
-                        {message.text ? <p className="text-sm md:text-base font-medium leading-relaxed">{message.text}</p> : null}
+                        {message.text ? <p className="text-sm md:text-base font-medium leading-relaxed">{renderMessageText(message.text)}</p> : null}
+                        {providerSentExternalLinks ? (
+                          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-800">
+                            This link leads to a site outside of LocalPros. Make sure the source is reliable, and remember that payments should always be made on LocalPros.
+                          </div>
+                        ) : null}
                         {message.customOrderProposal ? (
                           <div className={`mt-3 rounded-3xl border p-4 ${mine ? 'border-white/20 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
                             <div className="flex items-start justify-between gap-4">
