@@ -89,6 +89,7 @@ type ApiMessage = {
 const EMOJI_OPTIONS = ['😀', '😂', '😍', '👍', '🙏', '🔥', '🎉', '❤️', '😢', '😎', '🤝', '💯'];
 
 const EXTERNAL_LINK_REGEX = /((?:https?:\/\/|www\.)[^\s]+)/gi;
+const PENDING_INCOMING_CALL_STORAGE_KEY = 'pending_incoming_call';
 
 const getMessageLinks = (text = '') => {
   const matches = text.match(EXTERNAL_LINK_REGEX);
@@ -135,6 +136,24 @@ const renderMessageText = (text: string) => {
   }
 
   return nodes;
+};
+
+const formatOfferTime = (value?: string) => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/\b(?:AM|PM)\b/i.test(trimmed)) return trimmed;
+
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!match) return trimmed;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour > 23 || minute > 59) return trimmed;
+
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
 };
 
 type CallInvite = {
@@ -219,9 +238,11 @@ export default function MessagesPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const activeCallRef = useRef<{ conversationId: string; targetUserId: string; callType: 'voice' | 'video' } | null>(null);
+  const pendingIncomingCallLoadedRef = useRef(false);
 
   const { data: conversationResponse, refetch: refetchConversations } = useGetConversationsQuery();
   const [ensureConversationByOrder] = useEnsureConversationByOrderMutation();
@@ -338,6 +359,31 @@ export default function MessagesPage() {
   }, []);
   const callDurationLabel = useMemo(() => formatCallDuration(callSeconds), [callSeconds, formatCallDuration]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || pendingIncomingCallLoadedRef.current) return;
+    const raw = window.sessionStorage.getItem(PENDING_INCOMING_CALL_STORAGE_KEY);
+    if (!raw) return;
+
+    pendingIncomingCallLoadedRef.current = true;
+    window.sessionStorage.removeItem(PENDING_INCOMING_CALL_STORAGE_KEY);
+
+    try {
+      const payload = JSON.parse(raw) as CallInvite;
+      if (!payload?.conversationId || !payload?.callType) return;
+      window.setTimeout(() => {
+        setManualConversationId(payload.conversationId);
+        setIncomingCall(payload);
+        setActiveCall(payload.callType);
+        setCallStatus('ringing');
+        toast.info(`${payload.senderName || 'Someone'} is calling you`, {
+          description: payload.callType === 'video' ? 'Video call incoming.' : 'Voice call incoming.',
+        });
+      }, 0);
+    } catch {
+      window.sessionStorage.removeItem(PENDING_INCOMING_CALL_STORAGE_KEY);
+    }
+  }, []);
+
   const cleanupCall = useCallback(
     (shouldNotifyPeer = false) => {
       const call = activeCallRef.current;
@@ -359,6 +405,7 @@ export default function MessagesPage() {
 
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
       setHasLocalStream(false);
       setHasRemoteStream(false);
       setCallStartedAt(null);
@@ -410,8 +457,12 @@ export default function MessagesPage() {
 
         peer.ontrack = (event) => {
           const [remoteStream] = event.streams;
-          if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
+          if (remoteStream) {
+            if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = remoteStream;
+              void remoteAudioRef.current.play().catch(() => undefined);
+            }
             setHasRemoteStream(true);
           }
         };
@@ -479,8 +530,12 @@ export default function MessagesPage() {
 
         peer.ontrack = (event) => {
           const [remoteStream] = event.streams;
-          if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
+          if (remoteStream) {
+            if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = remoteStream;
+              void remoteAudioRef.current.play().catch(() => undefined);
+            }
             setHasRemoteStream(true);
           }
         };
@@ -1035,7 +1090,7 @@ export default function MessagesPage() {
                               </div>
                               <div>
                                 <p className="uppercase tracking-widest text-[10px]">Time</p>
-                                <p className={`mt-1 text-sm font-black ${mine ? 'text-white' : 'text-slate-900'}`}>{message.customOrderProposal.scheduledTime}</p>
+                                <p className={`mt-1 text-sm font-black ${mine ? 'text-white' : 'text-slate-900'}`}>{formatOfferTime(message.customOrderProposal.scheduledTime)}</p>
                               </div>
                             </div>
                             <div className={`mt-3 text-xs font-semibold ${mine ? 'text-white/80' : 'text-slate-500'}`}>
@@ -1247,6 +1302,7 @@ export default function MessagesPage() {
 
       {activeCall ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
+          <audio ref={remoteAudioRef} autoPlay playsInline />
           <div className="relative w-full max-w-5xl overflow-hidden rounded-[2.75rem] border border-white/10 bg-white shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
             <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-[#2286BE] via-[#1f9bd7] to-[#7c3aed] opacity-95" />
 

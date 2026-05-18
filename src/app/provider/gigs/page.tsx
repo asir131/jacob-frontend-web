@@ -527,22 +527,22 @@ export default function ProviderGigsPage() {
         <Dialog open={Boolean(analyticsGig)} onOpenChange={(open) => {
           if (!open) setAnalyticsGig(null);
         }}>
-          <DialogContent className="max-w-3xl rounded-[2rem] border-slate-200 p-0 overflow-hidden">
-            <div className="bg-white">
-              <DialogHeader className="border-b border-slate-100 px-8 py-6">
+          <DialogContent className="top-24 max-h-[calc(100vh-7rem)] max-w-3xl translate-y-0 rounded-[2rem] border-slate-200 p-0 overflow-hidden">
+            <div className="flex max-h-[calc(100vh-7rem)] flex-col bg-white">
+              <DialogHeader className="shrink-0 border-b border-slate-100 px-8 py-5">
                 <DialogTitle className="text-2xl font-black text-slate-900">Gig Analytics</DialogTitle>
                 <DialogDescription className="text-slate-500 font-medium">
                   {analyticsGig?.title || 'Selected gig'} income for the last 30 days.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="px-8 py-6">
-                <div className="grid gap-4 md:grid-cols-2 mb-6">
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+              <div className="overflow-y-auto px-8 py-5">
+                <div className="grid gap-4 md:grid-cols-2 mb-5">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
                       Last 30 Days Income
                     </p>
-                    <p className="text-4xl font-black text-slate-900">
+                    <p className="text-3xl font-black text-slate-900">
                       {isGigAnalyticsFetching ? '...' : `$${Number(analyticsSummary?.totalIncome || 0).toFixed(2)}`}
                     </p>
                     <p className="mt-2 text-sm font-medium text-slate-500">
@@ -550,11 +550,11 @@ export default function ProviderGigsPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
                       Paid Completed Orders
                     </p>
-                    <p className="text-4xl font-black text-slate-900">
+                    <p className="text-3xl font-black text-slate-900">
                       {isGigAnalyticsFetching ? '...' : Number(analyticsSummary?.completedPaidOrders || 0)}
                     </p>
                     <p className="mt-2 text-sm font-medium text-slate-500">
@@ -572,7 +572,7 @@ export default function ProviderGigsPage() {
                   </div>
 
                   {isGigAnalyticsFetching ? (
-                    <div className="h-[280px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
+                    <div className="h-[220px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
                       Loading analytics...
                     </div>
                   ) : analyticsSeries.length > 0 ? (
@@ -610,7 +610,7 @@ export default function ProviderGigsPage() {
                         </div>
                       </div>
 
-                      <div className="h-[300px] rounded-[1.25rem] bg-white p-4">
+                      <div className="h-[220px] rounded-[1.25rem] bg-white p-4">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={analyticsSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                             <defs>
@@ -659,7 +659,7 @@ export default function ProviderGigsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="h-[280px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
+                    <div className="h-[220px] rounded-[1.25rem] bg-slate-50 flex items-center justify-center text-slate-500 font-bold">
                       No income recorded for this gig in the last 30 days.
                     </div>
                   )}

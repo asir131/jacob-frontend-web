@@ -81,7 +81,9 @@ export default function CreateGigPage() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('editId');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const wizardTopRef = useRef<HTMLDivElement | null>(null);
   const stepContentRef = useRef<HTMLDivElement | null>(null);
+  const shouldScrollAfterStepChangeRef = useRef(false);
   const [step, setStep] = useState(1);
   const [gigTitle, setGigTitle] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORIES[0]?.slug || 'cleaning');
@@ -176,14 +178,27 @@ export default function CreateGigPage() {
   };
 
   const transitionToStep = (nextStep: number) => {
+    if (nextStep === step) return;
+    shouldScrollAfterStepChangeRef.current = true;
     setStep(nextStep);
+  };
+
+  useEffect(() => {
+    if (!shouldScrollAfterStepChangeRef.current) return;
+    shouldScrollAfterStepChangeRef.current = false;
+
     window.requestAnimationFrame(() => {
-      stepContentRef.current?.scrollIntoView({
+      const target = wizardTopRef.current || stepContentRef.current;
+      if (!target) return;
+
+      const stickyHeaderOffset = 88;
+      const targetTop = target.getBoundingClientRect().top + window.scrollY - stickyHeaderOffset;
+      window.scrollTo({
+        top: Math.max(0, targetTop),
         behavior: 'smooth',
-        block: 'start',
       });
     });
-  };
+  }, [step]);
 
   const handleImageSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -323,17 +338,17 @@ export default function CreateGigPage() {
     <div className="min-h-screen bg-slate-50 pb-20">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <button onClick={() => router.back()} className="flex items-center text-slate-600 hover:text-slate-900 font-medium">
+          <button type="button" onClick={() => router.back()} className="flex items-center text-slate-600 hover:text-slate-900 font-medium">
             <ChevronLeft size={20} className="mr-1" /> My Gigs
           </button>
           <div className="font-bold text-slate-800 hidden sm:block">Create New Gig</div>
-          <Button variant="ghost" onClick={() => router.push('/provider/gigs')} className="text-slate-500 hover:text-red-500 px-2">
+          <Button type="button" variant="ghost" onClick={() => router.push('/provider/gigs')} className="text-slate-500 hover:text-red-500 px-2">
             Cancel
           </Button>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 mt-8">
+      <div ref={wizardTopRef} className="max-w-4xl mx-auto px-4 mt-8">
         <div className="flex items-center mb-8 bg-white border border-slate-200 rounded-xl p-4 shadow-sm overflow-x-auto hide-scrollbar">
           {[
             { num: 1, title: 'Basics' },
@@ -344,9 +359,11 @@ export default function CreateGigPage() {
             { num: 6, title: 'Publish' },
           ].map((s, idx) => (
             <React.Fragment key={s.num}>
-              <div
-                className={`flex flex-col items-center flex-shrink-0 w-20 cursor-pointer ${step >= s.num ? 'opacity-100' : 'opacity-40'}`}
+              <button
+                type="button"
+                className={`flex flex-col items-center flex-shrink-0 w-20 ${step > s.num ? 'cursor-pointer' : 'cursor-default'} ${step >= s.num ? 'opacity-100' : 'opacity-40'}`}
                 onClick={() => step > s.num && transitionToStep(s.num)}
+                disabled={step <= s.num}
               >
                 <div
                   className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm mb-1 transition-colors ${
@@ -358,7 +375,7 @@ export default function CreateGigPage() {
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${step >= s.num ? 'text-slate-900' : 'text-slate-400'}`}>
                   {s.title}
                 </span>
-              </div>
+              </button>
               {idx < 5 && <div className={`flex-1 h-0.5 mx-2 min-w-[20px] ${step > s.num ? 'bg-[#2286BE]' : 'bg-slate-100'}`} />}
             </React.Fragment>
           ))}
@@ -679,15 +696,15 @@ export default function CreateGigPage() {
         </div>
 
         <div className="flex justify-between items-center mt-6">
-          <Button variant="outline" onClick={handleBack} className={`w-32 py-6 font-bold text-slate-600 ${step === 1 ? 'invisible' : ''}`}>
+          <Button type="button" variant="outline" onClick={handleBack} className={`w-32 py-6 font-bold text-slate-600 ${step === 1 ? 'invisible' : ''}`}>
             Back
           </Button>
           {step < 6 ? (
-            <Button onClick={handleNext} className="w-32 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] text-white">
+            <Button type="button" onClick={handleNext} className="w-32 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] text-white">
               Save & Next <ChevronRight size={18} className="ml-1" />
             </Button>
           ) : (
-            <Button onClick={handlePublish} disabled={isSubmitting} className="w-48 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg text-white text-lg">
+            <Button type="button" onClick={handlePublish} disabled={isSubmitting} className="w-48 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] shadow-lg text-white text-lg">
               {isSubmitting ? (editId ? 'Updating...' : 'Publishing...') : editId ? 'Update Gig Now' : 'Publish Gig Now'}
             </Button>
           )}
