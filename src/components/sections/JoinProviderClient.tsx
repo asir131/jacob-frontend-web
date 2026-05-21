@@ -18,7 +18,7 @@ const steps = [
 ];
 
 const perks = [
-  { icon: <DollarSign size={24} />, title: 'Competitive Earnings', desc: 'Keep up to 85% of every job. No hidden fees, no surprises.' },
+  { icon: <DollarSign size={24} />, title: 'Competitive Earnings', desc: 'Earn 85% of every completed job with clear platform commission.' },
   { icon: <ShieldCheck size={24} />, title: 'Verified Badge', desc: 'Get a Verified Pro badge after a quick background check to build client trust.' },
   { icon: <Clock size={24} />, title: 'Flexible Schedule', desc: 'Work when you want, take breaks anytime. You set your own availability.' },
   { icon: <Users size={24} />, title: 'Steady Client Flow', desc: 'Access thousands of active clients in your city searching for your service.' },

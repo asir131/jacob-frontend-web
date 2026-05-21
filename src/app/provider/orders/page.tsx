@@ -272,12 +272,18 @@ export default function ProviderOrdersPage() {
                         </div>
                       </div>
 
-                      <div className="mt-auto pt-6 border-t border-slate-50 flex justify-between items-center">
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Earning</p>
-                          <p className="text-3xl font-black text-slate-900 tracking-tighter">${Number(order.providerEarningsAmount || order.packagePrice || 0).toFixed(2)}</p>
+                      <div className="mt-auto pt-5 border-t border-slate-50 flex justify-between items-center gap-3">
+                        <div className="grid flex-1 grid-cols-2 gap-2">
+                          <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Customer</p>
+                            <p className="mt-1 text-lg font-black text-slate-900 tracking-tight">${Number(order.paymentAmount || order.packagePrice || 0).toFixed(2)}</p>
+                          </div>
+                          <div className="rounded-2xl bg-[#2286BE]/10 px-3 py-2.5">
+                            <p className="text-[9px] font-black text-[#2286BE]/70 uppercase tracking-widest">Your Net</p>
+                            <p className="mt-1 text-lg font-black text-[#2286BE] tracking-tight">${Number(order.providerEarningsAmount || order.packagePrice || 0).toFixed(2)}</p>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex shrink-0 gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -288,17 +294,17 @@ export default function ProviderOrdersPage() {
                                   : `/messages?orderId=${order.id}&user=${order.client.id}`
                               )
                             }
-                            className="h-12 w-12 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1.2rem] transition-all"
+                            className="h-10 w-10 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1rem] transition-all"
                           >
-                            <MessageSquare size={20} />
+                            <MessageSquare size={18} />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setProfileOrder(order)}
-                            className="h-12 w-12 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1.2rem] transition-all"
+                            className="h-10 w-10 text-slate-400 hover:text-[#2286BE] hover:bg-[#2286BE]/5 rounded-[1rem] transition-all"
                           >
-                            <User size={20} />
+                            <User size={18} />
                           </Button>
                         </div>
                       </div>

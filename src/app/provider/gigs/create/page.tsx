@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
-import { calculateAdminFeeAmount, calculateClientPaymentAmount } from '@/lib/pricing';
+import { calculateAdminFeeAmount, calculateProviderNetAmount } from '@/lib/pricing';
 import {
   useCreateGigMutation,
   useLazyGetMyGigsQuery,
@@ -532,8 +532,8 @@ export default function CreateGigPage() {
                            />
                          </div>
                          <p className="mt-2 text-[11px] font-bold text-slate-500">
-                           Admin Fee ${calculateAdminFeeAmount(Number(pkg.price) || 0).toFixed(2)}.
-                           Client total ${calculateClientPaymentAmount(Number(pkg.price) || 0).toFixed(2)}.
+                           Admin commission ${calculateAdminFeeAmount(Number(pkg.price) || 0).toFixed(2)}.
+                           Net payout ${calculateProviderNetAmount(Number(pkg.price) || 0).toFixed(2)}.
                          </p>
                        </div>
                     </div>

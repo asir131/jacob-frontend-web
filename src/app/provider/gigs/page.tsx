@@ -402,7 +402,7 @@ export default function ProviderGigsPage() {
                                   key={`${gig._id}-${pkg.name}`}
                                   className="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700"
                                 >
-                                  {pkg.name}: Admin Fee ${adminFee.toFixed(2)}
+                                  {pkg.name}: Admin commission ${adminFee.toFixed(2)}
                                 </span>
                               );
                             })}
