@@ -771,6 +771,17 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Chats'],
     }),
+    startProviderConversation: builder.mutation<
+      ApiEnvelope<{ conversation?: Record<string, unknown> }>,
+      { providerId: string; gigId: string }
+    >({
+      query: (payload) => ({
+        url: '/api/chats/conversations/provider/start',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Chats'],
+    }),
     startCustomOrderConversation: builder.mutation<
       ApiEnvelope<{ conversation?: Record<string, unknown>; message?: Record<string, unknown> }>,
       { providerId: string; gigId: string }
@@ -1105,6 +1116,7 @@ export const {
   useFinalizeClientOrderMutation,
   useGetConversationsQuery,
   useEnsureConversationByOrderMutation,
+  useStartProviderConversationMutation,
   useStartCustomOrderConversationMutation,
   useStartRepeatOrderConversationMutation,
   useGetConversationMessagesQuery,

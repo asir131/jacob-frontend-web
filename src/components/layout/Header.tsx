@@ -38,6 +38,15 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const canSwitchModes =
+    role === 'provider' ||
+    Boolean(
+      user?.businessBio ||
+      user?.experienceLevel ||
+      user?.serviceCity ||
+      user?.serviceLocationLat ||
+      user?.serviceLocationLng
+    );
 
   const navLinks = useMemo(() => {
     const baseLinks =
@@ -143,24 +152,26 @@ export default function Header() {
                     </div>
                     <DropdownMenuSeparator className="bg-slate-50" />
                     
-                    <div className="px-2 pb-2">
-                      <Button
-                        onClick={async () => {
-                          const nextRole = role === 'client' ? 'provider' : 'client';
-                          await setRole(nextRole);
-                          toast.success(
-                            nextRole === 'provider'
-                              ? 'Switched to selling mode.'
-                              : 'Switched to buying mode.'
-                          );
-                          router.push(nextRole === 'provider' ? '/provider/dashboard' : '/client/dashboard');
-                        }}
-                        className="w-full h-10 bg-[#2286BE]/5 hover:bg-[#2286BE]/10 text-[#2286BE] font-black text-xs uppercase tracking-widest rounded-xl transition-all border border-[#2286BE]/10"
-                      >
-                        <ArrowLeftRight size={14} className="mr-2" />
-                        Switch to {role === 'client' ? 'Selling' : 'Buying'}
-                      </Button>
-                    </div>
+                    {canSwitchModes && (
+                      <div className="px-2 pb-2">
+                        <Button
+                          onClick={async () => {
+                            const nextRole = role === 'client' ? 'provider' : 'client';
+                            await setRole(nextRole);
+                            toast.success(
+                              nextRole === 'provider'
+                                ? 'Switched to selling mode.'
+                                : 'Switched to buying mode.'
+                            );
+                            router.push(nextRole === 'provider' ? '/provider/dashboard' : '/client/dashboard');
+                          }}
+                          className="w-full h-10 bg-[#2286BE]/5 hover:bg-[#2286BE]/10 text-[#2286BE] font-black text-xs uppercase tracking-widest rounded-xl transition-all border border-[#2286BE]/10"
+                        >
+                          <ArrowLeftRight size={14} className="mr-2" />
+                          Switch to {role === 'client' ? 'Selling' : 'Buying'}
+                        </Button>
+                      </div>
+                    )}
                     
                     <Link href={role === 'provider' ? '/provider/dashboard' : '/client/dashboard'}>
                       <DropdownMenuItem className="rounded-xl focus:bg-[#2286BE]/5 focus:text-[#2286BE] font-bold py-2.5 cursor-pointer">
@@ -291,23 +302,25 @@ export default function Header() {
                       </Link>
                     </div>
 
-                    <Button
-                      onClick={async () => {
-                        const nextRole = role === 'client' ? 'provider' : 'client';
-                        await setRole(nextRole);
-                        toast.success(
-                          nextRole === 'provider'
-                            ? 'Switched to selling mode.'
-                            : 'Switched to buying mode.'
-                        );
-                        setIsMobileMenuOpen(false);
-                        router.push(nextRole === 'provider' ? '/provider/dashboard' : '/client/dashboard');
-                      }}
-                      className="w-full h-12 bg-[#2286BE]/5 hover:bg-[#2286BE]/10 text-[#2286BE] font-black rounded-2xl transition-all border border-[#2286BE]/10"
-                    >
-                      <ArrowLeftRight size={16} className="mr-2" />
-                      Switch to {role === 'client' ? 'Selling' : 'Buying'}
-                    </Button>
+                    {canSwitchModes && (
+                      <Button
+                        onClick={async () => {
+                          const nextRole = role === 'client' ? 'provider' : 'client';
+                          await setRole(nextRole);
+                          toast.success(
+                            nextRole === 'provider'
+                              ? 'Switched to selling mode.'
+                              : 'Switched to buying mode.'
+                          );
+                          setIsMobileMenuOpen(false);
+                          router.push(nextRole === 'provider' ? '/provider/dashboard' : '/client/dashboard');
+                        }}
+                        className="w-full h-12 bg-[#2286BE]/5 hover:bg-[#2286BE]/10 text-[#2286BE] font-black rounded-2xl transition-all border border-[#2286BE]/10"
+                      >
+                        <ArrowLeftRight size={16} className="mr-2" />
+                        Switch to {role === 'client' ? 'Selling' : 'Buying'}
+                      </Button>
+                    )}
 
                     <Link
                       href={role === 'provider' ? '/provider/dashboard' : '/client/dashboard'}

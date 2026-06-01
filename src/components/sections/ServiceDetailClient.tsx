@@ -23,6 +23,7 @@ import {
   useGetFaqsQuery,
   useRemoveSavedServiceMutation,
   useSaveServiceMutation,
+  useStartProviderConversationMutation,
   useStartCustomOrderConversationMutation,
 } from '@/store/services/apiSlice';
 
@@ -81,6 +82,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   const router = useRouter();
   const { isAuthenticated, user, updateProfile } = useAuth();
   const { data: faqResponse } = useGetFaqsQuery();
+  const [startProviderConversation, { isLoading: isContactingProvider }] = useStartProviderConversationMutation();
   const galleryImages = React.useMemo(
     () =>
       Array.isArray(service.images) && service.images.length > 0
@@ -262,6 +264,31 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
       router.push(`/messages?conversationId=${conversationId}`);
     } catch (error: any) {
       toast.error(error?.data?.message || error?.message || 'Could not start the custom order conversation.');
+    }
+  };
+
+  const handleContactProfessional = async () => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    if (user?.role !== 'client') {
+      toast.error('Only customers can contact professionals.');
+      return;
+    }
+
+    try {
+      const response = await startProviderConversation({
+        providerId: String(service.provider.id || ''),
+        gigId: String(service.id || ''),
+      }).unwrap();
+      const conversationId = String((response.data as any)?.conversation?.id || '');
+      if (!conversationId) {
+        throw new Error('Conversation could not be opened.');
+      }
+      router.push(`/messages?conversationId=${conversationId}`);
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Could not contact this professional.');
     }
   };
 
@@ -631,11 +658,14 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 </div>
               </div>
 
-              <Link href="/messages" className="w-full">
-                <Button variant="outline" className="w-full h-14 rounded-2xl border-slate-200 text-slate-900 hover:text-[#2286BE] hover:border-[#2286BE] transition-all font-black text-sm uppercase tracking-widest">
-                  Contact Professional
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                onClick={() => void handleContactProfessional()}
+                disabled={isContactingProvider}
+                className="w-full h-14 rounded-2xl border-slate-200 text-slate-900 hover:text-[#2286BE] hover:border-[#2286BE] transition-all font-black text-sm uppercase tracking-widest"
+              >
+                {isContactingProvider ? 'Opening Chat...' : 'Contact Professional'}
+              </Button>
             </div>
           </div>
         </div>
