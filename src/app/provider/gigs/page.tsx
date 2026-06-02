@@ -25,6 +25,7 @@ import {
   useLazyGetGigAnalyticsQuery,
   useGetPublicProviderProfileQuery,
 } from '@/store/services/apiSlice';
+import { formatDeliveryTime } from '@/lib/deliveryTime';
 import { calculateAdminFeeAmount } from '@/lib/pricing';
 
 type GigPackage = {
@@ -32,6 +33,7 @@ type GigPackage = {
   title: string;
   description: string;
   deliveryTime: string;
+  deliveryTimeUnit?: string;
   price: number;
 };
 
@@ -402,7 +404,7 @@ export default function ProviderGigsPage() {
                                   key={`${gig._id}-${pkg.name}`}
                                   className="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700"
                                 >
-                                  {pkg.name}: Admin commission ${adminFee.toFixed(2)}
+                                  {pkg.name}: {formatDeliveryTime(pkg.deliveryTime, pkg.deliveryTimeUnit)} · Admin commission ${adminFee.toFixed(2)}
                                 </span>
                               );
                             })}

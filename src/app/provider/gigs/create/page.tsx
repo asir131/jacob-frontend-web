@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Check, ChevronLeft, ChevronRight, MapPin, UploadCloud, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Film, MapPin, UploadCloud, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
 import { DEFAULT_CATEGORIES } from '@/data/categories';
+import { DELIVERY_TIME_UNITS, formatDeliveryTime, normalizeDeliveryTimeUnit, type DeliveryTimeUnit } from '@/lib/deliveryTime';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
 import { calculateAdminFeeAmount, calculateProviderNetAmount } from '@/lib/pricing';
 import {
@@ -24,6 +25,7 @@ type PackageState = {
   title: string;
   description: string;
   deliveryTime: string;
+  deliveryTimeUnit: DeliveryTimeUnit;
   price: string;
 };
 
@@ -45,11 +47,13 @@ const INITIAL_PACKAGES: PackageState[] = PACKAGE_NAMES.map((name, index) => ({
   title: PACKAGE_TITLES[index],
   description: '',
   deliveryTime: String(index + 1),
+  deliveryTimeUnit: 'Days',
   price: String((index + 1) * 15),
 }));
 
 const DEFAULT_CENTER = { lat: 40.7128, lng: -74.006 };
 const MAX_IMAGE_COUNT = 4;
+const MAX_VIDEO_COUNT = 2;
 
 type LoadedGig = {
   _id: string;
@@ -63,6 +67,7 @@ type LoadedGig = {
   requirements?: string;
   packages?: PackageState[];
   images?: string[];
+  videos?: string[];
   baseCity?: string;
   locationLat?: number | null;
   locationLng?: number | null;
@@ -81,6 +86,7 @@ export default function CreateGigPage() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('editId');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const wizardTopRef = useRef<HTMLDivElement | null>(null);
   const stepContentRef = useRef<HTMLDivElement | null>(null);
   const shouldScrollAfterStepChangeRef = useRef(false);
@@ -93,8 +99,11 @@ export default function CreateGigPage() {
   const [expertType, setExpertType] = useState<'solo' | 'team'>('solo');
   const [packages, setPackages] = useState<PackageState[]>(INITIAL_PACKAGES);
   const [images, setImages] = useState<File[]>([]);
+  const [videos, setVideos] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
+  const [existingVideoUrls, setExistingVideoUrls] = useState<string[]>([]);
   const [gigDescription, setGigDescription] = useState('');
   const [gigRequirements, setGigRequirements] = useState('');
   const [baseCity, setBaseCity] = useState('');
@@ -118,6 +127,11 @@ export default function CreateGigPage() {
     () => [...existingImageUrls, ...imagePreviews],
     [existingImageUrls, imagePreviews]
   );
+  const displayedVideoPreviews = useMemo(
+    () => [...existingVideoUrls, ...videoPreviews],
+    [existingVideoUrls, videoPreviews]
+  );
+  const mediaCount = displayedImagePreviews.length + displayedVideoPreviews.length;
 
   useEffect(() => {
     if (!editId) return;
@@ -149,13 +163,17 @@ export default function CreateGigPage() {
                 title: PACKAGE_TITLES[index] || pkg.title || `${pkg.name || PACKAGE_NAMES[index] || 'Package'} Package`,
                 description: pkg.description || '',
                 deliveryTime: pkg.deliveryTime || String(index + 1),
+                deliveryTimeUnit: normalizeDeliveryTimeUnit(pkg.deliveryTimeUnit),
                 price: String(pkg.price ?? ''),
               }))
             : INITIAL_PACKAGES) as PackageState[]
         );
         setExistingImageUrls(Array.isArray(gig.images) ? gig.images : []);
+        setExistingVideoUrls(Array.isArray(gig.videos) ? gig.videos : []);
         setImagePreviews([]);
+        setVideoPreviews([]);
         setImages([]);
+        setVideos([]);
         setGigDescription(gig.description || '');
         setGigRequirements(gig.requirements || '');
         setBaseCity(gig.baseCity || '');
@@ -173,7 +191,7 @@ export default function CreateGigPage() {
     void loadGigForEdit();
   }, [editId, getMyGigs]);
 
-  const updatePackage = (index: number, field: keyof PackageState, value: string) => {
+  const updatePackage = <K extends keyof PackageState>(index: number, field: K, value: PackageState[K]) => {
     setPackages((prev) => prev.map((pkg, pkgIndex) => (pkgIndex === index ? { ...pkg, [field]: value } : pkg)));
   };
 
@@ -228,6 +246,34 @@ export default function CreateGigPage() {
     }
   };
 
+  const handleVideoSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const remainingSlots = MAX_VIDEO_COUNT - existingVideoUrls.length - videos.length;
+    if (remainingSlots <= 0) {
+      toast.error(`You can select up to ${MAX_VIDEO_COUNT} videos only.`);
+      if (videoInputRef.current) videoInputRef.current.value = '';
+      return;
+    }
+
+    const allowedFiles = files.slice(0, remainingSlots);
+    try {
+      const nextVideos = allowedFiles.filter((file) => file.type.startsWith('video/'));
+      if (nextVideos.length !== allowedFiles.length) {
+        throw new Error('Please select video files only.');
+      }
+
+      const nextPreviews = nextVideos.map((file) => URL.createObjectURL(file));
+      setVideos((prev) => [...prev, ...nextVideos]);
+      setVideoPreviews((prev) => [...prev, ...nextPreviews]);
+    } catch {
+      toast.error('Could not read selected videos.');
+    } finally {
+      if (videoInputRef.current) videoInputRef.current.value = '';
+    }
+  };
+
   const handleNext = () => {
     if (step === 1) {
       if (!gigTitle.trim()) {
@@ -241,15 +287,15 @@ export default function CreateGigPage() {
     }
 
     if (step === 2) {
-      const incompletePackage = packages.some((pkg) => !pkg.title.trim() || !pkg.description.trim() || !pkg.deliveryTime.trim() || !pkg.price.trim());
+      const incompletePackage = packages.some((pkg) => !pkg.title.trim() || !pkg.description.trim() || !pkg.deliveryTime.trim() || !pkg.deliveryTimeUnit || !pkg.price.trim());
       if (incompletePackage) {
         toast.error('Please fill title, description, delivery time, and price for all packages.');
         return;
       }
     }
 
-    if (step === 3 && displayedImagePreviews.length < 1) {
-      toast.error('Please select at least 1 image.');
+    if (step === 3 && mediaCount < 1) {
+      toast.error('Please select at least 1 image or video.');
       return;
     }
 
@@ -298,6 +344,7 @@ export default function CreateGigPage() {
         title: pkg.title.trim(),
         description: pkg.description.trim(),
         deliveryTime: pkg.deliveryTime.trim(),
+        deliveryTimeUnit: pkg.deliveryTimeUnit,
         price: Number(pkg.price) || 0,
       }))));
       formData.append('baseCity', baseCity.trim());
@@ -305,8 +352,12 @@ export default function CreateGigPage() {
       formData.append('locationLng', String(selectedMapCoords.lng));
       formData.append('travelRadiusKm', String(convertMilesToKm(selectedRadius)));
       formData.append('images', JSON.stringify(existingImageUrls));
+      formData.append('videos', JSON.stringify(existingVideoUrls));
       images.forEach((file) => {
         formData.append('images', file);
+      });
+      videos.forEach((file) => {
+        formData.append('videos', file);
       });
 
       const payload = editId
@@ -506,18 +557,29 @@ export default function CreateGigPage() {
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-slate-500 mb-1 block">Delivery Time</label>
-                        <Select value={pkg.deliveryTime} onValueChange={(value) => updatePackage(idx, 'deliveryTime', value)}>
-                          <SelectTrigger className="h-10 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">1 Day</SelectItem>
-                            <SelectItem value="2">2 Days</SelectItem>
-                            <SelectItem value="3">3 Days</SelectItem>
-                            <SelectItem value="4">4 Days</SelectItem>
-                            <SelectItem value="5">5 Days</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="grid grid-cols-[1fr_110px] gap-2">
+                          <Input
+                            value={pkg.deliveryTime}
+                            onChange={(e) => updatePackage(idx, 'deliveryTime', e.target.value)}
+                            className="h-10 text-sm font-bold text-slate-900 focus-visible:ring-[#2286BE]"
+                            type="number"
+                            min="1"
+                            placeholder="2"
+                          />
+                          <Select value={pkg.deliveryTimeUnit} onValueChange={(value) => updatePackage(idx, 'deliveryTimeUnit', normalizeDeliveryTimeUnit(value))}>
+                            <SelectTrigger className="h-10 text-sm">
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DELIVERY_TIME_UNITS.map((unit) => (
+                                <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="mt-1 text-[11px] font-bold text-slate-500">
+                          Shows as {formatDeliveryTime(pkg.deliveryTime, pkg.deliveryTimeUnit)}.
+                        </p>
                       </div>
                        <div>
                          <label className="text-xs font-semibold text-slate-500 mb-1 block">Price (USD)</label>
@@ -546,17 +608,29 @@ export default function CreateGigPage() {
           {step === 3 && (
             <div className="animate-in fade-in duration-500 space-y-6">
               <h2 className="text-2xl font-bold text-slate-900">Gallery</h2>
-              <p className="text-slate-500 text-sm">Select minimum 1 and maximum 4 images.</p>
+              <p className="text-slate-500 text-sm">Select at least one image or video. Videos help customers understand what you offer.</p>
               <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelection} />
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center hover:bg-slate-50 transition-colors"
-              >
-                <UploadCloud size={44} className="mx-auto text-[#2286BE] mb-4" />
-                <h3 className="text-lg font-bold text-slate-900">Select images</h3>
-                <p className="text-sm text-slate-500 mt-2">Upload up to 4 JPG or PNG images.</p>
-              </button>
+              <input ref={videoInputRef} type="file" accept="video/*" multiple className="hidden" onChange={handleVideoSelection} />
+              <div className="grid gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors"
+                >
+                  <UploadCloud size={40} className="mx-auto text-[#2286BE] mb-4" />
+                  <h3 className="text-lg font-bold text-slate-900">Select images</h3>
+                  <p className="text-sm text-slate-500 mt-2">Upload up to 4 JPG or PNG images.</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors"
+                >
+                  <Film size={40} className="mx-auto text-[#2286BE] mb-4" />
+                  <h3 className="text-lg font-bold text-slate-900">Select videos</h3>
+                  <p className="text-sm text-slate-500 mt-2">Upload up to 2 service intro videos.</p>
+                </button>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {displayedImagePreviews.map((image, index) => (
                   <div key={`${image}-${index}`} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -584,6 +658,33 @@ export default function CreateGigPage() {
                   </div>
                 ))}
               </div>
+              {displayedVideoPreviews.length > 0 ? (
+                <div>
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-widest text-slate-500">Videos</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {displayedVideoPreviews.map((video, index) => (
+                      <div key={`${video}-${index}`} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
+                        <video src={video} controls className="aspect-video w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (index < existingVideoUrls.length) {
+                              setExistingVideoUrls((prev) => prev.filter((_, videoIndex) => videoIndex !== index));
+                            } else {
+                              const fileIndex = index - existingVideoUrls.length;
+                              setVideos((prev) => prev.filter((_, videoIndex) => videoIndex !== fileIndex));
+                              setVideoPreviews((prev) => prev.filter((_, videoIndex) => videoIndex !== fileIndex));
+                            }
+                          }}
+                          className="absolute right-2 top-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -685,7 +786,7 @@ export default function CreateGigPage() {
                 <div className="flex justify-between gap-4"><span>Category:</span> <span className="font-semibold text-slate-900 text-right">{selectedCategoryName}</span></div>
                 <div className="flex justify-between gap-4"><span>Packages:</span> <span className="font-semibold text-slate-900 text-right">{packages.length} tiers</span></div>
                 <div className="flex justify-between gap-4"><span>Expert Type:</span> <span className="font-semibold text-slate-900 text-right">{expertType === 'team' ? 'Team' : 'Solo'}</span></div>
-                <div className="flex justify-between gap-4"><span>Images:</span> <span className="font-semibold text-slate-900 text-right">{displayedImagePreviews.length} selected</span></div>
+                <div className="flex justify-between gap-4"><span>Media:</span> <span className="font-semibold text-slate-900 text-right">{displayedImagePreviews.length} images, {displayedVideoPreviews.length} videos</span></div>
                 <div className="flex justify-between gap-4"><span>Location:</span> <span className="font-semibold text-slate-900 text-right">{baseCity}</span></div>
                 <div className="flex justify-between gap-4"><span>Radius:</span> <span className="font-semibold text-slate-900 text-right">{selectedRadius} miles</span></div>
               </div>

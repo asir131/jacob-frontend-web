@@ -12,6 +12,7 @@ type ApiPackage = {
   title?: string;
   description?: string;
   deliveryTime?: string;
+  deliveryTimeUnit?: string;
   price?: number;
 };
 
@@ -24,6 +25,7 @@ type ApiService = {
   description?: string;
   requirements?: string;
   images?: string[];
+  videos?: string[];
   baseCity?: string;
   zipCode?: string;
   locationLat?: number | null;
@@ -65,6 +67,7 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
       title: matched?.title || `${name} package`,
       description: matched?.description || '',
       deliveryTime: matched?.deliveryTime || '',
+      deliveryTimeUnit: matched?.deliveryTimeUnit || 'Days',
       price: Number(matched?.price) || 0,
     };
   });
@@ -96,6 +99,7 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
         (normalizedPackages.filter((item) => item.price > 0).length || 1)),
     description: service.description || '',
     images: Array.isArray(service.images) && service.images.length > 0 ? service.images : [FALLBACK_IMAGE],
+    videos: Array.isArray(service.videos) ? service.videos : [],
     requirements: service.requirements || '',
     travelRadius: Number(service.travelRadiusKm) || 25,
     packages: normalizedPackages,

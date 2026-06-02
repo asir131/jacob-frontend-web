@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
+import { formatDeliveryTime } from '@/lib/deliveryTime';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateOrderMutation } from '@/store/services/apiSlice';
 
@@ -56,6 +57,7 @@ type ApiPackage = {
   title?: string;
   description?: string;
   deliveryTime?: string;
+  deliveryTimeUnit?: string;
   price?: number | string;
 };
 
@@ -90,6 +92,7 @@ export default function BookingClient({ service }: BookingClientProps) {
             : 'VIP priority service, team of experts, and full cleanup guarantee.'),
       deliveryTime:
         String(fromApi?.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
+      deliveryTimeUnit: fromApi?.deliveryTimeUnit || 'Days',
       price: Number(fromApi?.price) || fallbackPrice,
     };
   });
@@ -279,7 +282,7 @@ export default function BookingClient({ service }: BookingClientProps) {
                                    <label htmlFor={`pkg-${p}`} className="font-black text-xl text-slate-900 capitalize cursor-pointer">{option?.label || `${p} package`}</label>
                                    <div className="flex items-center gap-3 mt-1.5">
                                       <span className="text-slate-400 font-bold uppercase tracking-tighter text-[10px] flex items-center gap-1 font-medium">
-                                        <Clock size={12} className="text-[#2286BE]" /> {option?.deliveryTime || '1 Day'} Delivery
+                                        <Clock size={12} className="text-[#2286BE]" /> {formatDeliveryTime(option?.deliveryTime, option?.deliveryTimeUnit)} Delivery
                                       </span>
                                    </div>
                                  </div>

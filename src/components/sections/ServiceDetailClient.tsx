@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { BRAND } from '@/lib/constants';
+import { formatDeliveryTime } from '@/lib/deliveryTime';
 import { formatMilesFromKm } from '@/lib/distance';
 import { formatRating } from '@/lib/formatters';
 import { toast } from 'sonner';
@@ -60,7 +61,13 @@ type ApiPackage = {
   title?: string;
   description?: string;
   deliveryTime?: string;
+  deliveryTimeUnit?: string;
   price?: number | string;
+};
+
+type GalleryMedia = {
+  type: 'image' | 'video';
+  url: string;
 };
 
 const REVIEWS_PER_PAGE = 5;
@@ -83,14 +90,21 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   const { isAuthenticated, user, updateProfile } = useAuth();
   const { data: faqResponse } = useGetFaqsQuery();
   const [startProviderConversation, { isLoading: isContactingProvider }] = useStartProviderConversationMutation();
-  const galleryImages = React.useMemo(
-    () =>
-      Array.isArray(service.images) && service.images.length > 0
-        ? service.images
-        : ['https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'],
-    [service.images]
+  const galleryMedia = React.useMemo<GalleryMedia[]>(
+    () => {
+      const images =
+        Array.isArray(service.images) && service.images.length > 0
+          ? service.images
+          : ['https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'];
+      const videos = Array.isArray(service.videos) ? service.videos : [];
+      return [
+        ...images.map((url: string) => ({ type: 'image' as const, url })),
+        ...videos.map((url: string) => ({ type: 'video' as const, url })),
+      ];
+    },
+    [service.images, service.videos]
   );
-  const [selectedImage, setSelectedImage] = React.useState(galleryImages[0] || '');
+  const [selectedMedia, setSelectedMedia] = React.useState<GalleryMedia | null>(galleryMedia[0] || null);
   const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
   const [removeSavedService, { isLoading: isRemovingSavedService }] = useRemoveSavedServiceMutation();
   const [startCustomOrderConversation, { isLoading: isStartingCustomOrder }] = useStartCustomOrderConversationMutation();
@@ -143,10 +157,10 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   }, [filteredReviews, reviewPage]);
 
   React.useEffect(() => {
-    if (galleryImages.length > 0 && !selectedImage) {
-      setSelectedImage(galleryImages[0]);
+    if (galleryMedia.length > 0 && (!selectedMedia || !galleryMedia.some((item) => item.url === selectedMedia.url))) {
+      setSelectedMedia(galleryMedia[0]);
     }
-  }, [galleryImages, selectedImage]);
+  }, [galleryMedia, selectedMedia]);
 
   React.useEffect(() => {
     setReviewPage(1);
@@ -182,6 +196,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
               : 'VIP priority service, team of experts, and full cleanup guarantee.'),
         deliveryTime:
           String(fromApi?.deliveryTime || '') || (key === 'basic' ? '1 Day' : key === 'standard' ? '2 Days' : '3 Days'),
+        deliveryTimeUnit: fromApi?.deliveryTimeUnit || 'Days',
         price: Number(fromApi?.price) || fallbackPrice,
       };
     });
@@ -342,22 +357,33 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
               className="mb-16"
             >
               <div className="relative aspect-video w-full rounded-[2.5rem] overflow-hidden bg-slate-100 group mb-6 shadow-3xl shadow-slate-300/10 border-8 border-white">
-                <Image
-                  src={selectedImage || 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'}
-                  alt={service.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-1000"
-                  priority
-                />
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all flex items-center justify-center cursor-pointer">
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="h-20 w-20 bg-white/95 backdrop-blur-md rounded-full flex items-center justify-center text-[#2286BE] shadow-2xl"
-                  >
-                    <Play fill="currentColor" size={32} className="ml-1.5" />
-                  </motion.div>
-                </div>
+                {selectedMedia?.type === 'video' ? (
+                  <video
+                    src={selectedMedia.url}
+                    controls
+                    playsInline
+                    className="h-full w-full bg-black object-contain"
+                  />
+                ) : (
+                  <>
+                    <Image
+                      src={selectedMedia?.url || 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'}
+                      alt={service.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-1000"
+                      priority
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all flex items-center justify-center cursor-pointer">
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className="h-20 w-20 bg-white/95 backdrop-blur-md rounded-full flex items-center justify-center text-[#2286BE] shadow-2xl"
+                      >
+                        <Play fill="currentColor" size={32} className="ml-1.5" />
+                      </motion.div>
+                    </div>
+                  </>
+                )}
                 <div className="absolute top-6 right-6 flex gap-3">
                   <button
                     onClick={handleToggleFavorite}
@@ -384,16 +410,25 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 </div>
               </div>
               <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-                {galleryImages.map((img: string, i: number) => (
+                {galleryMedia.map((media, i: number) => (
                   <motion.div
                     key={i}
-                    onClick={() => setSelectedImage(img)}
+                    onClick={() => setSelectedMedia(media)}
                     whileHover={{ y: -4 }}
                     className={`relative h-20 w-32 flex-shrink-0 rounded-2xl overflow-hidden cursor-pointer border-4 transition-all ${
-                      selectedImage === img ? 'border-[#2286BE] shadow-lg shadow-[#2286BE]/20' : 'border-white shadow-sm opacity-60 hover:opacity-100'
+                      selectedMedia?.url === media.url ? 'border-[#2286BE] shadow-lg shadow-[#2286BE]/20' : 'border-white shadow-sm opacity-60 hover:opacity-100'
                     }`}
                   >
-                    <Image src={img} alt="gallery thumbnail" fill className="object-cover" />
+                    {media.type === 'video' ? (
+                      <>
+                        <video src={media.url} className="h-full w-full bg-black object-cover" muted playsInline />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                          <Play fill="currentColor" size={22} />
+                        </div>
+                      </>
+                    ) : (
+                      <Image src={media.url} alt="gallery thumbnail" fill className="object-cover" />
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -569,7 +604,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
 
                     <div className="space-y-4 mb-10">
                       {[
-                        { label: 'Delivery Time', value: pkg.deliveryTime },
+                        { label: 'Delivery Time', value: formatDeliveryTime(pkg.deliveryTime, pkg.deliveryTimeUnit) },
                         { label: 'Service Duration', value: pkg.key === 'basic' ? '1 hr' : pkg.key === 'standard' ? '3 hrs' : 'Full Day' },
                         { label: 'Team Size', value: pkg.key === 'premium' ? '2 Experts' : '1 Expert' },
                       ].map((spec, i) => (

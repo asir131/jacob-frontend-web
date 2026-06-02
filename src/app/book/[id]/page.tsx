@@ -10,6 +10,7 @@ type ApiPackage = {
   title?: string;
   description?: string;
   deliveryTime?: string;
+  deliveryTimeUnit?: string;
   price?: number;
 };
 
@@ -48,6 +49,7 @@ const toBookingShape = (service: ApiService, id: string) => {
       title: matched?.title || `${name} package`,
       description: matched?.description || '',
       deliveryTime: matched?.deliveryTime || '',
+      deliveryTimeUnit: matched?.deliveryTimeUnit || 'Days',
       price: Number(matched?.price) || 0,
     };
   });
