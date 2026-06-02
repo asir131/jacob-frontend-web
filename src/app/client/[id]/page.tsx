@@ -33,7 +33,7 @@ export default function ClientPublicProfile() {
   const client = {
     id: id,
     name: decodedName,
-    avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267045',
+    avatar: '',
     location: 'Dhaka, BD',
     joined: 'October 2023',
     rating: 4.9,
@@ -121,9 +121,9 @@ export default function ClientPublicProfile() {
              </h2>
              {(() => {
                const allReviews = [
-                 { name: 'QuickFix Team', role: 'Provider', rating: 5, date: 'Jan 20, 2024', text: 'Clear communication and provided easy access to the workspace. Highly recommended.', avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267042' },
-                 { name: 'Sarah Khan', role: 'Lead Cleaner', rating: 5, date: 'Dec 15, 2023', text: 'Very polite and helpful. The instructions were precise, making the job much smoother.', avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267046' },
-                 { name: 'Rafi Hasan', role: 'Handyman', rating: 4, date: 'Nov 10, 2023', text: 'Great client, very accommodating. Provided all necessary access without any hassle.', avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267048' },
+                 { name: 'QuickFix Team', role: 'Provider', rating: 5, date: 'Jan 20, 2024', text: 'Clear communication and provided easy access to the workspace. Highly recommended.', avatar: '' },
+                 { name: 'Sarah Khan', role: 'Lead Cleaner', rating: 5, date: 'Dec 15, 2023', text: 'Very polite and helpful. The instructions were precise, making the job much smoother.', avatar: '' },
+                 { name: 'Rafi Hasan', role: 'Handyman', rating: 4, date: 'Nov 10, 2023', text: 'Great client, very accommodating. Provided all necessary access without any hassle.', avatar: '' },
                ];
                const counts = allReviews.reduce((acc, r) => { acc[r.rating] = (acc[r.rating] || 0) + 1; return acc; }, {} as Record<number, number>);
                const filtered = reviewFilter === 0 ? allReviews : allReviews.filter(r => r.rating === reviewFilter);

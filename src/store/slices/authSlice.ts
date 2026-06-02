@@ -70,9 +70,6 @@ const authSlice = createSlice({
     },
     setAuthRole: (state, action: PayloadAction<Role>) => {
       state.role = action.payload;
-      if (state.user) {
-        state.user.role = action.payload;
-      }
     },
     updateAuthProfile: (state, action: PayloadAction<Partial<AuthUser>>) => {
       if (!state.user) return;
@@ -81,7 +78,9 @@ const authSlice = createSlice({
           ? state.user.payoutInfo
           : { ...(state.user.payoutInfo || {}), ...action.payload.payoutInfo };
       state.user = { ...state.user, ...action.payload, payoutInfo: mergedPayoutInfo };
-      state.role = state.user.role;
+      if (action.payload.role) {
+        state.role = action.payload.role;
+      }
       state.isAuthenticated = true;
     },
     logoutSuccess: (state) => {

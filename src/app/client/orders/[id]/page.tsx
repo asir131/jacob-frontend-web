@@ -7,7 +7,7 @@ import {
   ArrowLeft, Star, MessageSquare, AlertTriangle,
   CheckCircle2, Clock, MapPin, UploadCloud,
   X, HelpCircle, FileText, Image as ImageIcon,
-  AlertCircle
+  AlertCircle, User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -456,7 +456,7 @@ export default function OrderTrackingPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={order.provider.avatar} alt={order.provider.name || 'Provider'} className="h-full w-full object-cover" />
                   ) : (
-                    (order.provider?.name || 'P').charAt(0)
+                    <User className="h-10 w-10" aria-hidden="true" />
                   )}
                 </div>
                 <h3 className="text-xl font-black text-slate-900 mb-1">{order.provider?.name || 'Provider'}</h3>

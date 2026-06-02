@@ -38,8 +38,8 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const canSwitchModes =
-    role === 'provider' ||
+  const hasProviderAccount =
+    user?.role === 'provider' ||
     Boolean(
       user?.businessBio ||
       user?.experienceLevel ||
@@ -47,6 +47,7 @@ export default function Header() {
       user?.serviceLocationLat ||
       user?.serviceLocationLng
     );
+  const canSwitchModes = hasProviderAccount;
 
   const navLinks = useMemo(() => {
     const baseLinks =
@@ -60,7 +61,9 @@ export default function Header() {
             { name: 'My Gigs', href: '/provider/gigs' },
             { name: 'Provider Hub', href: '/provider/dashboard' },
           ]
-        : [{ name: 'Join as Pro', href: '/join-provider' }];
+        : hasProviderAccount
+          ? []
+          : [{ name: 'Join as Pro', href: '/join-provider' }];
 
     return [
       ...baseLinks,
@@ -68,7 +71,7 @@ export default function Header() {
       ...roleAwareLinks,
       { name: 'Success Stories', href: '/success-stories' },
     ];
-  }, [isAuthenticated, role]);
+  }, [hasProviderAccount, isAuthenticated, role]);
 
   const isActive = (href: string) => pathname === href;
 

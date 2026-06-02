@@ -32,7 +32,7 @@ const requests = [
     date: 'Oct 24, 2024',
     counterparty: {
       name: 'Rahim Uddin',
-      avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267041',
+      avatar: '',
       role: 'Provider'
     }
   },
@@ -46,7 +46,7 @@ const requests = [
     date: 'Oct 15, 2024',
     counterparty: {
       name: 'Sarah Khan',
-      avatar: 'https://i.pravatar.cc/150?u=a042581f4e290267046',
+      avatar: '',
       role: 'Client'
     }
   }
@@ -221,7 +221,7 @@ export default function ResolutionCenterPage() {
                          </div>
                          <div className="flex gap-4 items-start flex-row-reverse">
                             <Avatar className="h-10 w-10 shrink-0">
-                               <AvatarImage src="https://i.pravatar.cc/150?u=a042581f4e290267045" />
+                               <AvatarImage src="" />
                                <AvatarFallback>C</AvatarFallback>
                             </Avatar>
                             <div className="bg-[#2286BE]/5 p-6 rounded-[2rem] rounded-tr-none border border-[#2286BE]/10">

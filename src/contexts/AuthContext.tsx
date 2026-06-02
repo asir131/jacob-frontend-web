@@ -96,22 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setRole = async (nextRole: Role) => {
     dispatch(setAuthRole(nextRole));
-
-    if (user) {
-      const nextUser = { ...user, role: nextRole };
-      updateStoredUser(nextUser);
-
-      const token = getAccessToken();
-      if (token) {
-        try {
-          await store.dispatch(
-            apiSlice.endpoints.updateProfile.initiate({ role: nextRole })
-          ).unwrap();
-        } catch {
-          // keep local switch even if backend sync fails
-        }
-      }
-    }
   };
 
   const login = (payload?: LoginPayload) => {

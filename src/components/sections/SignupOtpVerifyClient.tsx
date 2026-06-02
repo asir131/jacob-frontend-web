@@ -15,6 +15,7 @@ import { useLoginMutation, useVerifySignupOtpMutation } from '@/store/services/a
 type VerifyOtpResponse = {
   success: boolean;
   message: string;
+  data?: LoginResponse['data'];
 };
 
 type LoginResponse = {
@@ -131,6 +132,39 @@ export default function SignupOtpVerifyClient() {
 
       if (!verifyRes?.success) {
         toast.error(verifyRes?.message || 'OTP verification failed.');
+        return;
+      }
+
+      if (verifyRes.data) {
+        const userSnapshot = verifyRes.data.user;
+        const normalizedRole = userSnapshot.role === 'provider' ? 'provider' : 'client';
+        setAuthSession({
+          accessToken: verifyRes.data.accessToken,
+          refreshToken: verifyRes.data.refreshToken,
+          user: userSnapshot,
+          persistent: true,
+        });
+        login({
+          id: userSnapshot.id,
+          firstName: userSnapshot.firstName,
+          lastName: userSnapshot.lastName,
+          email: userSnapshot.email,
+          role: normalizedRole,
+          avatar: userSnapshot.avatar,
+          phone: userSnapshot.phone,
+          address: userSnapshot.address,
+          preferredLanguage: userSnapshot.preferredLanguage,
+          locationLat: userSnapshot.locationLat ?? undefined,
+          locationLng: userSnapshot.locationLng ?? undefined,
+          businessBio: userSnapshot.businessBio,
+          experienceLevel: userSnapshot.experienceLevel,
+          serviceCity: userSnapshot.serviceCity,
+          serviceLocationLat: userSnapshot.serviceLocationLat ?? undefined,
+          serviceLocationLng: userSnapshot.serviceLocationLng ?? undefined,
+        });
+        sessionStorage.removeItem('pending_signup_auth');
+        toast.success(`Signup completed. Welcome to ${BRAND.name}!`);
+        router.replace('/');
         return;
       }
 

@@ -66,8 +66,7 @@ export default function ProviderPublicProfile() {
   const skills = useMemo(() => data?.data?.skills || [], [data?.data?.skills]);
 
   const providerName = provider?.name || 'Expert Provider';
-  const providerAvatar =
-    provider?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(providerName)}&background=2286BE&color=fff`;
+  const providerAvatar = provider?.avatar || '';
   const providerLevel = provider?.sellerLevel || provider?.level || 'New';
   const providerType = provider?.experienceLevel || 'Solo';
   const providerRating = Number(provider?.rating || 0);

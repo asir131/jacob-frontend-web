@@ -3,8 +3,8 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io, Socket } from 'socket.io-client';
-import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, CheckCheck, Smile, User } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { Search, MoreVertical, Send, Paperclip, Phone, Video, Info, ArrowLeft, CheckCheck, Smile, User, Trash2, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAccessToken } from '@/lib/authStorage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -31,6 +31,7 @@ import {
   useMarkConversationMessagesAsReadMutation,
   useRespondToCustomOrderProposalMutation,
   useSendConversationMessageMutation,
+  useDeleteConversationsMutation,
 } from '@/store/services/apiSlice';
 
 type Conversation = {
@@ -201,6 +202,7 @@ const acquireCallMedia = async (callType: 'voice' | 'video') => {
 
 export default function MessagesPage() {
   const { role: userRole, user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const orderIdParam = searchParams.get('orderId') || '';
   const conversationIdParam = searchParams.get('conversationId') || '';
@@ -210,6 +212,8 @@ export default function MessagesPage() {
   const [search, setSearch] = useState('');
   const [manualConversationId, setManualConversationId] = useState('');
   const [ensuredConversationId, setEnsuredConversationId] = useState('');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
@@ -235,6 +239,7 @@ export default function MessagesPage() {
   const [callSeconds, setCallSeconds] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const messageInputRef = useRef<HTMLInputElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -250,6 +255,7 @@ export default function MessagesPage() {
   const [createCustomOrderProposal, { isLoading: isCreatingProposal }] = useCreateCustomOrderProposalMutation();
   const [respondToCustomOrderProposal, { isLoading: isRespondingProposal }] = useRespondToCustomOrderProposalMutation();
   const [clearConversationHistory] = useClearConversationHistoryMutation();
+  const [deleteConversations, { isLoading: deletingConversations }] = useDeleteConversationsMutation();
   const [blockConversationUser] = useBlockConversationUserMutation();
   const [unblockConversationUser] = useUnblockConversationUserMutation();
   const [markAllMessagesAsRead] = useMarkAllMessagesAsReadMutation();
@@ -286,6 +292,24 @@ export default function MessagesPage() {
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   }, [apiMessages, liveMessages, selectedConversationId]);
+  const latestMessageId = mergedMessages[mergedMessages.length - 1]?.id || '';
+
+  useEffect(() => {
+    if (!selectedConversationId) return;
+
+    const scrollToLatest = (behavior: ScrollBehavior = 'auto') => {
+      messagesEndRef.current?.scrollIntoView({ block: 'end', behavior });
+    };
+
+    scrollToLatest('auto');
+    const shortTimer = window.setTimeout(() => scrollToLatest('auto'), 80);
+    const mediaTimer = window.setTimeout(() => scrollToLatest('smooth'), 260);
+
+    return () => {
+      window.clearTimeout(shortTimer);
+      window.clearTimeout(mediaTimer);
+    };
+  }, [latestMessageId, mergedMessages.length, selectedConversationId]);
 
   const filteredContacts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -330,15 +354,65 @@ export default function MessagesPage() {
   const isBlockedByOther = Boolean(blockedBy && String(blockedBy) !== String(user?.id || ''));
   const canSendMessage = !blockedBy;
   const canSendCurrentMessage = canSendMessage && (Boolean(newMessage.trim()) || selectedAttachments.length > 0);
+  const selectedDeleteCount = selectedConversationIds.length;
+  const toggleSelectedConversation = useCallback((conversationId: string) => {
+    setSelectedConversationIds((current) =>
+      current.includes(conversationId)
+        ? current.filter((id) => id !== conversationId)
+        : [...current, conversationId]
+    );
+  }, []);
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedConversationIds([]);
+  }, []);
+  const handleDeleteSelectedConversations = useCallback(async () => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      return;
+    }
+
+    if (!selectedDeleteCount) {
+      toast.error('Select one or more conversations first.');
+      return;
+    }
+
+    try {
+      await deleteConversations(selectedConversationIds).unwrap();
+      if (selectedConversationIds.includes(selectedConversationId)) {
+        setManualConversationId('');
+        setEnsuredConversationId('');
+        router.replace('/messages');
+      }
+      exitSelectionMode();
+      refetchConversations();
+      toast.success(`${selectedDeleteCount} conversation${selectedDeleteCount === 1 ? '' : 's'} deleted from inbox.`);
+    } catch {
+      toast.error('Could not delete selected conversations.');
+    }
+  }, [
+    deleteConversations,
+    exitSelectionMode,
+    refetchConversations,
+    router,
+    selectedConversationId,
+    selectedConversationIds,
+    selectedDeleteCount,
+    selectionMode,
+  ]);
   const canSendQuickEtaMessage =
-    userRole === 'provider' && Boolean(selectedConversation?.orderId) && Boolean(selectedConversationId) && canSendMessage;
+    !isAdminConversation &&
+    userRole === 'provider' &&
+    Boolean(selectedConversation?.orderId) &&
+    Boolean(selectedConversationId) &&
+    canSendMessage;
   const repeatSourceOrderId =
     sourceOrderIdParam ||
     (selectedConversation?.orderStatus === 'completed' && selectedConversation?.orderId
       ? String(selectedConversation.orderId)
       : '');
   const isRepeatProposalMode = proposalTypeParam === 'repeat_order' || Boolean(repeatSourceOrderId);
-  const canCreateProposal = userRole === 'provider' && Boolean(selectedConversationId);
+  const canCreateProposal = !isAdminConversation && userRole === 'provider' && Boolean(selectedConversationId);
   const canCreateCustomProposal = canCreateProposal && !selectedConversation?.orderId;
   const canCreateRepeatProposal = canCreateProposal && Boolean(repeatSourceOrderId);
   const canOpenProposalComposer = canCreateCustomProposal || canCreateRepeatProposal;
@@ -656,6 +730,10 @@ export default function MessagesPage() {
       refetchConversations();
     });
 
+    socket.on('chat:conversation:deleted', () => {
+      refetchConversations();
+    });
+
     socket.on('call:invite', (payload: CallInvite) => {
       if (payload.senderRole === 'superAdmin') {
         toast.info('Audio and video calls are not available with admin support.');
@@ -880,10 +958,28 @@ export default function MessagesPage() {
       <aside className={`${isSidebarOpen ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 flex-shrink-0 border-r border-slate-100 flex-col transition-all duration-300`}>
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Messages</h1>
-            <Button variant="ghost" size="icon" className="rounded-full text-slate-400">
-              <MoreVertical size={20} />
-            </Button>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                {selectionMode ? `${selectedDeleteCount} selected` : 'Messages'}
+              </h1>
+              {selectionMode ? <p className="text-xs font-bold text-slate-400 mt-1">Choose chats to delete from inbox</p> : null}
+            </div>
+            <div className="flex items-center gap-2">
+              {selectionMode ? (
+                <Button variant="ghost" size="icon" className="rounded-full text-slate-400" onClick={exitSelectionMode}>
+                  <X size={20} />
+                </Button>
+              ) : null}
+              <Button
+                variant={selectionMode ? 'default' : 'ghost'}
+                size="icon"
+                className={`rounded-full ${selectionMode ? 'bg-red-500 text-white hover:bg-red-600' : 'text-slate-400 hover:text-red-500'}`}
+                onClick={() => void handleDeleteSelectedConversations()}
+                disabled={deletingConversations}
+              >
+                <Trash2 size={18} />
+              </Button>
+            </div>
           </div>
           <div className="relative group">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2286BE] transition-colors" />
@@ -897,11 +993,30 @@ export default function MessagesPage() {
               <button
                 key={contact.id}
                 onClick={() => {
+                  if (selectionMode) {
+                    toggleSelectedConversation(contact.id);
+                    return;
+                  }
                   setManualConversationId(contact.id);
                   if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 ${selectedConversationId === contact.id ? 'bg-primary-soft shadow-sm' : 'hover:bg-slate-50'}`}
+                className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 ${
+                  selectedConversationIds.includes(contact.id)
+                    ? 'bg-[#2286BE]/10 ring-2 ring-[#2286BE]/20'
+                    : selectedConversationId === contact.id && !selectionMode
+                      ? 'bg-primary-soft shadow-sm'
+                      : 'hover:bg-slate-50'
+                }`}
               >
+                {selectionMode ? (
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                      selectedConversationIds.includes(contact.id) ? 'border-[#2286BE] bg-[#2286BE]' : 'border-slate-300 bg-white'
+                    }`}
+                  >
+                    {selectedConversationIds.includes(contact.id) ? <CheckCheck size={12} className="text-white" /> : null}
+                  </span>
+                ) : null}
                 <div className="relative group">
                     <Avatar className="h-12 w-12 border-2 border-white shadow-sm transition-transform group-hover:scale-105">
                       {contact.avatar ? <AvatarImage src={contact.avatar} /> : null}
@@ -1177,6 +1292,7 @@ export default function MessagesPage() {
                 You can&apos;t send message to this user anymore.
               </div>
             ) : null}
+            <div ref={messagesEndRef} className="h-px" />
           </div>
         </ScrollArea>
 

@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MessageCircle, Send, CheckCircle2, Clock, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { BRAND, CONTACT } from '@/lib/constants';
+import { useAuth } from '@/contexts/AuthContext';
+import { getAccessToken } from '@/lib/authStorage';
 
 const channels = [
   { icon: <MessageCircle size={24} />, color: 'bg-[#2286BE]', title: 'Live Chat', desc: 'Available 8AM-10PM BST', sub: 'Avg. wait < 3 min' },
@@ -37,9 +39,25 @@ const INITIAL_FORM: ContactFormState = {
 
 export default function ContactClient() {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+  const { user } = useAuth();
+  const authenticatedContact = useMemo(
+    () => ({
+      fullName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
+      email: user?.email || '',
+    }),
+    [user?.email, user?.firstName, user?.lastName]
+  );
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<ContactFormState>(INITIAL_FORM);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      fullName: authenticatedContact.fullName || current.fullName,
+      email: authenticatedContact.email || current.email,
+    }));
+  }, [authenticatedContact.email, authenticatedContact.fullName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +68,12 @@ export default function ContactClient() {
 
     setSubmitting(true);
     try {
+      const token = getAccessToken();
       const response = await fetch(`${apiBase}/api/support`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(form),
       });
@@ -62,7 +82,11 @@ export default function ContactClient() {
         throw new Error(payload?.message || 'Failed to send support message.');
       }
       setSent(true);
-      setForm(INITIAL_FORM);
+      setForm({
+        ...INITIAL_FORM,
+        fullName: authenticatedContact.fullName,
+        email: authenticatedContact.email,
+      });
       toast.success("Message sent! We'll get back to you within 12 hours.");
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to send support message.');

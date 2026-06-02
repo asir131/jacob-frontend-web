@@ -884,6 +884,14 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: (_result, _error, conversationId) => [{ type: 'Chats', id: conversationId }, 'Chats'],
     }),
+    deleteConversations: builder.mutation<ApiEnvelope<{ modifiedCount?: number }>, string[]>({
+      query: (conversationIds) => ({
+        url: '/api/chats/conversations',
+        method: 'DELETE',
+        body: { conversationIds },
+      }),
+      invalidatesTags: ['Chats'],
+    }),
     blockConversationUser: builder.mutation<ApiEnvelope<{ blockedBy?: string }>, string>({
       query: (conversationId) => ({
         url: `/api/chats/conversations/${conversationId}/block`,
@@ -1124,6 +1132,7 @@ export const {
   useCreateCustomOrderProposalMutation,
   useRespondToCustomOrderProposalMutation,
   useClearConversationHistoryMutation,
+  useDeleteConversationsMutation,
   useBlockConversationUserMutation,
   useUnblockConversationUserMutation,
   useMarkConversationMessagesAsReadMutation,
