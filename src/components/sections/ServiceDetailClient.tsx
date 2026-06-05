@@ -71,6 +71,17 @@ type GalleryMedia = {
 };
 
 const REVIEWS_PER_PAGE = 5;
+const FALLBACK_GALLERY_IMAGE = 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop';
+
+const normalizeGalleryMedia = (media: unknown): GalleryMedia[] => {
+  if (!Array.isArray(media)) return [];
+  return media
+    .map((item: any) => ({
+      type: item?.type === 'video' ? 'video' : item?.type === 'image' ? 'image' : '',
+      url: String(item?.url || '').trim(),
+    }))
+    .filter((item): item is GalleryMedia => (item.type === 'image' || item.type === 'video') && Boolean(item.url));
+};
 
 const calculateDistanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
   const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -92,17 +103,18 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   const [startProviderConversation, { isLoading: isContactingProvider }] = useStartProviderConversationMutation();
   const galleryMedia = React.useMemo<GalleryMedia[]>(
     () => {
-      const images =
-        Array.isArray(service.images) && service.images.length > 0
-          ? service.images
-          : ['https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'];
+      const media = normalizeGalleryMedia(service.media);
+      if (media.length > 0) return media;
+
+      const images = Array.isArray(service.images) ? service.images.filter(Boolean) : [];
       const videos = Array.isArray(service.videos) ? service.videos : [];
-      return [
+      const legacyMedia = [
         ...images.map((url: string) => ({ type: 'image' as const, url })),
         ...videos.map((url: string) => ({ type: 'video' as const, url })),
       ];
+      return legacyMedia.length > 0 ? legacyMedia : [{ type: 'image', url: FALLBACK_GALLERY_IMAGE }];
     },
-    [service.images, service.videos]
+    [service.images, service.media, service.videos]
   );
   const [selectedMedia, setSelectedMedia] = React.useState<GalleryMedia | null>(galleryMedia[0] || null);
   const [saveService, { isLoading: isSavingService }] = useSaveServiceMutation();
@@ -367,7 +379,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                 ) : (
                   <>
                     <Image
-                      src={selectedMedia?.url || 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop'}
+                      src={selectedMedia?.url || FALLBACK_GALLERY_IMAGE}
                       alt={service.title}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-1000"

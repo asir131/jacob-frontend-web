@@ -26,6 +26,10 @@ type ApiService = {
   requirements?: string;
   images?: string[];
   videos?: string[];
+  media?: Array<{
+    type?: 'image' | 'video';
+    url?: string;
+  }>;
   baseCity?: string;
   zipCode?: string;
   locationLat?: number | null;
@@ -58,8 +62,32 @@ type ApiService = {
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1581578731548-c64695ce6958?q=80&w=1200&h=675&auto=format&fit=crop';
 
+const splitMedia = (media: ApiService['media']) => {
+  if (!Array.isArray(media)) return { images: [], videos: [] };
+  return media.reduce(
+    (acc, item) => {
+      const url = String(item?.url || '').trim();
+      if (!url) return acc;
+      if (item.type === 'video') acc.videos.push(url);
+      if (item.type === 'image') acc.images.push(url);
+      return acc;
+    },
+    { images: [] as string[], videos: [] as string[] }
+  );
+};
+
 const toServiceDetailShape = (service: ApiService, id: string) => {
   const packages = Array.isArray(service.packages) ? service.packages : [];
+  const media = Array.isArray(service.media)
+    ? service.media
+        .map((item) => ({
+          type: item?.type === 'video' ? 'video' as const : item?.type === 'image' ? 'image' as const : null,
+          url: String(item?.url || '').trim(),
+        }))
+        .filter((item): item is { type: 'image' | 'video'; url: string } => Boolean(item.type && item.url))
+    : [];
+  const mediaUrls = splitMedia(media);
+  const hasMedia = media.length > 0;
   const normalizedPackages = ['Basic', 'Standard', 'Premium'].map((name) => {
     const matched = packages.find((item) => String(item?.name || '').toLowerCase() === name.toLowerCase());
     return {
@@ -98,8 +126,9 @@ const toServiceDetailShape = (service: ApiService, id: string) => {
       (normalizedPackages.filter((item) => item.price > 0).reduce((sum, item) => sum + item.price, 0) /
         (normalizedPackages.filter((item) => item.price > 0).length || 1)),
     description: service.description || '',
-    images: Array.isArray(service.images) && service.images.length > 0 ? service.images : [FALLBACK_IMAGE],
-    videos: Array.isArray(service.videos) ? service.videos : [],
+    images: hasMedia ? mediaUrls.images : Array.isArray(service.images) && service.images.length > 0 ? service.images : [FALLBACK_IMAGE],
+    videos: hasMedia ? mediaUrls.videos : Array.isArray(service.videos) ? service.videos : [],
+    media: hasMedia ? media : [],
     requirements: service.requirements || '',
     travelRadius: Number(service.travelRadiusKm) || 25,
     packages: normalizedPackages,

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, MoreHorizontal, Star, TrendingUp, Clock, Sparkles, ShieldCheck, AlertTriangle, Play } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ type MyGig = {
   categorySlug: string;
   expertType?: 'solo' | 'team';
   images?: string[];
+  videos?: string[];
   packages?: GigPackage[];
   status: 'draft' | 'pending_approval' | 'published' | 'rejected';
   baseCity?: string;
@@ -62,6 +63,7 @@ type PendingRequest = {
   status: string;
   expertType?: 'solo' | 'team';
   images?: string[];
+  videos?: string[];
   packages?: GigPackage[];
   baseCity?: string;
   travelRadiusKm?: number | null;
@@ -305,13 +307,34 @@ export default function ProviderGigsPage() {
           {!loading ? (
             <motion.div key={activeTab} variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {paginatedItems.map((gig) => {
-                const cover = gig.images?.[0] || 'https://images.unsplash.com/photo-1581578731548-c64695cc6954?q=80&w=800&auto=format&fit=crop';
+                const cover = gig.images?.[0] || '';
+                const thumbnailVideo = !cover && Array.isArray(gig.videos) ? gig.videos[0] : '';
+                const fallbackCover = 'https://images.unsplash.com/photo-1581578731548-c64695cc6954?q=80&w=800&auto=format&fit=crop';
                 const isPending = gig.status === 'pending_approval';
                 return (
                   <motion.div key={gig._id} variants={itemVariants}>
                     <Card className="overflow-hidden border-slate-200 hover:shadow-2xl transition-all duration-500 group flex flex-col h-full rounded-2xl">
                       <div className="relative aspect-[16/10] overflow-hidden">
-                        <Image src={cover} alt={gig.title} fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                        {cover ? (
+                          <Image src={cover} alt={gig.title} fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                        ) : thumbnailVideo ? (
+                          <>
+                            <video
+                              src={thumbnailVideo}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="h-full w-full bg-black object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-[#2286BE] shadow-lg">
+                                <Play size={22} fill="currentColor" className="ml-0.5" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <Image src={fallbackCover} alt={gig.title} fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         <div className="absolute top-4 left-4">
                           <Badge

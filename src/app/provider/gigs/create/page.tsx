@@ -54,6 +54,16 @@ const INITIAL_PACKAGES: PackageState[] = PACKAGE_NAMES.map((name, index) => ({
 const DEFAULT_CENTER = { lat: 40.7128, lng: -74.006 };
 const MAX_IMAGE_COUNT = 4;
 const MAX_VIDEO_COUNT = 2;
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_VIDEO_DURATION_SECONDS = 120;
+const ALLOWED_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.webm']);
+
+type GigMediaItem = {
+  type?: 'image' | 'video';
+  url?: string;
+};
 
 type LoadedGig = {
   _id: string;
@@ -68,6 +78,7 @@ type LoadedGig = {
   packages?: PackageState[];
   images?: string[];
   videos?: string[];
+  media?: GigMediaItem[];
   baseCity?: string;
   locationLat?: number | null;
   locationLng?: number | null;
@@ -79,6 +90,52 @@ type PublishGigResponseData = {
   gigRequest?: {
     status?: string;
   };
+};
+
+const getFileExtension = (filename: string) => {
+  const match = filename.toLowerCase().match(/\.[a-z0-9]+$/);
+  return match ? match[0] : '';
+};
+
+const isAllowedVideoFile = (file: File) => {
+  return ALLOWED_VIDEO_MIME_TYPES.has(file.type.toLowerCase()) || ALLOWED_VIDEO_EXTENSIONS.has(getFileExtension(file.name));
+};
+
+const readVideoMetadata = (file: File) =>
+  new Promise<{ previewUrl: string; duration: number }>((resolve, reject) => {
+    const previewUrl = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      resolve({
+        previewUrl,
+        duration: Number(video.duration) || 0,
+      });
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(previewUrl);
+      reject(new Error('Could not read video duration. Please choose another video.'));
+    };
+    video.src = previewUrl;
+  });
+
+const getMutationErrorMessage = (error: unknown, fallback: string) => {
+  const maybeError = error as { data?: { message?: string }; message?: string; error?: string };
+  return maybeError?.data?.message || maybeError?.message || maybeError?.error || fallback;
+};
+
+const splitMediaUrls = (media: GigMediaItem[] | undefined) => {
+  if (!Array.isArray(media)) return { images: [], videos: [] };
+  return media.reduce(
+    (acc, item) => {
+      const url = String(item?.url || '').trim();
+      if (!url) return acc;
+      if (item.type === 'video') acc.videos.push(url);
+      if (item.type === 'image') acc.images.push(url);
+      return acc;
+    },
+    { images: [] as string[], videos: [] as string[] }
+  );
 };
 
 export default function CreateGigPage() {
@@ -110,6 +167,7 @@ export default function CreateGigPage() {
   const [selectedRadius, setSelectedRadius] = useState('25');
   const [selectedMapCoords, setSelectedMapCoords] = useState(DEFAULT_CENTER);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingVideos, setIsProcessingVideos] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const [isLoadingGig, setIsLoadingGig] = useState(false);
   const [getMyGigs] = useLazyGetMyGigsQuery();
@@ -168,8 +226,10 @@ export default function CreateGigPage() {
               }))
             : INITIAL_PACKAGES) as PackageState[]
         );
-        setExistingImageUrls(Array.isArray(gig.images) ? gig.images : []);
-        setExistingVideoUrls(Array.isArray(gig.videos) ? gig.videos : []);
+        const existingMedia = splitMediaUrls(gig.media);
+        const hasMediaItems = existingMedia.images.length > 0 || existingMedia.videos.length > 0;
+        setExistingImageUrls(hasMediaItems ? existingMedia.images : Array.isArray(gig.images) ? gig.images : []);
+        setExistingVideoUrls(hasMediaItems ? existingMedia.videos : Array.isArray(gig.videos) ? gig.videos : []);
         setImagePreviews([]);
         setVideoPreviews([]);
         setImages([]);
@@ -235,12 +295,16 @@ export default function CreateGigPage() {
       if (nextImages.length !== allowedFiles.length) {
         throw new Error('Please select image files only.');
       }
+      const tooLargeImage = nextImages.find((file) => file.size > MAX_IMAGE_SIZE_BYTES);
+      if (tooLargeImage) {
+        throw new Error('Each image must be 10 MB or smaller.');
+      }
 
       const nextPreviews = nextImages.map((file) => URL.createObjectURL(file));
       setImages((prev) => [...prev, ...nextImages]);
       setImagePreviews((prev) => [...prev, ...nextPreviews]);
-    } catch {
-      toast.error('Could not read selected images.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not read selected images.');
     } finally {
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
@@ -258,18 +322,40 @@ export default function CreateGigPage() {
     }
 
     const allowedFiles = files.slice(0, remainingSlots);
+    setIsProcessingVideos(true);
+    const nextPreviews: string[] = [];
     try {
-      const nextVideos = allowedFiles.filter((file) => file.type.startsWith('video/'));
-      if (nextVideos.length !== allowedFiles.length) {
-        throw new Error('Please select video files only.');
+      const nextVideos: File[] = [];
+      for (const file of allowedFiles) {
+        if (!isAllowedVideoFile(file)) {
+          throw new Error('Videos must be MP4, MOV, or WebM files.');
+        }
+
+        if (file.size > MAX_VIDEO_SIZE_BYTES) {
+          throw new Error('Each video must be 100 MB or smaller.');
+        }
+
+        const metadata = await readVideoMetadata(file);
+        if (!Number.isFinite(metadata.duration) || metadata.duration <= 0) {
+          URL.revokeObjectURL(metadata.previewUrl);
+          throw new Error('Could not read video duration. Please choose another video.');
+        }
+        if (metadata.duration > MAX_VIDEO_DURATION_SECONDS) {
+          URL.revokeObjectURL(metadata.previewUrl);
+          throw new Error('Each video must be 2 minutes or shorter.');
+        }
+
+        nextVideos.push(file);
+        nextPreviews.push(metadata.previewUrl);
       }
 
-      const nextPreviews = nextVideos.map((file) => URL.createObjectURL(file));
       setVideos((prev) => [...prev, ...nextVideos]);
       setVideoPreviews((prev) => [...prev, ...nextPreviews]);
-    } catch {
-      toast.error('Could not read selected videos.');
+    } catch (error) {
+      nextPreviews.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+      toast.error(error instanceof Error ? error.message : 'Could not read selected videos.');
     } finally {
+      setIsProcessingVideos(false);
       if (videoInputRef.current) videoInputRef.current.value = '';
     }
   };
@@ -378,8 +464,8 @@ export default function CreateGigPage() {
       }
 
       router.push('/provider/gigs');
-    } catch {
-      toast.error('Could not publish gig right now.');
+    } catch (error) {
+      toast.error(getMutationErrorMessage(error, 'Could not publish gig right now.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -610,7 +696,7 @@ export default function CreateGigPage() {
               <h2 className="text-2xl font-bold text-slate-900">Gallery</h2>
               <p className="text-slate-500 text-sm">Select at least one image or video. Videos help customers understand what you offer.</p>
               <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelection} />
-              <input ref={videoInputRef} type="file" accept="video/*" multiple className="hidden" onChange={handleVideoSelection} />
+              <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" multiple className="hidden" onChange={handleVideoSelection} />
               <div className="grid gap-4 md:grid-cols-2">
                 <button
                   type="button"
@@ -624,11 +710,12 @@ export default function CreateGigPage() {
                 <button
                   type="button"
                   onClick={() => videoInputRef.current?.click()}
+                  disabled={isProcessingVideos}
                   className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors"
                 >
                   <Film size={40} className="mx-auto text-[#2286BE] mb-4" />
-                  <h3 className="text-lg font-bold text-slate-900">Select videos</h3>
-                  <p className="text-sm text-slate-500 mt-2">Upload up to 2 service intro videos.</p>
+                  <h3 className="text-lg font-bold text-slate-900">{isProcessingVideos ? 'Checking videos...' : 'Select videos'}</h3>
+                  <p className="text-sm text-slate-500 mt-2">Upload up to 2 MP4, MOV, or WebM videos. Max 100 MB and 2 minutes each.</p>
                 </button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -801,7 +888,7 @@ export default function CreateGigPage() {
             Back
           </Button>
           {step < 6 ? (
-            <Button type="button" onClick={handleNext} className="w-32 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] text-white">
+            <Button type="button" onClick={handleNext} disabled={step === 3 && isProcessingVideos} className="w-32 py-6 font-bold bg-[#2286BE] hover:bg-[#059669] text-white">
               Save & Next <ChevronRight size={18} className="ml-1" />
             </Button>
           ) : (

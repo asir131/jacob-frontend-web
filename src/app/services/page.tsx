@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, Search, Star, Filter, Heart } from 'lucide-react';
+import { MapPin, Search, Star, Filter, Heart, Play } from 'lucide-react';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Slider } from '@/components/ui/slider';
@@ -32,6 +32,7 @@ type ServiceCard = {
   categoryName: string;
   expertType?: 'solo' | 'team';
   image: string;
+  videos?: string[];
   avgPackagePrice: number;
   distanceKm: number | null;
   provider: {
@@ -422,6 +423,7 @@ export default function BrowseServicesPage() {
                   const isSaved = Array.isArray(user?.savedServiceIds) && user.savedServiceIds.includes(String(service.id));
                   const isUpdatingFavorite =
                     activeFavoriteId === String(service.id) && (isSavingService || isRemovingSavedService);
+                  const thumbnailVideo = !service.image && Array.isArray(service.videos) ? service.videos[0] : '';
                   return (
                      <Link key={service.id} href={`/services/${service.id}`} className="group block h-full">
                        <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-[#2286BE]/10 transition-all duration-500 h-full flex flex-col">
@@ -433,6 +435,21 @@ export default function BrowseServicesPage() {
                               fill
                               className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                             />
+                          ) : thumbnailVideo ? (
+                            <>
+                              <video
+                                src={thumbnailVideo}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                className="h-full w-full bg-black object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-[#2286BE] shadow-lg">
+                                  <Play size={22} fill="currentColor" className="ml-0.5" />
+                                </div>
+                              </div>
+                            </>
                           ) : (
                             <div className="absolute inset-0 flex items-center justify-center text-slate-400">
                               Service
