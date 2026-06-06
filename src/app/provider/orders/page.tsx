@@ -37,6 +37,7 @@ type ProviderOrder = {
     | 'done_after_sell_revision'
     | 'completed';
   packagePrice: number;
+  paymentAmount?: number;
   providerEarningsAmount?: number;
   serviceAddress: string;
   scheduledDate: string;
@@ -82,6 +83,86 @@ const itemVariants = {
   visible: { opacity: 1, scale: 1, y: 0 },
 };
 
+const UPCOMING_ORDER_STATUSES = new Set<ProviderOrder['status']>([
+  'pending',
+  'accepted',
+  'accepting_delivery',
+  'revision_requested',
+  'under_revision',
+  'after_sell_revision_requested',
+  'under_after_sell_revision',
+]);
+
+const parseScheduledTime = (scheduledTime = '') => {
+  const value = scheduledTime.trim().toUpperCase();
+  if (!value) return null;
+
+  const amPmMatch = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (amPmMatch) {
+    let hours = Number(amPmMatch[1]);
+    const minutes = Number(amPmMatch[2]);
+    const period = amPmMatch[3];
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+      return null;
+    }
+    if (period === 'AM' && hours === 12) hours = 0;
+    if (period === 'PM' && hours !== 12) hours += 12;
+    return { hours, minutes };
+  }
+
+  const twentyFourHourMatch = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (twentyFourHourMatch) {
+    const hours = Number(twentyFourHourMatch[1]);
+    const minutes = Number(twentyFourHourMatch[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      return null;
+    }
+    return { hours, minutes };
+  }
+
+  return null;
+};
+
+const formatScheduledTime = (scheduledTime = '') => {
+  const parsedTime = parseScheduledTime(scheduledTime);
+  if (!parsedTime) return 'Time unavailable';
+
+  const period = parsedTime.hours >= 12 ? 'PM' : 'AM';
+  const hour12 = parsedTime.hours % 12 || 12;
+  const minutes = String(parsedTime.minutes).padStart(2, '0');
+  return `${hour12}:${minutes} ${period}`;
+};
+
+const getScheduledAtMs = (order: ProviderOrder) => {
+  const date = new Date(order.scheduledDate);
+  const time = parseScheduledTime(order.scheduledTime);
+  if (Number.isNaN(date.getTime()) || !time) return Number.MAX_SAFE_INTEGER;
+
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    time.hours,
+    time.minutes,
+    0,
+    0
+  ).getTime();
+};
+
+const sortOrdersByAppointment = (orders: ProviderOrder[]) => {
+  const nowMs = Date.now();
+  return [...orders].sort((a, b) => {
+    const aScheduledAt = getScheduledAtMs(a);
+    const bScheduledAt = getScheduledAtMs(b);
+    const aUpcoming = aScheduledAt >= nowMs && UPCOMING_ORDER_STATUSES.has(a.status);
+    const bUpcoming = bScheduledAt >= nowMs && UPCOMING_ORDER_STATUSES.has(b.status);
+
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+    if (aScheduledAt !== bScheduledAt) return aUpcoming ? aScheduledAt - bScheduledAt : bScheduledAt - aScheduledAt;
+    return String(a.orderNumber || a.id).localeCompare(String(b.orderNumber || b.id));
+  });
+};
+
 export default function ProviderOrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -110,7 +191,10 @@ export default function ProviderOrdersPage() {
   const [acceptOrder, { isLoading: isAccepting }] = useAcceptProviderOrderMutation();
   const [declineOrder, { isLoading: isDeclining }] = useDeclineProviderOrderMutation();
 
-  const orders = useMemo(() => ((data?.data?.items || []) as ProviderOrder[]).filter(Boolean), [data]);
+  const orders = useMemo(
+    () => sortOrdersByAppointment(((data?.data?.items || []) as ProviderOrder[]).filter(Boolean)),
+    [data]
+  );
   const pagination = data?.data?.pagination;
 
   const handleAccept = async (id: string) => {
@@ -266,7 +350,7 @@ export default function ProviderOrdersPage() {
                           <div className="flex items-center gap-3 text-slate-500">
                             <CalendarIcon size={16} className="text-slate-300 flex-shrink-0" />
                             <p className="text-sm font-bold text-slate-500">
-                              {new Date(order.scheduledDate).toLocaleDateString()} • {order.scheduledTime}
+                              {new Date(order.scheduledDate).toLocaleDateString()} • {formatScheduledTime(order.scheduledTime)}
                             </p>
                           </div>
                         </div>
