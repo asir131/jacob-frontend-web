@@ -5,13 +5,17 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { CalendarDays, ChevronLeft, ChevronRight, DollarSign, CheckSquare, Clock, MapPin, TrendingUp, PlusCircle, Share2, Star, User } from 'lucide-react';
+import { Ban, CalendarDays, ChevronLeft, ChevronRight, DollarSign, CheckSquare, Clock, MapPin, TrendingUp, PlusCircle, Share2, Star, Trash2, User } from 'lucide-react';
 import { BRAND } from '@/lib/constants';
 import { toast } from 'sonner';
 import {
   useAcceptProviderOrderMutation,
+  useCreateProviderAvailabilityBlockMutation,
+  useDeleteProviderAvailabilityBlockMutation,
+  useGetProviderAvailabilityBlocksQuery,
   useDeclineProviderOrderMutation,
   useGetProviderDashboardQuery,
   useGetProviderOrdersQuery,
@@ -72,6 +76,16 @@ type ProviderBookedJob = {
   };
 };
 
+type AvailabilityBlock = {
+  id: string;
+  scope: 'full_day' | 'time_slot';
+  dateKey: string;
+  startTime?: string;
+  endTime?: string;
+  note?: string;
+  recurrence?: 'none' | 'weekly';
+};
+
 const ACTIVE_BOOKING_STATUSES = new Set([
   'accepted',
   'accepting_delivery',
@@ -125,9 +139,33 @@ const buildCalendarDays = (monthDate: Date) => {
   });
 };
 
+const parseDateKey = (dateKey: string) => {
+  const [year, month, day] = String(dateKey || '').split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const blockAppliesToDate = (block: AvailabilityBlock, dateKey: string) => {
+  if (block.dateKey === dateKey) return true;
+  if (block.recurrence !== 'weekly') return false;
+  const startDate = parseDateKey(block.dateKey);
+  const targetDate = parseDateKey(dateKey);
+  return Boolean(startDate && targetDate && targetDate >= startDate && targetDate.getDay() === startDate.getDay());
+};
+
+const formatBlockLabel = (block: AvailabilityBlock) => {
+  if (block.scope === 'full_day') return `Full day${block.recurrence === 'weekly' ? ' weekly' : ''}`;
+  return `${block.startTime || 'Start'} - ${block.endTime || 'End'}${block.recurrence === 'weekly' ? ' weekly' : ''}`;
+};
+
 export default function ProviderDashboardClient() {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState('');
+  const [blockScope, setBlockScope] = useState<'full_day' | 'time_slot'>('time_slot');
+  const [blockStartTime, setBlockStartTime] = useState('09:00');
+  const [blockEndTime, setBlockEndTime] = useState('12:00');
+  const [blockNote, setBlockNote] = useState('');
+  const [blockRecursWeekly, setBlockRecursWeekly] = useState(false);
   const { data, isLoading, refetch } = useGetProviderDashboardQuery();
   const { data: providerOrdersData } = useGetProviderOrdersQuery(
     { page: 1, limit: 100, search: '', status: 'all' },
@@ -139,6 +177,8 @@ export default function ProviderDashboardClient() {
   );
   const [acceptOrder] = useAcceptProviderOrderMutation();
   const [declineOrder] = useDeclineProviderOrderMutation();
+  const [createAvailabilityBlock, { isLoading: isCreatingBlock }] = useCreateProviderAvailabilityBlockMutation();
+  const [deleteAvailabilityBlock, { isLoading: isDeletingBlock }] = useDeleteProviderAvailabilityBlockMutation();
   const { notifications } = useSocketNotifications();
   const refetchMarkerRef = useRef<string>('');
   const latestNotification = notifications[0];
@@ -173,7 +213,26 @@ export default function ProviderDashboardClient() {
   }, [bookedJobs]);
 
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
+  const calendarRange = useMemo(() => {
+    return {
+      from: calendarDays[0]?.key || '',
+      to: calendarDays[calendarDays.length - 1]?.key || '',
+    };
+  }, [calendarDays]);
+  const { data: availabilityData } = useGetProviderAvailabilityBlocksQuery(calendarRange);
+  const availabilityBlocks = useMemo(
+    () => (availabilityData?.data?.items || []) as AvailabilityBlock[],
+    [availabilityData?.data?.items]
+  );
+  const availabilityByDate = useMemo(() => {
+    return calendarDays.reduce<Record<string, AvailabilityBlock[]>>((acc, day) => {
+      const blocks = availabilityBlocks.filter((block) => blockAppliesToDate(block, day.key));
+      if (blocks.length) acc[day.key] = blocks;
+      return acc;
+    }, {});
+  }, [availabilityBlocks, calendarDays]);
   const selectedDateJobs = selectedCalendarDate ? bookedJobsByDate[selectedCalendarDate] || [] : [];
+  const selectedDateBlocks = selectedCalendarDate ? availabilityByDate[selectedCalendarDate] || [] : [];
 
   const chartData = summary?.earningsAnalytics?.length
     ? summary.earningsAnalytics.map((entry) => ({
@@ -218,6 +277,33 @@ export default function ProviderDashboardClient() {
       toast.success(`Order ${action === 'accept' ? 'accepted' : 'declined'} successfully!`);
     } catch (error: any) {
       toast.error(error?.data?.message || `Failed to ${action} order.`);
+    }
+  };
+
+  const handleCreateAvailabilityBlock = async () => {
+    if (!selectedCalendarDate) return;
+    try {
+      await createAvailabilityBlock({
+        dateKey: selectedCalendarDate,
+        scope: blockScope,
+        startTime: blockScope === 'time_slot' ? blockStartTime : '',
+        endTime: blockScope === 'time_slot' ? blockEndTime : '',
+        note: blockNote,
+        recurrence: blockRecursWeekly ? 'weekly' : 'none',
+      }).unwrap();
+      setBlockNote('');
+      toast.success('Availability block added.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to block availability.');
+    }
+  };
+
+  const handleDeleteAvailabilityBlock = async (id: string) => {
+    try {
+      await deleteAvailabilityBlock(id).unwrap();
+      toast.success('Availability block removed.');
+    } catch (error: any) {
+      toast.error(error?.data?.message || 'Failed to remove availability block.');
     }
   };
 
@@ -489,7 +575,7 @@ export default function ProviderDashboardClient() {
                   <CardTitle className="text-xl font-black text-slate-900 tracking-tight">Calendar View</CardTitle>
                 </div>
                 <CardDescription className="font-medium">
-                  Upcoming booked jobs by service date. Click a booked date to view booking details.
+                  Upcoming booked jobs and blocked availability. Click any day to manage blocked time.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
@@ -529,15 +615,21 @@ export default function ProviderDashboardClient() {
                 {calendarDays.map((day) => {
                   const dayJobs = bookedJobsByDate[day.key] || [];
                   const hasJobs = dayJobs.length > 0;
+                  const dayBlocks = availabilityByDate[day.key] || [];
+                  const hasBlocks = dayBlocks.length > 0;
+                  const hasFullDayBlock = dayBlocks.some((block) => block.scope === 'full_day');
 
                   return (
                     <button
                       key={day.key}
                       type="button"
-                      disabled={!hasJobs}
                       onClick={() => setSelectedCalendarDate(day.key)}
                       className={`min-h-16 rounded-xl border p-1.5 text-left transition-all ${
-                        hasJobs
+                        hasFullDayBlock
+                          ? 'border-rose-300 bg-rose-50 hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md'
+                          : hasBlocks
+                            ? 'border-amber-300 bg-amber-50 hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md'
+                            : hasJobs
                           ? 'border-[#2286BE]/30 bg-[#2286BE]/5 hover:-translate-y-0.5 hover:border-[#2286BE] hover:bg-[#2286BE]/10 hover:shadow-md'
                           : 'border-slate-100 bg-slate-50/50'
                       } ${day.isCurrentMonth ? 'opacity-100' : 'opacity-40'}`}
@@ -552,10 +644,16 @@ export default function ProviderDashboardClient() {
                           <span className="rounded-full bg-[#2286BE] px-1.5 py-0.5 text-[9px] font-black text-white">
                             {dayJobs.length}
                           </span>
+                        ) : hasBlocks ? (
+                          <Ban size={14} className={hasFullDayBlock ? 'text-rose-500' : 'text-amber-500'} />
                         ) : null}
                       </div>
 
-                      {hasJobs ? (
+                      {hasBlocks ? (
+                        <div className="mt-1 truncate rounded-md bg-white px-1.5 py-0.5 text-[10px] font-black text-rose-600 shadow-sm">
+                          {formatBlockLabel(dayBlocks[0])}
+                        </div>
+                      ) : hasJobs ? (
                         <div className="mt-1">
                           <div className="truncate rounded-md bg-white px-1.5 py-0.5 text-[10px] font-black text-slate-700 shadow-sm">
                             {dayJobs[0]?.scheduledTime || 'Time TBD'} - {dayJobs[0]?.orderName || 'Booked job'}
@@ -572,10 +670,10 @@ export default function ProviderDashboardClient() {
                 })}
               </div>
 
-              {bookedJobs.length === 0 ? (
+              {bookedJobs.length === 0 && availabilityBlocks.length === 0 ? (
                 <div className="mt-4 rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50/50 py-5 text-center">
-                  <p className="text-sm font-black text-slate-400">No upcoming booked jobs yet</p>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-300">Accepted bookings will appear here</p>
+                  <p className="text-sm font-black text-slate-400">No upcoming booked jobs or blocked time yet</p>
+                  <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-300">Click a day to block availability</p>
                 </div>
               ) : null}
             </CardContent>
@@ -592,11 +690,86 @@ export default function ProviderDashboardClient() {
                   {formatBookingDate(selectedDateJobs[0]?.scheduledDate || selectedCalendarDate)}
                 </DialogTitle>
                 <DialogDescription className="font-medium text-slate-500">
-                  {selectedDateJobs.length} booked {selectedDateJobs.length === 1 ? 'job' : 'jobs'} scheduled for this date.
+                  {selectedDateJobs.length} booked {selectedDateJobs.length === 1 ? 'job' : 'jobs'} and {selectedDateBlocks.length} blocked {selectedDateBlocks.length === 1 ? 'slot' : 'slots'}.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 overflow-y-auto px-7 py-5">
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-5">
+                  <div className="flex items-center gap-2">
+                    <Ban size={18} className="text-rose-500" />
+                    <h3 className="text-lg font-black text-slate-900">Block availability</h3>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="flex rounded-xl bg-white p-1 shadow-sm">
+                      {(['time_slot', 'full_day'] as const).map((scope) => (
+                        <button
+                          key={scope}
+                          type="button"
+                          onClick={() => setBlockScope(scope)}
+                          className={`flex-1 rounded-lg px-3 py-2 text-xs font-black uppercase tracking-widest ${
+                            blockScope === scope ? 'bg-rose-500 text-white' : 'text-slate-500'
+                          }`}
+                        >
+                          {scope === 'time_slot' ? 'Time Slot' : 'Full Day'}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-600 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={blockRecursWeekly}
+                        onChange={(event) => setBlockRecursWeekly(event.target.checked)}
+                        className="h-4 w-4 accent-rose-500"
+                      />
+                      Repeat weekly
+                    </label>
+                    {blockScope === 'time_slot' ? (
+                      <>
+                        <Input type="time" value={blockStartTime} onChange={(event) => setBlockStartTime(event.target.value)} className="rounded-xl bg-white" />
+                        <Input type="time" value={blockEndTime} onChange={(event) => setBlockEndTime(event.target.value)} className="rounded-xl bg-white" />
+                      </>
+                    ) : null}
+                    <Input
+                      value={blockNote}
+                      onChange={(event) => setBlockNote(event.target.value)}
+                      placeholder="Optional reason or note"
+                      className="rounded-xl bg-white md:col-span-2"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={isCreatingBlock}
+                    onClick={handleCreateAvailabilityBlock}
+                    className="mt-4 rounded-xl bg-rose-500 px-5 font-black hover:bg-rose-600"
+                  >
+                    {isCreatingBlock ? 'Saving...' : 'Block This Time'}
+                  </Button>
+                </div>
+
+                {selectedDateBlocks.length ? (
+                  <div className="space-y-3">
+                    {selectedDateBlocks.map((block) => (
+                      <div key={block.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{formatBlockLabel(block)}</p>
+                          {block.note ? <p className="mt-1 text-sm font-medium text-slate-500">{block.note}</p> : null}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={isDeletingBlock}
+                          onClick={() => handleDeleteAvailabilityBlock(block.id)}
+                          className="h-10 w-10 rounded-xl border-rose-100 text-rose-500 hover:bg-rose-50"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
                 {selectedDateJobs.map((job) => (
                   <div key={job.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

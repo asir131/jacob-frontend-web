@@ -141,6 +141,20 @@ type ProviderOrdersQuery = {
   status?: string;
 };
 
+type ProviderAvailabilityBlock = {
+  id: string;
+  providerId?: string;
+  scope: 'full_day' | 'time_slot';
+  dateKey: string;
+  startTime?: string;
+  endTime?: string;
+  note?: string;
+  recurrence?: 'none' | 'weekly';
+  status?: 'active' | 'cancelled';
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
 type ProviderPagedQuery = {
   page?: number;
   limit?: number;
@@ -362,7 +376,7 @@ export const apiSlice = createApi({
 
     return result;
   },
-  tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats', 'ServiceRequests'],
+  tagTypes: ['Profile', 'Gigs', 'Categories', 'Orders', 'Chats', 'ServiceRequests', 'Availability'],
   endpoints: (builder) => ({
     getFaqs: builder.query<ApiEnvelope<FaqItem[]>, void>({
       query: () => '/api/faqs',
@@ -444,6 +458,18 @@ export const apiSlice = createApi({
     }),
     getPublicProviderProfile: builder.query<ApiEnvelope<PublicProviderProfileResponse>, string>({
       query: (providerId) => `/api/profile/provider/${providerId}/public`,
+    }),
+    getPublicProviderAvailabilityBlocks: builder.query<
+      ApiEnvelope<{ items?: ProviderAvailabilityBlock[] }>,
+      { providerId: string; from?: string; to?: string }
+    >({
+      query: ({ providerId, from = '', to = '' }) => {
+        const params = new URLSearchParams();
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        return `/api/orders/availability/provider/${providerId}?${params.toString()}`;
+      },
+      providesTags: ['Availability'],
     }),
     createOrder: builder.mutation<ApiEnvelope<{ order?: Record<string, unknown> }>, CreateOrderPayload>({
       query: (payload) => ({
@@ -587,6 +613,43 @@ export const apiSlice = createApi({
         return `/api/orders/provider/ratings?${params.toString()}`;
       },
       providesTags: ['Orders', 'Profile'],
+    }),
+    getProviderAvailabilityBlocks: builder.query<
+      ApiEnvelope<{ items?: ProviderAvailabilityBlock[] }>,
+      { from?: string; to?: string } | void
+    >({
+      query: (args) => {
+        const params = new URLSearchParams();
+        if (args?.from) params.set('from', args.from);
+        if (args?.to) params.set('to', args.to);
+        return `/api/orders/provider/availability-blocks?${params.toString()}`;
+      },
+      providesTags: ['Availability'],
+    }),
+    createProviderAvailabilityBlock: builder.mutation<
+      ApiEnvelope<{ block?: ProviderAvailabilityBlock }>,
+      {
+        dateKey: string;
+        scope: 'full_day' | 'time_slot';
+        startTime?: string;
+        endTime?: string;
+        note?: string;
+        recurrence?: 'none' | 'weekly';
+      }
+    >({
+      query: (payload) => ({
+        url: '/api/orders/provider/availability-blocks',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Availability'],
+    }),
+    deleteProviderAvailabilityBlock: builder.mutation<ApiEnvelope<unknown>, string>({
+      query: (id) => ({
+        url: `/api/orders/provider/availability-blocks/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Availability'],
     }),
     getClientDashboard: builder.query<ApiEnvelope<ClientDashboardResponse>, void>({
       query: () => '/api/orders/client/dashboard',
@@ -1094,6 +1157,7 @@ export const {
   useTrackGigDetailViewMutation,
   useLazyGetGigAnalyticsQuery,
   useGetPublicProviderProfileQuery,
+  useGetPublicProviderAvailabilityBlocksQuery,
   useCreateOrderMutation,
   useCreateServiceRequestMutation,
   useGetClientServiceRequestsQuery,
@@ -1105,6 +1169,9 @@ export const {
   useGetProviderDashboardQuery,
   useGetProviderRevenueHistoryQuery,
   useGetProviderRatingsQuery,
+  useGetProviderAvailabilityBlocksQuery,
+  useCreateProviderAvailabilityBlockMutation,
+  useDeleteProviderAvailabilityBlockMutation,
   useGetClientDashboardQuery,
   useGetClientOrdersQuery,
   useGetClientOrderDetailQuery,

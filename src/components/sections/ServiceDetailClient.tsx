@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Star, ShieldCheck, CheckCircle2, ChevronRight, Play, Share2, Heart } from 'lucide-react';
+import { MapPin, Star, ShieldCheck, CheckCircle2, ChevronRight, Play, Share2, Heart, ArrowLeftRight, MessageSquare } from 'lucide-react';
 import AuthModal from '@/components/ui/AuthModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -98,7 +98,7 @@ const calculateDistanceKm = (fromLat: number, fromLng: number, toLat: number, to
 
 export default function ServiceDetailClient({ service }: ServiceDetailClientProps) {
   const router = useRouter();
-  const { isAuthenticated, user, updateProfile } = useAuth();
+  const { isAuthenticated, role, setRole, user, updateProfile } = useAuth();
   const { data: faqResponse } = useGetFaqsQuery();
   const [startProviderConversation, { isLoading: isContactingProvider }] = useStartProviderConversationMutation();
   const galleryMedia = React.useMemo<GalleryMedia[]>(
@@ -215,8 +215,8 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
   }, [service.packages, service.startingPrice]);
 
   const handleBooking = () => {
-    if (user?.role === 'provider') {
-      toast.error('Please switch to a client account to place service orders.');
+    if (role === 'provider') {
+      toast.error('Please switch to buying mode to place service orders.');
       return;
     }
 
@@ -228,7 +228,7 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
 
     if (
       isAuthenticated &&
-      user?.role === 'client' &&
+      role === 'client' &&
       clientLat !== null &&
       clientLng !== null &&
       serviceLat !== null &&
@@ -273,8 +273,8 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
       setIsAuthModalOpen(true);
       return;
     }
-    if (user?.role !== 'client') {
-      toast.error('Only clients can request a custom order.');
+    if (role !== 'client') {
+      toast.error('Please switch to buying mode to request a custom order.');
       return;
     }
 
@@ -299,8 +299,8 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
       setIsAuthModalOpen(true);
       return;
     }
-    if (user?.role !== 'client') {
-      toast.error('Only customers can contact professionals.');
+    if (role !== 'client') {
+      toast.error('Please switch to buying mode to contact professionals.');
       return;
     }
 
@@ -319,8 +319,41 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
     }
   };
 
+  if (role === 'provider') {
+    return (
+      <div className="min-h-screen bg-slate-50/30 py-16">
+        <div className="mx-auto max-w-2xl px-4">
+          <div className="rounded-[2.5rem] border border-slate-200 bg-white p-10 text-center shadow-xl shadow-slate-200/40">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2286BE]/10 text-[#2286BE]">
+              <ArrowLeftRight size={28} />
+            </div>
+            <h1 className="mt-6 text-3xl font-black text-slate-900">Switch to buying mode</h1>
+            <p className="mt-3 text-base font-medium leading-7 text-slate-500">
+              Service browsing, contact, custom orders, and checkout are available only while you are using the buyer side.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button variant="outline" className="rounded-2xl" onClick={() => router.push('/provider/dashboard')}>
+                Provider Dashboard
+              </Button>
+              <Button
+                className="rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]"
+                onClick={async () => {
+                  await setRole('client');
+                  toast.success('Switched to buying mode.');
+                  router.push(`/services/${service.id}`);
+                }}
+              >
+                Switch to Buying
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50/30 pb-20">
+    <div className="min-h-screen bg-slate-50/30 pb-36 lg:pb-20">
       <div className="border-b border-slate-100 bg-white py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
           <Link href="/" className="hover:text-[#2286BE] transition-colors">
@@ -627,8 +660,18 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
                       ))}
                     </div>
 
-                    <Button onClick={handleBooking} className="w-full bg-[#2286BE] hover:bg-[#1b6da0] text-white h-16 text-lg font-black rounded-2xl flex items-center justify-center shadow-xl shadow-[#2286BE]/20 mb-6 group">
+                    <Button onClick={handleBooking} className="w-full bg-[#2286BE] hover:bg-[#1b6da0] text-white h-16 text-lg font-black rounded-2xl flex items-center justify-center shadow-xl shadow-[#2286BE]/20 mb-3 group">
                       Order Now <ChevronRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={() => void handleContactProfessional()}
+                      disabled={isContactingProvider}
+                      className="mb-6 h-14 w-full rounded-2xl border-2 border-slate-900 bg-slate-900 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-slate-900/15 hover:bg-slate-800"
+                    >
+                      <MessageSquare size={18} className="mr-2" />
+                      {isContactingProvider ? 'Opening Chat...' : 'Contact Professional'}
                     </Button>
 
                     <button
@@ -706,11 +749,11 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
               </div>
 
               <Button
-                variant="outline"
                 onClick={() => void handleContactProfessional()}
                 disabled={isContactingProvider}
-                className="w-full h-14 rounded-2xl border-slate-200 text-slate-900 hover:text-[#2286BE] hover:border-[#2286BE] transition-all font-black text-sm uppercase tracking-widest"
+                className="w-full h-14 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 transition-all font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-900/15"
               >
+                <MessageSquare size={18} className="mr-2" />
                 {isContactingProvider ? 'Opening Chat...' : 'Contact Professional'}
               </Button>
             </div>
@@ -801,6 +844,27 @@ export default function ServiceDetailClient({ service }: ServiceDetailClientProp
         title="Save this Service"
         subtitle="Join LocallyServe to save your favorite services and build your dream team."
       />
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-16px_45px_rgba(15,23,42,0.12)] backdrop-blur-md lg:hidden">
+        <div className="mx-auto flex max-w-7xl items-center gap-3">
+          <Button
+            type="button"
+            onClick={() => void handleContactProfessional()}
+            disabled={isContactingProvider}
+            className="h-14 flex-1 rounded-2xl bg-slate-900 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800"
+          >
+            <MessageSquare size={17} className="mr-2" />
+            {isContactingProvider ? 'Opening...' : 'Contact'}
+          </Button>
+          <Button
+            type="button"
+            onClick={handleBooking}
+            className="h-14 flex-1 rounded-2xl bg-[#2286BE] text-xs font-black uppercase tracking-widest text-white hover:bg-[#1b6da0]"
+          >
+            Order Now
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

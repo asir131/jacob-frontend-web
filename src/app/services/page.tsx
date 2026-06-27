@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { MapPin, Search, Star, Filter, Heart, Play } from 'lucide-react';
+import { MapPin, Search, Star, Filter, Heart, Play, ArrowLeftRight } from 'lucide-react';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useLocation } from '@/contexts/LocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Slider } from '@/components/ui/slider';
@@ -82,7 +83,7 @@ const getLocationParts = (rawAddress: string, fallbackCity: string) => {
 export default function BrowseServicesPage() {
   const router = useRouter();
   const { city, coordinates, radius, setRadius } = useLocation();
-  const { user, role, isAuthenticated, updateProfile } = useAuth();
+  const { user, role, setRole, isAuthenticated, updateProfile } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -119,16 +120,21 @@ export default function BrowseServicesPage() {
     return [...defaultCategories, ...customCategories];
   }, [categoriesPayload]);
 
-  const { data: servicesPayload, isFetching } = useGetPublicServicesQuery({
-    page,
-    limit,
-    radiusKm: milesToKm(radius),
-    requireCoverage: true,
-    categorySlug: selectedCategory,
-    search: searchQuery,
-    lat,
-    lng,
-  });
+  const isProviderMode = role === 'provider';
+  const { data: servicesPayload, isFetching } = useGetPublicServicesQuery(
+    isProviderMode
+      ? skipToken
+      : {
+          page,
+          limit,
+          radiusKm: milesToKm(radius),
+          requireCoverage: true,
+          categorySlug: selectedCategory,
+          search: searchQuery,
+          lat,
+          lng,
+        }
+  );
 
   const rawItems = useMemo(() => {
     const items = servicesPayload?.data?.items;
@@ -218,6 +224,39 @@ export default function BrowseServicesPage() {
     visibleGigIds.forEach((gigId) => trackedImpressionGigIdsRef.current.add(gigId));
     void trackGigImpressions(visibleGigIds);
   }, [availableServices, isAuthenticated, role, trackGigImpressions]);
+
+  if (isProviderMode) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 py-16">
+        <div className="mx-auto max-w-2xl px-4">
+          <div className="rounded-[2.5rem] border border-slate-200 bg-white p-10 text-center shadow-xl shadow-slate-200/40">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2286BE]/10 text-[#2286BE]">
+              <ArrowLeftRight size={28} />
+            </div>
+            <h1 className="mt-6 text-3xl font-black text-slate-900">Switch to buying mode</h1>
+            <p className="mt-3 text-base font-medium leading-7 text-slate-500">
+              Searching and browsing services are available only while you are using the buyer side.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button variant="outline" className="rounded-2xl" onClick={() => router.push('/provider/dashboard')}>
+                Provider Dashboard
+              </Button>
+              <Button
+                className="rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]"
+                onClick={async () => {
+                  await setRole('client');
+                  toast.success('Switched to buying mode.');
+                  router.push('/services');
+                }}
+              >
+                Switch to Buying
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 py-10">

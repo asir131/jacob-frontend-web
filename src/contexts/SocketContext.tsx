@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Phone, User, Video } from 'lucide-react';
+import { User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { Button } from '@/components/ui/button';
@@ -189,16 +189,14 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on('call:invite', (payload: CallInvite) => {
-      if (!payload?.conversationId || payload.senderRole === 'superAdmin') return;
-
-      if (window.location.pathname.startsWith('/messages')) {
-        return;
+      if (payload?.senderId) {
+        socket.emit('call:end', {
+          conversationId: payload.conversationId,
+          targetUserId: payload.senderId,
+          callType: payload.callType,
+          reason: 'unavailable',
+        });
       }
-
-      setIncomingCall(payload);
-      toast.info(`${payload.senderName || 'Someone'} is calling you`, {
-        description: payload.callType === 'video' ? 'Video call incoming.' : 'Voice call incoming.',
-      });
     });
 
     socket.on('call:end', (payload: { conversationId?: string }) => {
@@ -265,52 +263,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-      {incomingCall ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
-            <div className="bg-[#2286BE] px-6 py-5 text-white">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-                  {incomingCall.callType === 'video' ? <Video size={26} /> : <Phone size={26} />}
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/75">
-                    Incoming {incomingCall.callType === 'video' ? 'Video' : 'Voice'} Call
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black">{incomingCall.senderName || 'Someone'} is calling</h2>
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-5">
-              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
-                  <User size={20} />
-                </div>
-                <p className="text-sm font-bold text-slate-600">
-                  Accept to open the conversation and connect the call.
-                </p>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-12 rounded-2xl border-slate-200 font-black text-slate-600"
-                  onClick={declineIncomingCall}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="h-12 rounded-2xl bg-emerald-500 font-black text-white hover:bg-emerald-600"
-                  onClick={acceptIncomingCall}
-                >
-                  Accept
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </SocketContext.Provider>
   );
 }

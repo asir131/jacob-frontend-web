@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star,
@@ -30,7 +30,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ReviewFilter from '@/components/ui/ReviewFilter';
 import { formatRating } from '@/lib/formatters';
-import { useGetPublicProviderProfileQuery } from '@/store/services/apiSlice';
+import { useAuth } from '@/contexts/AuthContext';
+import { useGetPublicProviderProfileQuery, useStartProviderConversationMutation } from '@/store/services/apiSlice';
 
 type ReviewItem = {
   id?: string;
@@ -49,6 +50,8 @@ type ReviewItem = {
 
 export default function ProviderPublicProfile() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { isAuthenticated, role } = useAuth();
   const providerId = typeof params?.id === 'string' ? params.id : '';
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState(0);
@@ -58,6 +61,7 @@ export default function ProviderPublicProfile() {
   const { data, isLoading, isError } = useGetPublicProviderProfileQuery(providerId, {
     skip: !providerId,
   });
+  const [startProviderConversation, { isLoading: isContactingProvider }] = useStartProviderConversationMutation();
 
   const provider = data?.data?.provider;
   const providerServices = data?.data?.gigs || [];
@@ -75,6 +79,34 @@ export default function ProviderPublicProfile() {
   const recommendRate = Number(provider?.recommendRate ?? provider?.completionRate ?? 0);
   const joinedYear = provider?.joinedAt ? new Date(provider.joinedAt).getFullYear() : null;
   const primaryCategory = providerServices[0]?.categoryName || providerType || 'Service';
+  const primaryGigId = String(providerServices[0]?.id || '');
+
+  const handleContactProvider = async () => {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    if (role !== 'client') {
+      toast.error('Please switch to buying mode to contact professionals.');
+      return;
+    }
+    if (!providerId || !primaryGigId) {
+      toast.error('This provider does not have an active service to contact about yet.');
+      return;
+    }
+
+    try {
+      const response = await startProviderConversation({
+        providerId,
+        gigId: primaryGigId,
+      }).unwrap();
+      const conversationId = String((response.data as any)?.conversation?.id || '');
+      if (!conversationId) throw new Error('Conversation could not be opened.');
+      router.push(`/messages?conversationId=${conversationId}`);
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Could not contact this professional.');
+    }
+  };
 
   const filteredReviews = useMemo(() => {
     const list = providerReviews.map((review) => ({
@@ -152,11 +184,14 @@ export default function ProviderPublicProfile() {
               </div>
 
               <div className="flex flex-col gap-3 w-full">
-                <Link href={`/messages?user=${provider?.id || providerId}`} className="w-full">
-                  <Button className="w-full h-12 bg-[#2286BE] hover:bg-[#1b6da0] rounded-xl font-bold shadow-lg shadow-[#2286BE]/20 gap-2">
-                    <MessageSquare size={18} /> Contact Me
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  onClick={() => void handleContactProvider()}
+                  disabled={isContactingProvider}
+                  className="w-full h-14 bg-[#1A2C42] hover:bg-slate-800 rounded-xl font-black shadow-xl shadow-slate-900/15 gap-2 uppercase tracking-widest text-xs"
+                >
+                  <MessageSquare size={18} /> {isContactingProvider ? 'Opening Chat...' : 'Contact Professional'}
+                </Button>
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
@@ -529,6 +564,17 @@ export default function ProviderPublicProfile() {
           </div>
         )}
       </AnimatePresence>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-16px_45px_rgba(15,23,42,0.12)] backdrop-blur-md md:hidden">
+        <Button
+          type="button"
+          onClick={() => void handleContactProvider()}
+          disabled={isContactingProvider}
+          className="mx-auto h-14 w-full max-w-md rounded-2xl bg-[#1A2C42] text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800"
+        >
+          <MessageSquare size={18} className="mr-2" />
+          {isContactingProvider ? 'Opening Chat...' : 'Contact Professional'}
+        </Button>
+      </div>
     </div>
   );
 }

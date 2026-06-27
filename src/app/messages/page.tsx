@@ -735,19 +735,14 @@ export default function MessagesPage() {
     });
 
     socket.on('call:invite', (payload: CallInvite) => {
-      if (payload.senderRole === 'superAdmin') {
-        toast.info('Audio and video calls are not available with admin support.');
-        return;
+      if (payload?.senderId) {
+        socket.emit('call:end', {
+          conversationId: payload.conversationId,
+          targetUserId: payload.senderId,
+          callType: payload.callType,
+          reason: 'unavailable',
+        });
       }
-      if (payload?.conversationId && payload.conversationId !== selectedConversationId) {
-        setManualConversationId(payload.conversationId);
-      }
-      setIncomingCall(payload);
-      setActiveCall(payload.callType);
-      setCallStatus('ringing');
-      toast.info(`${payload.senderName || 'Someone'} is calling you`, {
-        description: payload.callType === 'video' ? 'Video call incoming.' : 'Voice call incoming.',
-      });
     });
 
     socket.on('call:signal', async (payload: CallSignal) => {
@@ -1064,16 +1059,6 @@ export default function MessagesPage() {
           </div>
 
           <div className="flex items-center gap-1">
-            {canStartCalls ? (
-              <>
-                <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl" onClick={() => startCall('voice')}>
-                  <Phone size={20} />
-                </Button>
-                <Button variant="ghost" size="icon" className="hidden sm:inline-flex text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl" onClick={() => startCall('video')}>
-                  <Video size={20} />
-                </Button>
-              </>
-            ) : null}
             <Button variant="ghost" size="icon" className={`text-slate-400 hover:text-[#2286BE] hover:bg-primary-soft rounded-xl transition-colors ${isInfoPanelOpen ? 'text-[#2286BE] bg-primary-soft' : ''}`} onClick={() => setIsInfoPanelOpen(!isInfoPanelOpen)}>
               <Info size={20} />
             </Button>

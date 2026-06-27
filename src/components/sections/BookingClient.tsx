@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronRight, ShieldCheck, Navigation } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronRight, ShieldCheck, Navigation, ArrowLeftRight, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { BRAND } from '@/lib/constants';
 import { formatDeliveryTime } from '@/lib/deliveryTime';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCreateOrderMutation } from '@/store/services/apiSlice';
+import { useCreateOrderMutation, useGetPublicProviderAvailabilityBlocksQuery } from '@/store/services/apiSlice';
 
 const variants = {
   enter: (direction: number) => ({
@@ -61,9 +61,70 @@ type ApiPackage = {
   price?: number | string;
 };
 
+type AvailabilityBlock = {
+  scope: 'full_day' | 'time_slot';
+  dateKey: string;
+  startTime?: string;
+  endTime?: string;
+  recurrence?: 'none' | 'weekly';
+};
+
+const toDateKey = (value?: Date) => {
+  if (!value) return '';
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const addDaysKey = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+};
+
+const parseTimeToMinutes = (value = '') => {
+  const text = String(value).trim();
+  const meridiem = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (meridiem) {
+    const rawHour = Number(meridiem[1]);
+    const minute = Number(meridiem[2]);
+    const hour = meridiem[3].toUpperCase() === 'PM' ? (rawHour % 12) + 12 : rawHour % 12;
+    return hour * 60 + minute;
+  }
+  const clock = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (!clock) return null;
+  return Number(clock[1]) * 60 + Number(clock[2]);
+};
+
+const parseDateKey = (dateKey: string) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const blockAppliesToDate = (block: AvailabilityBlock, dateKey: string) => {
+  if (block.dateKey === dateKey) return true;
+  if (block.recurrence !== 'weekly') return false;
+  const startDate = parseDateKey(block.dateKey);
+  const targetDate = parseDateKey(dateKey);
+  return Boolean(startDate && targetDate && targetDate >= startDate && targetDate.getDay() === startDate.getDay());
+};
+
+const isTimeBlocked = (blocks: AvailabilityBlock[], dateKey: string, timeValue: string) => {
+  const minutes = parseTimeToMinutes(timeValue);
+  return blocks.some((block) => {
+    if (!blockAppliesToDate(block, dateKey)) return false;
+    if (block.scope === 'full_day') return true;
+    const start = parseTimeToMinutes(block.startTime || '');
+    const end = parseTimeToMinutes(block.endTime || '');
+    return minutes !== null && start !== null && end !== null && minutes >= start && minutes < end;
+  });
+};
+
 export default function BookingClient({ service }: BookingClientProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, role, setRole } = useAuth();
   const sourcePackages = (Array.isArray(service?.packages) ? service.packages : []) as ApiPackage[];
   const byName = new Map<string, ApiPackage>(
     sourcePackages
@@ -110,6 +171,11 @@ export default function BookingClient({ service }: BookingClientProps) {
   const [isAddrModalOpen, setIsAddrModalOpen] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [createOrder, { isLoading: isCreatingOrder }] = useCreateOrderMutation();
+  const providerId = String(service?.provider?.id || '');
+  const { data: availabilityData } = useGetPublicProviderAvailabilityBlocksQuery(
+    { providerId, from: addDaysKey(0), to: addDaysKey(90) },
+    { skip: !providerId }
+  );
 
   const detectLocation = () => {
     setIsDetectingLocation(true);
@@ -136,13 +202,16 @@ export default function BookingClient({ service }: BookingClientProps) {
   const selectedPackage = getPackageData(pkg);
   const price = selectedPackage?.price || 0;
   const total = Number(price) || 0;
+  const availabilityBlocks = (availabilityData?.data?.items || []) as AvailabilityBlock[];
+  const selectedDateKey = toDateKey(date);
+  const selectedSlotBlocked = isTimeBlocked(availabilityBlocks, selectedDateKey, time);
 
   const handleNext = () => setStep([Math.min(3, step + 1), 1]);
   const handleBack = () => setStep([Math.max(1, step - 1), -1]);
 
   const handleFinalizeOrder = async () => {
-    if (user?.role === 'provider') {
-      toast.error('Please switch to a client account to place service orders.');
+    if (role === 'provider') {
+      toast.error('Please switch to buying mode to place service orders.');
       return;
     }
 
@@ -152,6 +221,10 @@ export default function BookingClient({ service }: BookingClientProps) {
     }
     if (!time) {
       toast.error('Please select a time.');
+      return;
+    }
+    if (selectedSlotBlocked) {
+      toast.error('The provider is unavailable for that date and time.');
       return;
     }
     if (!String(address || '').trim()) {
@@ -177,24 +250,31 @@ export default function BookingClient({ service }: BookingClientProps) {
     }
   };
 
-  if (user?.role === 'provider') {
+  if (role === 'provider') {
     return (
       <div className="min-h-screen bg-slate-50/50 py-16">
         <div className="max-w-2xl mx-auto px-4">
           <div className="rounded-[2.5rem] border border-slate-200 bg-white p-10 text-center shadow-xl shadow-slate-200/40">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-              <ShieldCheck size={28} />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2286BE]/10 text-[#2286BE]">
+              <ArrowLeftRight size={28} />
             </div>
-            <h1 className="mt-6 text-3xl font-black text-slate-900">Switch to client to order</h1>
+            <h1 className="mt-6 text-3xl font-black text-slate-900">Switch to buying mode to order</h1>
             <p className="mt-3 text-base font-medium leading-7 text-slate-500">
-              Providers cannot place service orders from this account. Please switch to a client account to continue.
+              Ordering services is available only while you are using the buyer side.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button variant="outline" className="rounded-2xl" onClick={() => router.back()}>
-                Go Back
+              <Button variant="outline" className="rounded-2xl" onClick={() => router.push('/provider/dashboard')}>
+                Provider Dashboard
               </Button>
-              <Button className="rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]" onClick={() => router.push('/services')}>
-                Browse Services
+              <Button
+                className="rounded-2xl bg-[#2286BE] hover:bg-[#1b6da0]"
+                onClick={async () => {
+                  await setRole('client');
+                  toast.success('Switched to buying mode.');
+                  router.push(`/book/${service.id}`);
+                }}
+              >
+                Switch to Buying
               </Button>
             </div>
           </div>
@@ -332,19 +412,34 @@ export default function BookingClient({ service }: BookingClientProps) {
                               <Clock size={14} className="mr-2 text-[#2286BE]"/> Available Times
                            </h3>
                            <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-                             {['09:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM'].map(t => (
+                             {['09:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM'].map(t => {
+                               const blocked = isTimeBlocked(availabilityBlocks, selectedDateKey, t);
+                               return (
                                <motion.button 
                                  variants={staggerItem}
                                  key={t}
                                  whileHover={{ y: -2 }}
                                  whileTap={{ scale: 0.98 }}
+                                 disabled={blocked}
                                  onClick={() => setTime(t)}
-                                 className={`py-4 px-4 rounded-2xl text-sm font-black transition-all border-2 ${time === t ? 'border-[#2286BE] bg-[#2286BE]/5 text-[#2286BE] shadow-lg shadow-[#2286BE]/10' : 'border-slate-50 text-slate-400 hover:border-slate-200 bg-white'}`}
+                                 className={`py-4 px-4 rounded-2xl text-sm font-black transition-all border-2 ${
+                                   blocked
+                                     ? 'cursor-not-allowed border-rose-100 bg-rose-50 text-rose-300'
+                                     : time === t
+                                       ? 'border-[#2286BE] bg-[#2286BE]/5 text-[#2286BE] shadow-lg shadow-[#2286BE]/10'
+                                       : 'border-slate-50 text-slate-400 hover:border-slate-200 bg-white'
+                                 }`}
                                >
-                                 {t}
+                                 {blocked ? 'Blocked' : t}
                                </motion.button>
-                             ))}
+                             )})}
                            </motion.div>
+                           {selectedSlotBlocked ? (
+                             <div className="mb-5 flex items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-600">
+                               <Ban size={18} />
+                               The provider is unavailable for the selected date and time.
+                             </div>
+                           ) : null}
                            <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-[11px] font-bold text-slate-400 leading-relaxed text-center sm:text-left">
                               * Arrival might vary by 30 mins depending on local traffic conditions in your area.
                            </div>
@@ -415,7 +510,16 @@ export default function BookingClient({ service }: BookingClientProps) {
                 Previous Step
               </Button>
               {step < 3 ? (
-                <Button onClick={handleNext} className="w-full sm:w-56 h-16 rounded-[1.25rem] bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-base shadow-2xl shadow-[#2286BE]/20 active:scale-95 transition-all">
+                <Button
+                  onClick={() => {
+                    if (step === 2 && selectedSlotBlocked) {
+                      toast.error('Please choose an available time.');
+                      return;
+                    }
+                    handleNext();
+                  }}
+                  className="w-full sm:w-56 h-16 rounded-[1.25rem] bg-[#2286BE] hover:bg-[#1b6da0] text-white font-black text-base shadow-2xl shadow-[#2286BE]/20 active:scale-95 transition-all"
+                >
                   Continue Process <ChevronRight size={20} className="ml-2" />
                 </Button>
               ) : (
