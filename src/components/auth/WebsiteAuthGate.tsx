@@ -6,7 +6,7 @@ import { clearAuthSession, getAccessToken, refreshAccessToken } from '@/lib/auth
 
 const PUBLIC_PATHS = ['/login', '/signup', '/signup/verify-otp'];
 const PROTECTED_PATH_PREFIXES = ['/book', '/client', '/provider', '/messages', '/notifications'];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || '').trim().replace(/\/$/, '');
 
 export default function WebsiteAuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -55,7 +55,9 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
         let response = await fetch(`${API_BASE_URL}/api/profile/me`, {
           method: 'GET',
           headers: {
+            Accept: 'application/json',
             Authorization: `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true',
           },
         });
 
@@ -68,25 +70,32 @@ export default function WebsiteAuthGate({ children }: { children: React.ReactNod
           response = await fetch(`${API_BASE_URL}/api/profile/me`, {
             method: 'GET',
             headers: {
+              Accept: 'application/json',
               Authorization: `Bearer ${refreshedToken}`,
+              'ngrok-skip-browser-warning': 'true',
             },
           });
         }
 
-        if (!response.ok) {
+        if (response.status === 401) {
           throw new Error('Invalid or expired token');
         }
 
         if (!isMounted) return;
         setHasToken(true);
         setChecked(true);
-      } catch {
-        clearAuthSession();
+      } catch (error) {
+        const isInvalidToken =
+          error instanceof Error && error.message === 'Invalid or expired token';
+
+        if (isInvalidToken) {
+          clearAuthSession();
+        }
 
         if (!isMounted) return;
-        setHasToken(false);
+        setHasToken(!isInvalidToken);
         setChecked(true);
-        if (isProtectedPath) {
+        if (isInvalidToken && isProtectedPath) {
           router.replace('/login');
         }
       }

@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from '@/contexts/LocationContext';
 import MapboxLocationPicker from '@/components/profile/MapboxLocationPicker';
+import DeleteAccountSection from '@/components/profile/DeleteAccountSection';
 import { resolveAddressFromCoordinates } from '@/lib/geocodeAddress';
 import {
   useChangePasswordMutation,
@@ -609,6 +610,9 @@ export default function ClientProfilePage() {
                   </div>
                 )}
 
+                <div className="border-t border-slate-100 pt-8">
+                  <DeleteAccountSection />
+                </div>
               </div>
             </motion.div>
           </div>

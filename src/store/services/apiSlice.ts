@@ -318,11 +318,13 @@ type GigAnalyticsResponse = {
   }>;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim().replace(/\/$/, '');
 const rawBaseQuery = fetchBaseQuery({
   baseUrl,
   prepareHeaders: (headers) => {
     const token = getAccessToken();
+    headers.set('Accept', 'application/json');
+    headers.set('ngrok-skip-browser-warning', 'true');
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
@@ -1069,6 +1071,12 @@ export const apiSlice = createApi({
         body: payload,
       }),
     }),
+    deleteAccount: builder.mutation<ApiEnvelope<unknown>, void>({
+      query: () => ({
+        url: '/api/profile/me',
+        method: 'DELETE',
+      }),
+    }),
     loginWithGoogle: builder.mutation<ApiEnvelope<unknown>, GoogleLoginPayload>({
       query: (payload) => ({
         url: '/api/auth/google',
@@ -1211,6 +1219,7 @@ export const {
   useUpdateProfileMutation,
   useUploadAvatarMutation,
   useChangePasswordMutation,
+  useDeleteAccountMutation,
   useGetSavedServicesQuery,
   useSaveServiceMutation,
   useRemoveSavedServiceMutation,

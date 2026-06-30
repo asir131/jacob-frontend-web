@@ -108,13 +108,15 @@ export const updateStoredTokens = ({
 export const refreshAccessToken = async (apiBaseUrl: string) => {
   const currentRefreshToken = getRefreshToken();
   if (!apiBaseUrl || !currentRefreshToken) return null;
+  const normalizedApiBaseUrl = apiBaseUrl.trim().replace(/\/$/, '');
 
   try {
-    const response = await fetch(`${apiBaseUrl}/api/auth/refresh-token`, {
+    const response = await fetch(`${normalizedApiBaseUrl}/api/auth/refresh-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ refreshToken: currentRefreshToken }),
     });

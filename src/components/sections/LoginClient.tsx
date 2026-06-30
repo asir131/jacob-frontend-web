@@ -132,13 +132,15 @@ export default function LoginClient() {
   };
 
   const fetchProfileSnapshot = async (token: string) => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, '');
     if (!baseUrl) return null;
 
     try {
       const response = await fetch(`${baseUrl}/api/profile/me`, {
         headers: {
+          Accept: 'application/json',
           Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true',
         },
       });
       if (!response.ok) return null;
